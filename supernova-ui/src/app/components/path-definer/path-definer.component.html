@@ -1,0 +1,244 @@
+<div class="pd flex flex-col h-full bg-surface text-ink">
+
+  <!-- Üst bar -->
+  <header class="pd-head flex items-center gap-3 px-5 py-3 bg-surface-card border-b border-edge shrink-0">
+    <div class="pd-logo"><i class="fas fa-route"></i></div>
+    <div *ngIf="view==='library'">
+      <h1 class="pd-title">Path Definer</h1>
+      <p class="pd-sub">Define hierarchical paths from query data — SCADA / factory / tree.</p>
+    </div>
+    <div *ngIf="view==='build'">
+      <h1 class="pd-title">Define Path</h1>
+      <p class="pd-sub">Query + structure type + column mapping → preview → save.</p>
+    </div>
+    <div *ngIf="view==='search'">
+      <h1 class="pd-title">Search Path</h1>
+      <p class="pd-sub">Search for a value — see which path it belongs to.</p>
+    </div>
+
+    <div class="flex items-center gap-1.5 ml-auto">
+      <button *ngIf="view!=='library'" class="pd-btn" (click)="view='library'; loadPaths()"><i class="fas fa-arrow-left"></i><span>Library</span></button>
+      <button *ngIf="view==='library' && canDefine" class="pd-btn pd-btn-accent" (click)="newBuild()"><i class="fas fa-plus"></i><span>New Path</span></button>
+    </div>
+  </header>
+
+  <!-- ============ KÜTÜPHANE ============ -->
+  <div *ngIf="view==='library'" class="pd-body flex-1 overflow-y-auto p-5">
+    <div class="pd-search flex items-center gap-2 mb-4">
+      <i class="fas fa-search text-ink-muted"></i>
+      <input [(ngModel)]="searchLib" placeholder="Search path..." />
+      <span class="ml-auto text-xs text-ink-muted">{{ filteredPaths.length }} path(s)</span>
+    </div>
+
+    <div class="pd-grid">
+      <div *ngFor="let p of filteredPaths" class="pd-card">
+        <div class="pd-card-top">
+          <div class="pd-card-ic"><i class="fas" [ngClass]="structureMeta(p.structure).icon"></i></div>
+          <span class="pd-card-tag">{{ structureMeta(p.structure).label }}</span>
+        </div>
+        <h3 class="pd-card-name truncate">{{ p.name }}</h3>
+        <p class="pd-card-desc">{{ p.description || 'No description' }}</p>
+        <div class="pd-card-foot">
+          <span class="pd-card-q"><i class="fas fa-database"></i> {{ queries.find(q=>q.id===p.queryId)?.name || p.queryId }}</span>
+          <div class="pd-card-actions">
+            <button class="pd-act" (click)="openSearch(p)" title="Search"><i class="fas fa-search"></i></button>
+            <button *ngIf="canDefine" class="pd-act" (click)="editBuild(p)" title="Edit"><i class="fas fa-pen"></i></button>
+            <button *ngIf="canDefine" class="pd-act pd-act-del" (click)="deletePath(p,$event)" title="Delete"><i class="fas fa-trash"></i></button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div *ngIf="!paths.length" class="pd-empty">
+      <i class="fas fa-route"></i>
+      <p>No paths yet.</p>
+      <button *ngIf="canDefine" class="pd-btn pd-btn-accent mt-3" (click)="newBuild()"><i class="fas fa-plus"></i><span>Create first path</span></button>
+    </div>
+  </div>
+
+  <!-- ============ TANIMLA ============ -->
+  <div *ngIf="view==='build'" class="pd-build flex-1 flex min-h-0">
+
+    <!-- Sol: form -->
+    <aside class="pd-form flex flex-col gap-3 w-[380px] shrink-0 overflow-y-auto p-5 border-r border-edge bg-surface-card">
+      <div class="flex flex-col gap-1.5">
+        <label class="pd-label">Path Name</label>
+        <input class="pd-input" [(ngModel)]="form.name" placeholder="e.g., Area → Bay → Element" />
+      </div>
+      <div class="flex flex-col gap-1.5">
+        <label class="pd-label">Description</label>
+        <input class="pd-input" [(ngModel)]="form.description" placeholder="optional" />
+      </div>
+
+      <div class="flex flex-col gap-1.5">
+        <label class="pd-label">Query (Data Source)</label>
+        <select class="pd-input" [(ngModel)]="form.queryId" (ngModelChange)="onQueryChange()">
+          <option value="">— select query —</option>
+          <option *ngFor="let q of scopedQueries" [value]="q.id">{{ q.name }}</option>
+        </select>
+      </div>
+
+      <div class="flex flex-col gap-1.5">
+        <label class="pd-label">Structure Type</label>
+        <div class="pd-struct-grid">
+          <button *ngFor="let s of structures" type="button" class="pd-struct"
+            [class.active]="form.structure === s.value"
+            (click)="form.structure = s.value; onStructureChange()">
+            <i class="fas" [ngClass]="s.icon"></i>
+            <span class="pd-struct-name">{{ s.label }}</span>
+            <span class="pd-struct-hint">{{ s.hint }}</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Kolon eşleme -->
+      <div *ngIf="queryColumns.length" class="pd-mapping flex flex-col gap-2">
+        <label class="pd-label">Column Mapping <span class="pd-hint">(auto-suggested)</span></label>
+
+        <ng-container *ngIf="form.structure==='tree' || form.structure==='binary_tree'">
+          <div class="pd-map-row"><span>Identity (id)</span>
+            <select class="pd-sel" [(ngModel)]="form.config.id_col"><option value="">—</option><option *ngFor="let c of queryColumns" [value]="c">{{ c }}</option></select></div>
+          <div class="pd-map-row"><span>Parent</span>
+            <select class="pd-sel" [(ngModel)]="form.config.parent_col"><option value="">—</option><option *ngFor="let c of queryColumns" [value]="c">{{ c }}</option></select></div>
+          <div class="pd-map-row"><span>Label</span>
+            <select class="pd-sel" [(ngModel)]="form.config.label_col"><option value="">—</option><option *ngFor="let c of queryColumns" [value]="c">{{ c }}</option></select></div>
+          <div class="pd-map-row"><span>Type (optional)</span>
+            <select class="pd-sel" [(ngModel)]="form.config.type_col"><option value="">—</option><option *ngFor="let c of queryColumns" [value]="c">{{ c }}</option></select></div>
+        </ng-container>
+
+        <ng-container *ngIf="form.structure==='sequence'">
+          <div class="pd-map-row"><span>Identity (id)</span>
+            <select class="pd-sel" [(ngModel)]="form.config.id_col"><option value="">—</option><option *ngFor="let c of queryColumns" [value]="c">{{ c }}</option></select></div>
+          <div class="pd-map-row"><span>Next</span>
+            <select class="pd-sel" [(ngModel)]="form.config.next_col"><option value="">—</option><option *ngFor="let c of queryColumns" [value]="c">{{ c }}</option></select></div>
+          <div class="pd-map-row"><span>Or order</span>
+            <select class="pd-sel" [(ngModel)]="form.config.order_col"><option value="">—</option><option *ngFor="let c of queryColumns" [value]="c">{{ c }}</option></select></div>
+          <div class="pd-map-row"><span>Label</span>
+            <select class="pd-sel" [(ngModel)]="form.config.label_col"><option value="">—</option><option *ngFor="let c of queryColumns" [value]="c">{{ c }}</option></select></div>
+        </ng-container>
+
+        <ng-container *ngIf="form.structure==='grouped'">
+          <div class="pd-map-row"><span>Group column</span>
+            <select class="pd-sel" [(ngModel)]="form.config.group_col"><option value="">—</option><option *ngFor="let c of queryColumns" [value]="c">{{ c }}</option></select></div>
+          <div class="pd-map-row"><span>Label</span>
+            <select class="pd-sel" [(ngModel)]="form.config.label_col"><option value="">—</option><option *ngFor="let c of queryColumns" [value]="c">{{ c }}</option></select></div>
+          <div class="pd-map-row"><span>Order (optional)</span>
+            <select class="pd-sel" [(ngModel)]="form.config.order_col"><option value="">—</option><option *ngFor="let c of queryColumns" [value]="c">{{ c }}</option></select></div>
+        </ng-container>
+
+        <!-- Hedef Kolon (Ortak) -->
+        <div class="pd-map-row mt-2 pt-2 border-t border-[rgb(58,52,64)]/50">
+          <span class="text-indigo-300 font-semibold">Target Column</span>
+          <select class="pd-sel !border-indigo-500/30 focus:!border-indigo-400" [(ngModel)]="form.config.target_col">
+            <option value="">—</option>
+            <option *ngFor="let c of queryColumns" [value]="c">{{ c }}</option>
+          </select>
+        </div>
+      </div>
+      <p *ngIf="!queryColumns.length && form.queryId" class="pd-hint">Columns could not be loaded — you can still try Preview.</p>
+
+      <div class="pd-form-actions flex flex-col gap-2 mt-auto pt-3">
+        <button class="pd-btn" (click)="doPreview()" [disabled]="previewLoading || !form.queryId">
+          <i class="fas" [ngClass]="previewLoading ? 'fa-spinner fa-spin' : 'fa-eye'"></i><span>Preview</span>
+        </button>
+        <button class="pd-btn pd-btn-accent" (click)="save()" [disabled]="saving">
+          <i class="fas" [ngClass]="saving ? 'fa-spinner fa-spin' : 'fa-save'"></i><span>{{ form.id ? 'Update' : 'Save' }}</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Sağ: önizleme -->
+    <section class="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div class="pd-prev-head flex items-center gap-3 px-5 py-3 border-b border-edge bg-surface-card shrink-0">
+        <span class="pd-label">Preview</span>
+        <span *ngIf="preview" class="pd-stats">
+          <b>{{ preview.structure.stats.node_count }}</b> node(s) ·
+          <b>{{ preview.structure.stats.path_count }}</b> path(s) ·
+          depth <b>{{ preview.structure.stats.max_depth }}</b>
+        </span>
+      </div>
+
+      <div class="flex-1 overflow-y-auto p-5">
+        <div class="pd-empty" *ngIf="previewLoading"><i class="fas fa-spinner fa-spin"></i><p>Calculating...</p></div>
+        <div class="pd-error" *ngIf="previewError">{{ previewError }}</div>
+
+        <ng-container *ngIf="preview && !previewLoading">
+          <!-- Uyarılar -->
+          <div *ngIf="preview.structure.stats.warnings?.length" class="pd-warns">
+            <div *ngFor="let w of preview.structure.stats.warnings"><i class="fas fa-triangle-exclamation"></i> {{ w }}</div>
+          </div>
+
+          <!-- Ağaç -->
+          <div *ngIf="previewTree.length" class="pd-tree">
+            <ng-container *ngFor="let root of previewTree">
+              <ng-container *ngTemplateOutlet="treeNode; context: { $implicit: root }"></ng-container>
+            </ng-container>
+          </div>
+
+          <!-- Yol listesi -->
+          <div class="pd-paths">
+            <div class="pd-label mb-2">Paths (root › leaf)</div>
+            <div *ngFor="let path of preview.structure.paths.slice(0, 50)" class="pd-path">
+              {{ breadcrumbFromIds(path) }}
+            </div>
+            <p *ngIf="preview.structure.paths.length > 50" class="pd-hint">… and {{ preview.structure.paths.length - 50 }} more path(s).</p>
+          </div>
+        </ng-container>
+
+        <div *ngIf="!preview && !previewLoading && !previewError" class="pd-empty">
+          <i class="fas fa-sitemap"></i>
+          <p>Select query + structure, then press Preview.</p>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ============ ARA ============ -->
+  <div *ngIf="view==='search'" class="pd-search-view flex-1 flex flex-col min-h-0 overflow-hidden">
+    <div class="px-5 py-4 border-b border-edge bg-surface-card flex items-center gap-3 shrink-0">
+      <span class="pd-label">Path:</span>
+      <span class="pd-curpath">{{ searchPath?.name }}</span>
+      <div class="pd-search-box ml-auto flex items-center gap-2">
+        <i class="fas fa-search text-ink-muted"></i>
+        <input [(ngModel)]="term" (keydown.enter)="doSearch()" placeholder="Search value (id, name, column)..." />
+        <button class="pd-btn pd-btn-sm pd-btn-accent" (click)="doSearch()" [disabled]="searchLoading"><i class="fas fa-search"></i></button>
+      </div>
+    </div>
+
+    <div class="flex-1 overflow-y-auto p-5">
+      <div *ngIf="searchLoading" class="pd-empty"><i class="fas fa-spinner fa-spin"></i><p>Searching...</p></div>
+
+      <ng-container *ngIf="searchResult && !searchLoading">
+        <p class="pd-result-count">{{ searchResult.hits.length }} match(es)</p>
+        <div *ngFor="let h of searchResult.hits" class="pd-hit">
+          <div class="pd-hit-label">{{ h.label }} <span *ngIf="h.type" class="pd-hit-type">{{ h.type }}</span></div>
+          <div class="pd-hit-crumb">
+            <span *ngFor="let c of h.breadcrumb; let last = last" class="pd-crumb">
+              {{ c }}<i *ngIf="!last" class="fas fa-chevron-right"></i>
+            </span>
+          </div>
+        </div>
+        <div *ngIf="!searchResult.hits.length" class="pd-empty"><i class="fas fa-magnifying-glass"></i><p>"{{ term }}" not found.</p></div>
+      </ng-container>
+
+      <div *ngIf="!searchResult && !searchLoading" class="pd-empty">
+        <i class="fas fa-search"></i><p>Enter a value and search — we will show you which path it belongs to.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div *ngIf="toast" class="pd-toast">{{ toast }}</div>
+</div>
+
+<!-- Özyinelemeli ağaç düğümü -->
+<ng-template #treeNode let-tn>
+  <div class="pd-tree-row" [style.padding-left.px]="8 + tn.node.depth * 18">
+    <i class="fas pd-tree-i" [ngClass]="tn.children.length ? 'fa-caret-down' : 'fa-circle'"></i>
+    <span class="pd-tree-label" [class.pd-tree-root]="tn.node.depth===0">{{ tn.node.label }}</span>
+    <span *ngIf="tn.node.type" class="pd-tree-type">{{ tn.node.type }}</span>
+  </div>
+  <ng-container *ngFor="let child of tn.children">
+    <ng-container *ngTemplateOutlet="treeNode; context: { $implicit: child }"></ng-container>
+  </ng-container>
+</ng-template>

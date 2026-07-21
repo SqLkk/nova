@@ -1,0 +1,80 @@
+.alarms-page {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+}
+
+// Severity indicator bar (left edge of each alarm row)
+.alarm-sev-bar {
+  display: block;
+  width: 3px;
+  min-height: 100%;
+  border-radius: 2px;
+  
+  &.sev-critical { background: rgb(var(--danger)); }
+  &.sev-high     { background: rgb(var(--accent-secondary)); }
+  &.sev-medium   { background: rgb(var(--warning)); }
+  &.sev-low      { background: rgb(var(--accent-primary)); }
+}
+
+// Alarm row hover & severity background tint
+.alarm-row {
+  transition: background-color 0.1s ease;
+  
+  &.alarm-critical {
+    background: rgb(var(--danger) / 0.04);
+    &:hover { background: rgb(var(--danger) / 0.08) !important; }
+  }
+  &.alarm-high {
+    background: rgb(var(--accent-secondary) / 0.03);
+    &:hover { background: rgb(var(--accent-secondary) / 0.07) !important; }
+  }
+  &.alarm-medium {
+    &:hover { background: rgb(var(--warning) / 0.06) !important; }
+  }
+}
+
+// Table header sticky
+.alarm-table-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+// Compact animations
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.alarm-row {
+  animation: fadeIn 0.15s ease-out;
+}
+
+// Dark mode scrollbar
+.dark ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.dark ::-webkit-scrollbar-track { background: rgb(var(--bg-secondary)); }
+.dark ::-webkit-scrollbar-thumb {
+  background: rgb(var(--bg-elevated));
+  border-radius: 3px;
+}
+.dark ::-webkit-scrollbar-thumb:hover { background: rgb(var(--text-muted)); }
+
+// Responsive
+@media (max-width: 768px) {
+  .alarms-page .p-3 { padding: 0.5rem; }
+}
+
+// Print styles
+@media print {
+  .alarms-page {
+    color: black !important;
+    background: white !important;
+    
+    .alarm-row {
+      break-inside: avoid;
+      border: 1px solid #e5e7eb;
+    }
+  }
+}

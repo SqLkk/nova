@@ -1,0 +1,278 @@
+// Modern Report Creator Styles
+
+// Professional Animations
+@keyframes slide-in-right {
+  0% {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes fade-in-up {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgb(var(--accent-primary) / 0.7);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 10px rgb(var(--accent-primary) / 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgb(var(--accent-primary) / 0);
+  }
+}
+
+// Form Elements Enhancement
+.form-card {
+  animation: fade-in-up 0.6s ease-out;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow:
+      0 20px 25px rgb(var(--shadow-color) / 0.15),
+      0 10px 10px rgb(var(--shadow-color) / 0.04);
+  }
+}
+
+// Input Field Enhancements
+input[type="text"],
+input[type="date"],
+textarea,
+select {
+  &:focus {
+    transform: translateY(-1px);
+    box-shadow:
+      0 0 0 3px rgb(var(--accent-primary) / 0.1),
+      0 4px 14px rgb(var(--shadow-color) / 0.1);
+  }
+  
+  &:hover:not(:focus) {
+    transform: translateY(-0.5px);
+  }
+}
+
+// Radio Button Enhancement
+input[type="radio"] {
+  &:checked {
+    animation: pulse-ring 1.5s infinite;
+  }
+}
+
+// Button Interactions
+button {
+  position: relative;
+  overflow: hidden;
+  
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+    transition: left 0.5s;
+  }
+  
+  &:hover::before {
+    left: 100%;
+  }
+  
+  &:active {
+    transform: scale(0.98);
+  }
+}
+
+// Loading Animation
+.loading-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid transparent;
+  border-top: 2px solid currentColor;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+// Custom Scrollbar
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgb(var(--text-muted) / 0.1);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgb(var(--text-muted) / 0.3);
+  border-radius: 4px;
+
+  &:hover {
+    background: rgb(var(--text-muted) / 0.5);
+  }
+}
+
+// Custom Scrollbar for Path List
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--accent-primary) / 0.3) transparent;
+
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: rgb(var(--bg-primary) / 0.3);
+    border-radius: 3px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgb(var(--accent-primary) / 0.4);
+    border-radius: 3px;
+
+    &:hover {
+      background: rgb(var(--accent-primary) / 0.6);
+    }
+  }
+}
+
+// Professional Focus States
+.focus-ring {
+  &:focus {
+    outline: none;
+    box-shadow:
+      0 0 0 3px rgb(var(--accent-primary) / 0.1),
+      0 0 0 1px rgb(var(--accent-primary) / 0.2);
+  }
+}
+
+// Gradient Text Effect
+.gradient-text {
+  background: linear-gradient(135deg, rgb(var(--accent-primary)), rgb(var(--accent-tertiary)));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+// Card Hover Effects
+.hover-lift {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow:
+      0 20px 25px rgb(var(--shadow-color) / 0.15),
+      0 10px 10px rgb(var(--shadow-color) / 0.04);
+  }
+}
+
+// Professional Transitions
+.smooth-transition {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+// Error State Animation
+.error-shake {
+  animation: shake 0.5s ease-in-out;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-2px); }
+  20%, 40%, 60%, 80% { transform: translateX(2px); }
+}
+
+// Success State
+.success-glow {
+  box-shadow: 0 0 20px rgb(var(--success) / 0.3);
+  border-color: rgb(var(--success) / 0.5);
+}
+
+// Responsive Design
+@media (max-width: 768px) {
+  .form-card {
+    margin: 0 -1rem;
+    border-radius: 0;
+  }
+  
+  input, textarea, select {
+    font-size: 16px; // Prevent zoom on iOS
+  }
+}
+
+// Dark Mode Specific Enhancements
+@media (prefers-color-scheme: dark) {
+  .form-card {
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+}
+
+// Interactive Elements
+.interactive-element {
+  cursor: pointer;
+  user-select: none;
+  
+  &:active {
+    transform: scale(0.98);
+  }
+}
+
+// Modern Toggle Animation
+.toggle-animation {
+  transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+// Professional Shadows
+.professional-shadow {
+  box-shadow:
+    0 1px 3px rgb(var(--shadow-color) / 0.12),
+    0 1px 2px rgb(var(--shadow-color) / 0.24);
+}
+
+.professional-shadow-lg {
+  box-shadow:
+    0 10px 15px -3px rgb(var(--shadow-color) / 0.1),
+    0 4px 6px -2px rgb(var(--shadow-color) / 0.05);
+}
+
+// Dark themed date & time inputs
+::ng-deep html.dark {
+  .date-input-dark {
+    color-scheme: dark;
+
+    &::-webkit-calendar-picker-indicator {
+      filter: invert(0.7) sepia(1) saturate(3) hue-rotate(100deg);
+      cursor: pointer;
+      opacity: 0.7;
+      transition: opacity 0.2s;
+
+      &:hover {
+        opacity: 1;
+      }
+    }
+  }
+}

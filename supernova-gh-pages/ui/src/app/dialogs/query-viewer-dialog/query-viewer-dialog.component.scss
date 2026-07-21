@@ -1,0 +1,29 @@
+// Custom Scrollbar
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--text-muted) / 0.4) rgb(var(--bg-secondary) / 0.3);
+
+  &::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: rgb(var(--bg-secondary) / 0.3);
+    border-radius: 4px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgb(var(--text-muted) / 0.4);
+    border-radius: 4px;
+
+    &:hover {
+      background: rgb(var(--text-muted) / 0.6);
+    }
+  }
+}
+
+// Dialog Backdrop
+.backdrop-blur-sm {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}

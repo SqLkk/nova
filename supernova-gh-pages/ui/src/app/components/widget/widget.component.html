@@ -1,0 +1,676 @@
+<div 
+  [ngClass]="{
+    'border-emerald-500 shadow-emerald-500/25': type === 'success',
+    'border-cyan-500 shadow-cyan-500/25': type === 'info',
+    'border-red-500 shadow-red-500/25': type === 'danger'
+  }"
+  class="bg-white/60 dark:bg-gradient-to-br dark:from-gray-900/90 dark:to-gray-950/85 backdrop-blur-md p-2 rounded-xl border-l-4 transition-all duration-500 relative hover:shadow-2xl shadow-xl border border-slate-200/30 dark:border-gray-800/50 h-full flex flex-col overflow-hidden"
+>  
+  <!-- Gorgeous Glassmorphism Loading Spinner Overlay -->
+  <div *ngIf="isLoadingData" 
+       class="absolute inset-0 bg-slate-900/5 dark:bg-gray-950/15 backdrop-blur-[2px] z-50 flex flex-col items-center justify-center select-none animate-fade-in-grow">
+    <div class="p-3 bg-white dark:bg-slate-800/95 border border-gray-250 dark:border-slate-700/50 rounded-xl shadow-2xl flex items-center gap-2.5 text-slate-800 dark:text-cyan-400">
+      <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500 dark:border-cyan-400"></div>
+      <span class="text-[10px] text-slate-700 dark:text-cyan-400 font-bold tracking-wider">Syncing LIVE/SYS...</span>
+    </div>
+  </div>
+
+  <!-- Gorgeous Glassmorphism Self-healing Error Overlay -->
+  <div *ngIf="hasError" 
+       class="absolute inset-0 bg-red-950/5 dark:bg-red-950/30 backdrop-blur-[3px] z-40 flex flex-col items-center justify-center select-none animate-fade-in-grow">
+    <div class="p-4 bg-white dark:bg-slate-900/95 border border-red-300 dark:border-red-500/35 rounded-xl shadow-2xl flex flex-col items-center gap-2 max-w-[90%] text-center">
+      <div class="flex items-center gap-2">
+        <i class="fas fa-exclamation-triangle text-red-500 text-sm animate-pulse"></i>
+        <span class="text-xs text-red-600 dark:text-red-400 font-bold tracking-wider">Connection Problem</span>
+      </div>
+      <p class="text-[10px] text-slate-500 dark:text-gray-400 max-w-[200px] truncate-3-lines">{{ errorMessage || 'API is temporarily unavailable.' }}</p>
+      
+      <div class="flex items-center gap-2 mt-1 w-full justify-center">
+        <button (click)="manualRetry()" 
+                class="px-2.5 py-1 bg-red-50 hover:bg-red-100 dark:bg-red-900/40 dark:hover:bg-red-900/70 border border-red-300 dark:border-red-500/30 text-red-600 dark:text-white text-[9px] font-bold rounded-lg transition-all flex items-center gap-1.5 active:scale-95 shadow-md">
+          <i class="fas fa-sync-alt"></i>
+          <span>Retry Now</span>
+        </button>
+        <span *ngIf="retryCountdown > 0" class="text-[9px] text-slate-500 dark:text-gray-500 font-mono">
+          Retrying in {{ retryCountdown }}s
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Gorgeous No Data Overlay -->
+  <div *ngIf="isNoData && !isLoadingData && !hasError" 
+       class="absolute inset-0 bg-slate-900/5 dark:bg-gray-950/10 backdrop-blur-[1px] z-30 flex flex-col items-center justify-center select-none animate-fade-in-grow">
+    <div class="p-5 bg-white dark:bg-slate-900/90 border border-gray-200 dark:border-slate-700/50 rounded-xl shadow-2xl flex flex-col items-center gap-2 max-w-[90%] text-center">
+      <i class="fas fa-database text-slate-400 dark:text-gray-500 text-lg"></i>
+      <span class="text-xs text-slate-800 dark:text-gray-400 font-bold tracking-wider uppercase">No Data</span>
+      <p class="text-[10px] text-slate-500 dark:text-gray-500 max-w-[200px]">No historical records found for the selected path and date range.</p>
+    </div>
+  </div>
+
+  <div *ngIf="showHeader" class="flex items-center gap-1.5 mb-1 flex-shrink-0">
+    <div class="bg-slate-50/80 dark:bg-gradient-to-br dark:from-gray-900/80 dark:to-gray-950/60 border border-slate-200/30 dark:border-gray-700/50 rounded p-1 shadow-md">
+      <i [class]="icon + ' text-xs text-cyan-500 dark:text-cyan-400'"></i>
+    </div>
+    
+    <div class="flex-1 min-w-0">
+      <h4 class="text-xs font-bold text-slate-900 dark:text-white truncate">
+        {{ title }}
+        <span *ngIf="formula" class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-mono font-bold bg-amber-500/15 text-amber-400 border border-amber-500/25" title="Formula: {{ formula }}">
+          ƒ
+        </span>
+      </h4>
+    </div>
+  </div>  
+  
+  <!-- Multi-Path Legend & Interactive Toggles -->
+  <div *ngIf="currentDataPaths.length > 1" class="flex flex-wrap gap-1 mb-2 px-1 flex-shrink-0">
+    <div 
+      *ngFor="let path of currentDataPaths; let i = index"
+      (click)="togglePathActive(path)"
+      [title]="path"
+      [ngClass]="{
+        'opacity-40 line-through decoration-slate-400': activePaths[path] === false,
+        'bg-slate-100/50 dark:bg-gray-800/40 hover:bg-slate-200/50 dark:hover:bg-gray-700/50 border border-slate-200/20 dark:border-gray-700/30': activePaths[path] !== false
+      }"
+      class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-semibold transition-all duration-300 cursor-pointer shadow-sm select-none"
+    >
+      <span 
+        class="w-2.5 h-2.5 rounded-full border border-white dark:border-gray-900 shadow-sm"
+        [style.backgroundColor]="getColorsForDataType(path, i).border"
+      ></span>
+      <span class="text-slate-700 dark:text-gray-300 truncate max-w-[120px]">
+        {{ getPathDisplayName(path) }}
+      </span>
+    </div>
+  </div>
+
+  <!-- Grafik Alanı -->
+  <div class="w-full flex-1 min-h-0">
+    <ng-container *ngIf="currentDataPaths.length > 0; else noDataSource">
+      <!-- Value-card / sayısal kart modunu kontrol et -->
+      <ng-container *ngIf="widgetType === 'value-card'; else chartMode">
+        <div class="w-full h-full flex items-center justify-center relative overflow-hidden bg-gradient-to-br from-slate-100/50 to-slate-200/40 dark:from-gray-900/50 dark:to-gray-800/30 backdrop-blur-sm border border-slate-200/50 dark:border-gray-700/40 rounded-xl">
+          <!-- Professional Background Pattern -->
+          <div class="absolute inset-0 opacity-[0.03]">
+            <div class="grid grid-cols-10 grid-rows-8 h-full w-full">
+              <div *ngFor="let i of [].constructor(80)" 
+                   class="border border-cyan-400/30"></div>
+            </div>
+          </div>
+          
+          <!-- Animated Corner Accents -->
+          <div class="absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl from-cyan-500/10 to-transparent"></div>
+          <div class="absolute bottom-0 left-0 w-16 h-16 bg-gradient-to-tr from-cyan-500/10 to-transparent"></div>
+          
+          <div class="text-center relative z-10 p-6">
+            <div class="flex flex-col items-center space-y-4">
+              <!-- Professional Value Display -->
+              <div class="relative">
+                <!-- Animated Background Glow -->
+                <div class="absolute -inset-8 rounded-full opacity-40 animate-pulse blur-xl"
+                     [ngClass]="{
+                       'bg-gradient-to-r from-emerald-400/30 to-cyan-400/30': valueStatus === 'normal',
+                       'bg-gradient-to-r from-amber-400/30 to-yellow-400/30': valueStatus === 'warning',
+                       'bg-gradient-to-r from-red-400/30 to-pink-400/30': valueStatus === 'danger'
+                     }"></div>
+                
+                <!-- Main Value -->
+                <div class="text-5xl font-black transition-all duration-700 mb-2 flex items-baseline justify-center tracking-tight tabular-nums relative"
+                     [ngClass]="{
+                       'text-emerald-400 drop-shadow-[0_0_16px_rgb(52,211,153,0.5)]': valueStatus === 'normal',
+                       'text-amber-400 drop-shadow-[0_0_16px_rgb(251,191,36,0.5)]': valueStatus === 'warning',
+                       'text-red-400 drop-shadow-[0_0_16px_rgb(248,113,113,0.5)]': valueStatus === 'danger'
+                     }">
+                  <span class="drop-shadow-2xl font-mono">{{ currentValue !== null ? formatValue(currentValue) : '--' }}</span>
+                  <span class="text-xl ml-2 opacity-90 font-semibold text-slate-500 dark:text-gray-300">{{ valueUnit }}</span>
+                </div>
+                
+                <!-- Subtle Underline Animation -->
+                <div class="absolute -bottom-2 left-1/2 transform -translate-x-1/2 h-0.5 rounded-full animate-pulse"
+                     style="width: 60%"
+                     [ngClass]="{
+                       'bg-gradient-to-r from-transparent via-emerald-400/60 to-transparent': valueStatus === 'normal',
+                       'bg-gradient-to-r from-transparent via-amber-400/60 to-transparent': valueStatus === 'warning',
+                       'bg-gradient-to-r from-transparent via-red-400/60 to-transparent': valueStatus === 'danger'
+                     }"></div>
+              </div>
+              
+              <!-- Professional Status Indicators -->
+              <div class="flex flex-col items-center space-y-3">
+                <!-- Status Badge with Enhanced Design -->
+                <div class="px-4 py-2.5 rounded-xl text-sm font-bold border backdrop-blur-md shadow-xl transition-all duration-300 hover:scale-105" 
+                     [ngClass]="{
+                       'bg-gradient-to-r from-emerald-50 to-emerald-100/50 dark:from-emerald-950/50 dark:to-emerald-800/30 text-emerald-700 dark:text-emerald-200 border-emerald-200 dark:border-emerald-400/60 shadow-emerald-500/25': valueStatus === 'normal',
+                       'bg-gradient-to-r from-amber-50 to-amber-100/50 dark:from-amber-900/50 dark:to-amber-800/30 text-amber-700 dark:text-amber-200 border-amber-200 dark:border-amber-400/60 shadow-amber-500/25': valueStatus === 'warning',
+                       'bg-gradient-to-r from-red-50 to-red-100/50 dark:from-red-900/50 dark:to-red-800/30 text-red-700 dark:text-red-200 border-red-200 dark:border-red-400/60 shadow-red-500/25': valueStatus === 'danger'
+                     }">
+                  <i [ngClass]="{
+                      'fa-check-circle text-emerald-300': valueStatus === 'normal',
+                      'fa-exclamation-triangle text-amber-300': valueStatus === 'warning',
+                      'fa-times-circle text-red-300': valueStatus === 'danger'
+                    }" class="fas mr-2.5 drop-shadow-lg"></i>
+                  <span class="font-black tracking-wide">{{ valueStatus === 'normal' ? 'OPTIMAL' : (valueStatus === 'warning' ? ('REPORTS.WARNING_STATUS' | translate) : ('REPORTS.CRITICAL_STATUS' | translate)) }}</span>
+                </div>
+                
+                <!-- Enhanced Threshold Information -->
+                <div *ngIf="thresholds.warning || thresholds.danger" 
+                     class="flex items-center space-x-4 px-4 py-2.5 bg-slate-100/70 dark:bg-gray-800/70 rounded-xl border border-slate-200/50 dark:border-gray-600/50 backdrop-blur-md shadow-xl">
+                  <div class="flex items-center space-x-4 text-sm font-mono font-semibold">
+                    <span *ngIf="thresholds.warning" class="flex items-center text-amber-700 dark:text-amber-300 bg-amber-500/10 px-2 py-1 rounded-lg">
+                      <i class="fas fa-exclamation-triangle mr-2 text-amber-400"></i>
+                      {{ thresholds.warning }}{{ valueUnit }}
+                    </span>
+                    <div *ngIf="thresholds.warning && thresholds.danger" class="w-px h-5 bg-gray-500"></div>
+                    <span *ngIf="thresholds.danger" class="flex items-center text-red-700 dark:text-red-300 bg-red-500/10 px-2 py-1 rounded-lg">
+                      <i class="fas fa-times-circle mr-2 text-red-400"></i>
+                      {{ thresholds.danger }}{{ valueUnit }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              
+
+            </div>
+          </div>
+        </div>
+      </ng-container>
+      
+      <!-- Grafik modu için template -->
+      <ng-template #chartMode>
+        <!-- Chart Widget Templates -->
+        <div [ngSwitch]="widgetType" class="w-full h-full">
+          
+          <!-- Chart Widgets (Line, Bar, Pie, etc.) -->
+          <canvas *ngSwitchCase="'line-chart'" baseChart
+            [data]="chartData"
+            [type]="chartType"
+            [options]="chartOptions">
+          </canvas>
+          
+          <canvas *ngSwitchCase="'area-chart'" baseChart
+            [data]="chartData"
+            [type]="chartType"
+            [options]="chartOptions">
+          </canvas>
+          
+          <canvas *ngSwitchCase="'bar-chart'" baseChart
+            [data]="chartData"
+            [type]="chartType"
+            [options]="chartOptions">
+          </canvas>
+          
+          <canvas *ngSwitchCase="'pie-chart'" baseChart
+            [data]="chartData"
+            [type]="chartType"
+            [options]="chartOptions">
+          </canvas>
+          
+          <canvas *ngSwitchCase="'doughnut-chart'" baseChart
+            [data]="chartData"
+            [type]="chartType"
+            [options]="chartOptions">
+          </canvas>
+          
+          <canvas *ngSwitchCase="'radar-chart'" baseChart
+            [data]="chartData"
+            [type]="chartType"
+            [options]="chartOptions">
+          </canvas>
+          
+          <!-- Gauge Widget -->
+          <div *ngSwitchCase="'gauge'" class="w-full h-full flex items-center justify-center">
+            <div class="relative">
+              <!-- Professional Gauge Container -->
+              <div class="relative w-36 h-36">
+                <!-- Outer Glow Ring -->
+                <div class="absolute inset-0 rounded-full opacity-60 animate-pulse"
+                     [style.background]="'conic-gradient(from 0deg, rgb(6 182 212 / 0.3) 0%, rgb(6 182 212 / 0.3) ' + getGaugePercentage() + '%, transparent ' + getGaugePercentage() + '%, transparent 100%)'">
+                </div>
+                
+                <!-- Main Gauge Ring -->
+                <div class="absolute inset-2 rounded-full border-4 border-slate-200 dark:border-gray-700/50 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-gray-800/80 dark:to-gray-900/60 backdrop-blur-sm shadow-2xl">
+                  <!-- Progress Ring -->
+                  <div class="absolute inset-0 rounded-full border-4 border-transparent"
+                       [style.background]="'conic-gradient(from -90deg, rgb(52 211 153) 0%, rgb(52 211 153) ' + getGaugePercentage() + '%, transparent ' + getGaugePercentage() + '%, transparent 100%)'">
+                  </div>
+                </div>
+                
+                <!-- Center Value Display -->
+                <div class="absolute inset-0 flex items-center justify-center flex-col">
+                  <div class="text-3xl font-black text-emerald-600 dark:text-emerald-400 drop-shadow-[0_0_12px_rgb(52,211,153,0.4)] tabular-nums">
+                    {{ currentValue !== null ? formatValue(currentValue) : '--' }}
+                  </div>
+                  <div class="text-sm text-slate-500 dark:text-gray-300 font-semibold mt-1">{{ valueUnit }}</div>
+                  
+                  <!-- Percentage Indicator -->
+                  <div class="text-xs text-cyan-700 dark:text-cyan-400 font-bold mt-1 px-2 py-0.5 bg-cyan-50 dark:bg-cyan-900/30 rounded-lg border border-cyan-200 dark:border-cyan-500/40">
+                    {{ getGaugePercentage() }}%
+                  </div>
+                </div>
+                
+                <!-- Gauge Markers -->
+                <div class="absolute inset-0">
+                  <div class="absolute top-0 left-1/2 transform -translate-x-1/2 w-0.5 h-3 bg-gray-500"></div>
+                  <div class="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-0.5 h-3 bg-gray-500"></div>
+                  <div class="absolute left-0 top-1/2 transform -translate-y-1/2 h-0.5 w-3 bg-gray-500"></div>
+                  <div class="absolute right-0 top-1/2 transform -translate-y-1/2 h-0.5 w-3 bg-gray-500"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+                  <!-- Enhanced Stat Card Widget -->
+          <div *ngSwitchCase="'stat-card'" class="w-full h-full p-4 bg-gradient-to-br from-white to-slate-50/50 dark:from-gray-800/80 dark:to-gray-900/60 backdrop-blur-sm rounded-xl border border-slate-200 dark:border-gray-700/50 shadow-xl">
+            <!-- Header with Trend -->
+            <div class="flex items-center justify-between mb-4">
+              <div class="text-lg font-black text-slate-900 dark:text-white drop-shadow-md tracking-wide">{{ title }}</div>
+              <div class="flex items-center space-x-2">
+                <!-- Trend Indicator -->
+                <div class="text-2xl drop-shadow-lg">
+                  <i [class]="getTrendIcon()" [ngClass]="{
+                    'text-emerald-500 dark:text-emerald-400 drop-shadow-[0_0_8px_rgb(52,211,153,0.4)]': getTrendDirection() === 'up',
+                    'text-red-500 dark:text-red-400 drop-shadow-[0_0_8px_rgb(248,113,113,0.4)]': getTrendDirection() === 'down',
+                    'text-gray-450 dark:text-gray-400': getTrendDirection() === 'stable'
+                  }"></i>
+                </div>
+                <!-- Performance Badge -->
+                <div class="px-2 py-1 bg-gradient-to-r from-cyan-50 to-blue-50 dark:from-cyan-600/20 dark:to-blue-600/20 border border-cyan-200 dark:border-cyan-500/40 rounded-lg text-xs text-cyan-700 dark:text-cyan-300 font-bold">
+                  <i class="fas fa-chart-line mr-1"></i>
+                  LIVE
+                </div>
+              </div>
+            </div>
+            
+            <!-- Enhanced Statistics Grid -->
+            <div class="space-y-3">
+              <!-- Current Value - Highlighted -->
+              <div class="flex justify-between items-center p-3 bg-gradient-to-r from-emerald-50 to-green-50/50 dark:from-emerald-900/30 dark:to-green-900/20 border border-emerald-500/40 rounded-xl">
+                <span class="text-emerald-700 dark:text-emerald-300 font-bold flex items-center">
+                  <i class="fas fa-bolt mr-2"></i>
+                  Current:
+                </span>
+                <span class="text-emerald-800 dark:text-emerald-400 font-black text-lg tabular-nums drop-shadow-[0_0_8px_rgb(52,211,153,0.3)]">
+                  {{ currentValue !== null ? formatValue(currentValue) : '--' }} {{ valueUnit }}
+                </span>
+              </div>
+              
+              <!-- Min Value -->
+              <div class="flex justify-between items-center p-2.5 bg-cyan-50/50 dark:bg-cyan-900/20 border border-cyan-200 dark:border-cyan-500/30 rounded-lg">
+                <span class="text-cyan-800 dark:text-cyan-300 font-semibold flex items-center">
+                  <i class="fas fa-arrow-down mr-2 text-cyan-600 dark:text-cyan-400"></i>
+                  Min:
+                </span>
+                <span class="text-cyan-700 dark:text-cyan-400 font-bold tabular-nums">{{ getStatValue('min') }} {{ valueUnit }}</span>
+              </div>
+              
+              <!-- Max Value -->
+              <div class="flex justify-between items-center p-2.5 bg-amber-50/50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-500/30 rounded-lg">
+                <span class="text-amber-800 dark:text-amber-300 font-semibold flex items-center">
+                  <i class="fas fa-arrow-up mr-2 text-amber-650 dark:text-amber-405"></i>
+                  Max:
+                </span>
+                <span class="text-amber-700 dark:text-amber-400 font-bold tabular-nums">{{ getStatValue('max') }} {{ valueUnit }}</span>
+              </div>
+              
+              <!-- Average Value -->
+              <div class="flex justify-between items-center p-2.5 bg-violet-50/50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-500/30 rounded-lg">
+                <span class="text-violet-800 dark:text-violet-300 font-semibold flex items-center">
+                  <i class="fas fa-equals mr-2 text-violet-650 dark:text-violet-400"></i>
+                  Avg:
+                </span>
+                <span class="text-violet-700 dark:text-violet-400 font-bold tabular-nums">{{ getStatValue('avg') }} {{ valueUnit }}</span>
+              </div>
+            </div>
+          </div>div>
+          
+          <!-- Data Table Template -->
+          <ng-template #dataTableTemplate>
+            <div class="w-full h-full overflow-hidden rounded-lg bg-gradient-to-br from-slate-100 to-slate-200/50 dark:from-gray-800/90 dark:to-gray-900/80 backdrop-blur-md">
+              <div class="w-full h-full overflow-auto custom-scrollbar">
+
+                <!-- SQL Table -->
+                <table *ngIf="dataSourceType === 'sql' || dataSourceType === 'python'" class="w-full text-sm border-collapse">
+                  <thead class="sticky top-0 bg-gradient-to-r from-teal-50 to-slate-50 dark:from-teal-950/95 dark:to-slate-900/95 backdrop-blur-sm border-b border-teal-200 dark:border-teal-500/30 shadow-sm">
+                    <tr>
+                      <th *ngFor="let col of sqlTableColumns" class="px-4 py-3 text-left text-teal-800 dark:text-teal-300 font-semibold tracking-wide border-r border-teal-200/50 dark:border-teal-500/10 last:border-r-0">
+                        <div class="flex items-center justify-between group">
+                          <span class="truncate font-semibold">{{ col }}</span>
+                          <button (click)="toggleFilterPopover(col)" 
+                                  [class.text-teal-400]="columnFilters[col]"
+                                  class="ml-2 opacity-50 group-hover:opacity-100 transition-opacity">
+                            <i class="fas fa-filter text-[10px]"></i>
+                          </button>
+                        </div>
+
+                        <!-- Excel-style Filter Popover -->
+                        <div *ngIf="activeFilterColumn === col" class="absolute z-50 mt-2 p-3 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg shadow-xl w-48 text-slate-900 dark:text-white">
+                          <input type="text" placeholder="Filtrele..." 
+                                 [ngModel]="columnFilters[col] || ''"
+                                 (ngModelChange)="setFilter(col, $event)"
+                                 class="w-full bg-slate-50 dark:bg-slate-950 text-xs px-2 py-1.5 rounded border border-gray-300 dark:border-slate-600 focus:border-teal-400 outline-none text-slate-900 dark:text-white mb-2">
+                          <div class="flex justify-end gap-2">
+                            <button (click)="clearFilter(col)" class="text-[10px] text-slate-400 hover:text-red-400">Temizle</button>
+                            <button (click)="toggleFilterPopover(col)" class="text-[10px] text-teal-500 dark:text-teal-400 hover:text-teal-600 dark:hover:text-teal-300">Kapat</button>
+                          </div>
+                        </div>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-gray-200/50 dark:divide-gray-700/50">
+                    <tr *ngFor="let row of getFilteredSqlRows(); even as isEven" 
+                        [class]="isEven ? 'bg-slate-100/30 dark:bg-gray-800/30' : 'bg-slate-50/20 dark:bg-gray-800/10'" 
+                        class="hover:bg-teal-950/5 dark:hover:bg-teal-950/10 transition-all duration-200">
+                      <td *ngFor="let col of sqlTableColumns" class="px-4 py-3 text-slate-800 dark:text-gray-300 border-r border-slate-200/50 dark:border-gray-700/30 last:border-r-0 font-mono text-xs">
+                        {{ row[col] !== null && row[col] !== undefined ? row[col] : '-' }}
+                      </td>
+                    </tr>
+                    <tr *ngIf="getFilteredSqlRows().length === 0">
+                      <td [attr.colspan]="sqlTableColumns.length" class="p-6 text-center text-gray-500 text-xs">
+                        Eşleşen veri bulunamadı.
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                <!-- Regular Parameter Table -->
+                <table *ngIf="dataSourceType !== 'sql' && dataSourceType !== 'python'" class="w-full text-sm border-collapse">
+                  <thead class="sticky top-0 bg-gradient-to-r from-slate-100 to-slate-200 dark:from-gray-700/95 dark:to-gray-800/95 backdrop-blur-sm border-b border-slate-300 dark:border-gray-600/50 shadow-sm">
+                    <tr>
+                      <th class="px-4 py-3 text-left text-slate-700 dark:text-gray-200 font-semibold tracking-wide border-r border-slate-200 dark:border-gray-600/30 last:border-r-0">
+                        <div class="flex items-center space-x-2">
+                          <i class="fas fa-list-ul text-blue-500 dark:text-blue-400 text-xs"></i>
+                          <span>Parameter</span>
+                        </div>
+                      </th>
+                      <th class="px-4 py-3 text-left text-slate-700 dark:text-gray-200 font-semibold tracking-wide border-r border-slate-200 dark:border-gray-600/30 last:border-r-0">
+                        <div class="flex items-center space-x-2">
+                          <i class="fas fa-hashtag text-green-500 dark:text-green-400 text-xs"></i>
+                          <span>Value</span>
+                        </div>
+                      </th>
+                      <th class="px-4 py-3 text-left text-slate-700 dark:text-gray-200 font-semibold tracking-wide">
+                        <div class="flex items-center space-x-2">
+                          <i class="fas fa-signal text-yellow-500 dark:text-yellow-400 text-xs"></i>
+                          <span>Status</span>
+                        </div>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-gray-200/50 dark:divide-gray-700/50">
+                    <tr *ngFor="let row of getTableData(); even as isEven" 
+                        [class]="isEven ? 'bg-slate-100/30 dark:bg-gray-800/30' : 'bg-slate-50/20 dark:bg-gray-800/10'" 
+                        class="hover:bg-gradient-to-r hover:from-slate-100/30 hover:to-slate-200/30 dark:hover:from-gray-700/30 dark:hover:to-gray-800/30 transition-all duration-200 group">
+                      <td class="px-4 py-3 text-slate-700 dark:text-gray-300 border-r border-slate-200/50 dark:border-gray-700/30 last:border-r-0">
+                        <div class="flex items-center space-x-2">
+                          <div class="w-2 h-2 rounded-full bg-blue-500/60 group-hover:bg-blue-400 transition-colors duration-200"></div>
+                          <span class="font-medium">{{ row.parameter }}</span>
+                        </div>
+                      </td>
+                      <td class="px-4 py-3 border-r border-slate-200/50 dark:border-gray-700/30 last:border-r-0">
+                        <div class="flex items-center space-x-2">
+                          <span class="text-slate-800 dark:text-white font-mono bg-slate-50 dark:bg-gray-900/50 px-2 py-1 rounded text-xs font-semibold tabular-nums border border-slate-200 dark:border-gray-600/30">
+                            {{ row.value }}
+                          </span>
+                        </div>
+                      </td>
+                      <td class="px-4 py-3">
+                        <div class="flex items-center space-x-2">
+                          <span [ngClass]="{
+                            'bg-green-500/10 text-green-600 dark:text-green-300 border-green-200 dark:border-green-500/30': row.status === 'normal',
+                            'bg-yellow-500/10 text-yellow-600 dark:text-yellow-300 border-yellow-200 dark:border-yellow-500/30': row.status === 'warning',
+                            'bg-red-500/10 text-red-600 dark:text-red-300 border-red-200 dark:border-red-500/30': row.status === 'danger'
+                          }" class="px-2 py-1 rounded-full text-xs font-bold uppercase tracking-wider border backdrop-blur-sm">
+                            <i [ngClass]="{
+                              'fas fa-check-circle': row.status === 'normal',
+                              'fas fa-exclamation-triangle': row.status === 'warning',
+                              'fas fa-times-circle': row.status === 'danger'
+                            }" class="mr-1"></i>
+                            {{ row.status }}
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+
+              </div>
+            </div>
+          </ng-template>
+
+          <!-- Data Table Widget -->
+          <div *ngSwitchCase="'data-table'">
+            <ng-container *ngTemplateOutlet="dataTableTemplate"></ng-container>
+          </div>
+
+          <!-- Query Viewer Widget -->
+          <div *ngSwitchCase="'query-viewer'">
+            <ng-container *ngTemplateOutlet="dataTableTemplate"></ng-container>
+          </div>
+          
+          <!-- Trend Indicator Widget -->
+          <div *ngSwitchCase="'trend-indicator'" class="w-full h-full flex items-center justify-center">
+            <div class="text-center">
+              <div class="text-4xl mb-2">
+                <i [class]="getTrendIcon()" [ngClass]="{
+                  'text-green-600 dark:text-green-400': getTrendDirection() === 'up',
+                  'text-red-600 dark:text-red-400': getTrendDirection() === 'down',
+                  'text-gray-500 dark:text-gray-400': getTrendDirection() === 'stable'
+                }"></i>
+              </div>
+              <div class="text-lg font-semibold text-slate-900 dark:text-white mb-1">{{ getTrendDirection().toUpperCase() }}</div>
+              <div class="text-sm text-slate-500 dark:text-gray-400">{{ getTrendPercentage() }}%</div>
+            </div>
+          </div>
+          
+          <!-- Status Indicator Widget -->
+          <div *ngSwitchCase="'status-indicator'" class="w-full h-full flex items-center justify-center">
+            <div class="text-center">
+              <div class="w-16 h-16 rounded-full mb-4 flex items-center justify-center text-2xl animate-pulse" 
+                   [ngClass]="{
+                     'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-400': valueStatus === 'normal',
+                     'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-400': valueStatus === 'warning',
+                     'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-400': valueStatus === 'danger'
+                   }">
+                <i [ngClass]="{
+                    'fa-check': valueStatus === 'normal',
+                    'fa-exclamation': valueStatus === 'warning',
+                    'fa-times': valueStatus === 'danger'
+                  }" class="fas"></i>
+              </div>
+              <div class="text-lg font-semibold text-slate-900 dark:text-white">
+                {{ valueStatus === 'normal' ? 'NORMAL' : valueStatus === 'warning' ? 'WARNING' : 'CRITICAL' }}
+              </div>
+            </div>
+          </div>
+          
+          <!-- KPI Widget -->
+          <div *ngSwitchCase="'kpi-widget'" class="w-full h-full p-4 bg-gradient-to-br from-white to-slate-50/50 dark:from-gray-800/90 dark:to-gray-900/80 backdrop-blur-md rounded-lg border border-slate-200 dark:border-gray-700/30 shadow-xl">
+            <div class="grid grid-cols-2 gap-3 h-full">
+              <!-- Efficiency KPI -->
+              <div class="bg-gradient-to-br from-green-50 to-green-100/50 dark:from-green-900/20 dark:to-green-800/10 rounded-lg p-3 border border-green-200 dark:border-green-500/20 hover:border-green-300 dark:hover:border-green-400/40 transition-all duration-300 group">
+                <div class="flex items-center justify-between mb-2">
+                  <i class="fas fa-cogs text-green-600 dark:text-green-400 group-hover:text-green-500 transition-colors duration-300"></i>
+                  <div class="w-2 h-2 rounded-full bg-green-400 animate-pulse"></div>
+                </div>
+                <div class="text-center">
+                  <div class="text-2xl font-bold text-green-700 dark:text-green-400 group-hover:text-green-600 dark:group-hover:text-green-350 transition-colors duration-300 tabular-nums">
+                    {{ getKPIValue('efficiency') }}%
+                  </div>
+                  <div class="text-xs text-slate-500 dark:text-gray-400 font-medium uppercase tracking-wider">Efficiency</div>
+                </div>
+              </div>
+              
+              <!-- Availability KPI -->
+              <div class="bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-900/20 dark:to-blue-800/10 rounded-lg p-3 border border-blue-200 dark:border-blue-500/20 hover:border-blue-300 dark:hover:border-blue-400/40 transition-all duration-300 group">
+                <div class="flex items-center justify-between mb-2">
+                  <i class="fas fa-server text-blue-600 dark:text-blue-400 group-hover:text-blue-550 transition-colors duration-300"></i>
+                  <div class="w-2 h-2 rounded-full bg-blue-400 animate-pulse"></div>
+                </div>
+                <div class="text-center">
+                  <div class="text-2xl font-bold text-blue-700 dark:text-blue-400 group-hover:text-blue-600 dark:group-hover:text-blue-350 transition-colors duration-300 tabular-nums">
+                    {{ getKPIValue('availability') }}%
+                  </div>
+                  <div class="text-xs text-slate-500 dark:text-gray-400 font-medium uppercase tracking-wider">Availability</div>
+                </div>
+              </div>
+              
+              <!-- Performance KPI -->
+              <div class="bg-gradient-to-br from-orange-50 to-orange-100/50 dark:from-orange-900/20 dark:to-orange-800/10 rounded-lg p-3 border border-orange-200 dark:border-orange-500/20 hover:border-orange-300 dark:hover:border-orange-400/40 transition-all duration-300 group">
+                <div class="flex items-center justify-between mb-2">
+                  <i class="fas fa-tachometer-alt text-orange-600 dark:text-orange-400 group-hover:text-orange-550 transition-colors duration-300"></i>
+                  <div class="w-2 h-2 rounded-full bg-orange-400 animate-pulse"></div>
+                </div>
+                <div class="text-center">
+                  <div class="text-2xl font-bold text-orange-700 dark:text-orange-400 group-hover:text-orange-600 dark:group-hover:text-orange-350 transition-colors duration-300 tabular-nums">
+                    {{ getKPIValue('performance') }}%
+                  </div>
+                  <div class="text-xs text-slate-500 dark:text-gray-400 font-medium uppercase tracking-wider">Performance</div>
+                </div>
+              </div>
+              
+              <!-- Quality KPI -->
+              <div class="bg-gradient-to-br from-purple-50 to-purple-100/50 dark:from-purple-900/20 dark:to-purple-800/10 rounded-lg p-3 border border-purple-200 dark:border-purple-500/20 hover:border-purple-300 dark:hover:border-purple-400/40 transition-all duration-300 group">
+                <div class="flex items-center justify-between mb-2">
+                  <i class="fas fa-medal text-purple-600 dark:text-purple-400 group-hover:text-purple-550 transition-colors duration-300"></i>
+                  <div class="w-2 h-2 rounded-full bg-purple-400 animate-pulse"></div>
+                </div>
+                <div class="text-center">
+                  <div class="text-2xl font-bold text-purple-700 dark:text-purple-400 group-hover:text-purple-600 dark:group-hover:text-purple-355 transition-colors duration-300 tabular-nums">
+                    {{ getKPIValue('quality') }}%
+                  </div>
+                  <div class="text-xs text-slate-500 dark:text-gray-400 font-medium uppercase tracking-wider">Quality</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Alert Widget -->
+          <div *ngSwitchCase="'alert-widget'" class="w-full h-full p-4 bg-slate-50 dark:bg-gray-800 rounded-lg overflow-y-auto">
+            <div class="space-y-2">
+              <div *ngFor="let alert of getAlerts()" 
+                   class="flex items-center p-2 rounded border" 
+                   [ngClass]="{
+                     'bg-red-50 border-red-200 dark:bg-red-900/50 dark:border-transparent': alert.severity === 'critical',
+                     'bg-yellow-50 border-yellow-200 dark:bg-yellow-900/50 dark:border-transparent': alert.severity === 'warning',
+                     'bg-blue-50 border-blue-200 dark:bg-blue-900/50 dark:border-transparent': alert.severity === 'info'
+                   }">
+                <i [ngClass]="{
+                    'fa-exclamation-triangle text-red-650 dark:text-red-400': alert.severity === 'critical',
+                    'fa-exclamation-circle text-yellow-650 dark:text-yellow-400': alert.severity === 'warning',
+                    'fa-info-circle text-blue-600 dark:text-blue-400': alert.severity === 'info'
+                  }" class="fas mr-2"></i>
+                <div class="flex-1">
+                  <div class="text-sm text-slate-800 dark:text-white">{{ alert.message }}</div>
+                  <div class="text-xs text-slate-500 dark:text-gray-400">{{ alert.time }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Default Chart for Other Types -->
+          <canvas *ngSwitchDefault baseChart
+            [data]="chartData"
+            [type]="chartType"
+            [options]="chartOptions">
+          </canvas>
+          
+        </div>
+      </ng-template>
+      
+    </ng-container>
+    
+    <ng-template #noDataSource>
+      <div class="w-full h-full flex items-center justify-center flex-col">
+        <i class="fas fa-chart-line text-4xl text-gray-500 mb-3 opacity-30"></i>
+        <p class="text-center text-gray-500">
+          {{ 'REPORTS.NO_DATA_SOURCE' | translate }}
+          <br>
+          <span class="text-sm opacity-70">{{ 'REPORTS.NO_DATA_SOURCE_DESC' | translate }}</span>
+        </p>
+      </div>
+    </ng-template>
+  </div>
+</div>
+
+<!-- Path Selector Dialog - Sadece gerektiğinde oluştur -->
+<app-path-selector-dialog
+  *ngIf="pathSelectorVisible"
+  [(visible)]="pathSelectorVisible"
+  [currentPaths]="currentDataPaths"
+  [currentFormula]="formula"
+  [widgetType]="widgetType"
+  (pathSelected)="onPathSelected($event)"
+></app-path-selector-dialog>
+
+<!-- Tam Ekran Modal -->
+<div *ngIf="isFullscreen" class="fixed inset-0 bg-white dark:bg-gray-950 z-[9999] p-8 flex flex-col overflow-hidden w-screen h-screen">
+  <div class="w-full h-full flex flex-col justify-between">
+    <div class="flex justify-between items-center mb-6 border-b border-slate-200 dark:border-gray-800 pb-4">
+      <div class="flex items-center">
+        <i [class]="icon + ' text-4xl mr-4 text-cyan-400'"></i>
+        <h3 class="text-2xl font-black text-slate-900 dark:text-white tracking-wide">{{ title }}</h3>
+      </div>
+      <button (click)="toggleFullscreen()" class="text-slate-500 hover:text-slate-800 dark:text-gray-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-gray-800 p-2 rounded-lg transition-colors text-3xl">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    
+    <div class="flex-grow overflow-hidden relative">
+      <!-- Value-card tam ekran gösterimi (Ekranı tamamen devasa kaplamalı!) -->
+      <div *ngIf="widgetType === 'value-card' && currentDataPaths.length > 0" 
+           class="w-full h-full flex items-center justify-center bg-slate-50/50 dark:bg-gray-900/40 rounded-2xl border border-slate-200 dark:border-gray-800/80">
+        <div class="text-center p-12">
+          <div class="flex flex-col items-center space-y-8">
+            <!-- Devasa Değer gösterimi -->
+            <div [ngClass]="{
+              'text-emerald-600 dark:text-emerald-400 drop-shadow-[0_0_40px_rgba(52,211,153,0.3)]': valueStatus === 'normal',
+              'text-amber-600 dark:text-amber-400 drop-shadow-[0_0_40px_rgba(251,191,36,0.3)]': valueStatus === 'warning',
+              'text-red-650 dark:text-red-400 drop-shadow-[0_0_40px_rgba(248,113,113,0.3)]': valueStatus === 'danger'
+            }" class="text-[12rem] font-black transition-all duration-700 leading-none flex items-baseline tracking-tighter font-mono">
+              {{ currentValue !== null ? formatValue(currentValue) : '--' }}
+              <span class="text-5xl ml-4 opacity-85 text-slate-500 dark:text-gray-300 font-semibold">{{ valueUnit }}</span>
+            </div>
+            
+            <!-- Durum göstergeleri -->
+            <div class="flex items-center space-x-6 mt-6">
+              <div class="px-6 py-3 rounded-full text-2xl font-bold border" 
+                   [ngClass]="{
+                     'bg-emerald-50/80 text-emerald-700 border-emerald-200 dark:bg-emerald-950/80 dark:text-emerald-400 dark:border-emerald-500/30': valueStatus === 'normal',
+                     'bg-amber-50/80 text-amber-700 border-amber-200 dark:bg-amber-950/80 dark:text-amber-400 dark:border-amber-500/30': valueStatus === 'warning',
+                     'bg-red-50/80 text-red-700 border-red-200 dark:bg-red-950/80 dark:text-red-400 dark:border-red-500/30': valueStatus === 'danger'
+                   }">
+                <i [ngClass]="{
+                    'fa-check-circle': valueStatus === 'normal',
+                    'fa-exclamation-triangle': valueStatus === 'warning',
+                    'fa-times-circle': valueStatus === 'danger'
+                  }" class="fas mr-3"></i>
+                {{ valueStatus === 'normal' ? 'Normal' : (valueStatus === 'warning' ? ('REPORTS.WARNING_LABEL' | translate) : ('REPORTS.CRITICAL_LABEL' | translate)) }}
+              </div>
+              
+              <!-- Eşik değerleri bilgisi -->
+              <div *ngIf="thresholds.warning || thresholds.danger" class="text-lg text-slate-500 dark:text-gray-400 font-medium">
+                <span *ngIf="thresholds.warning">{{ 'REPORTS.WARNING_THRESHOLD' | translate }} {{ thresholds.warning }}</span>
+                <span *ngIf="thresholds.warning && thresholds.danger"> | </span>
+                <span *ngIf="thresholds.danger">{{ 'REPORTS.CRITICAL_THRESHOLD' | translate }} {{ thresholds.danger }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Normal grafik gösterimi (Ekranı tam kaplayacak genişlik ve yükseklik!) -->
+      <div *ngIf="widgetType !== 'value-card' && currentDataPaths.length > 0" class="w-full h-full p-4 bg-slate-50/30 dark:bg-gray-900/30 rounded-2xl border border-slate-200 dark:border-gray-800/80">
+        <canvas baseChart
+          [data]="chartData"
+          [type]="chartType"
+          [options]="fullscreenChartOptions"
+          style="width: 100%; height: 100%;"
+        ></canvas>
+      </div>
+      
+      <div *ngIf="currentDataPaths.length === 0" class="w-full h-full flex items-center justify-center">
+        <p class="text-slate-500 dark:text-gray-400 text-xl">{{ 'REPORTS.NO_DATA_SOURCE_SHORT' | translate }}</p>
+      </div>
+    </div>
+  </div>
+</div>

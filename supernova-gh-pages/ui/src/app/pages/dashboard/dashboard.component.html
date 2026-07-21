@@ -1,0 +1,397 @@
+<div class="min-h-screen bg-[rgb(20,17,27)] relative overflow-hidden text-slate-100 font-sans pt-16">
+  
+  <!-- Super Nova Space Background Effect -->
+  <div class="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+    <!-- Deep space radial gradient -->
+    <div class="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900/20 via-[rgb(var(--bg-primary))] to-[rgb(var(--bg-primary))]"></div>
+    
+    <!-- Glowing Nebulas -->
+    <div class="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-[rgb(var(--accent-primary))]/5 rounded-full blur-[120px] animate-pulse-slow"></div>
+    <div class="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-purple-900/10 rounded-full blur-[150px] animate-pulse-subtle"></div>
+    <div class="absolute top-[40%] right-[10%] w-[30%] h-[30%] bg-blue-900/10 rounded-full blur-[100px]"></div>
+    
+    <!-- Stars / Particles -->
+    <div class="absolute inset-0" style="background-image: radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px); background-size: 50px 50px; opacity: 0.3;"></div>
+  </div>
+
+  <!-- Main Content -->
+  <main class="relative z-10 p-8 overflow-y-auto h-full">
+    
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-8">
+      <div>
+        <h2 class="text-4xl font-black tracking-tight bg-gradient-to-r from-[rgb(var(--accent-primary))] via-[rgb(var(--accent-soft))] to-[rgb(var(--accent-secondary))] bg-clip-text text-transparent drop-shadow-[0_0_15px_rgb(var(--accent-primary)/0.3)]">
+          SUPER NOVA
+        </h2>
+        <p class="text-[rgb(201,196,186)] mt-1 font-medium tracking-wide text-sm">Advanced Business Intelligence Hub</p>
+      </div>      
+      
+      <div class="flex items-center space-x-4">
+        <!-- Connection Status Indicator -->
+        <div class="flex items-center space-x-3 px-4 py-2 rounded-2xl bg-[rgb(31,27,38)]/60 backdrop-blur-md border border-[rgb(58,52,64)] shadow-[0_0_20px_rgba(0,0,0,0.5)]">
+          <div *ngFor="let conn of connections" class="flex items-center space-x-1.5" [title]="conn.name + ': ' + conn.latencyMs + 'ms'">
+            <i class="fas fa-circle text-[8px]" 
+               [ngClass]="{'text-emerald-400': conn.status === 'online', 'text-amber-400': conn.status === 'degraded', 'text-red-400': conn.status === 'offline'}"
+               [class.animate-pulse]="conn.status === 'online'"></i>
+            <span class="text-xs font-semibold text-[rgb(201,196,186)] uppercase tracking-wider">{{ conn.id.split('-')[0] }}</span>
+          </div>
+        </div>
+        
+        <!-- Edit Dashboard Toggle -->
+        <button *ngIf="!editMode"
+          class="group flex items-center px-5 py-2.5 bg-[rgb(31,27,38)]/80 backdrop-blur-md border border-[rgb(82,74,90)] text-[rgb(201,196,186)] hover:text-white hover:border-[rgb(var(--accent-primary))]/50 rounded-xl font-semibold shadow-lg hover:shadow-[0_0_20px_rgb(var(--accent-primary)/0.2)] transition-all duration-300 cursor-pointer"
+          (click)="toggleEditMode()">
+          <i class="fas fa-meteor mr-2.5 text-[rgb(var(--accent-primary))] group-hover:rotate-12 transition-transform duration-300"></i>
+          <span class="text-sm">Edit Nova Matrix</span>
+        </button>
+
+        <!-- Edit Mode Actions -->
+        <div *ngIf="editMode" class="flex items-center space-x-2">
+          <button (click)="cancelEditing()"
+                  class="px-4 py-2.5 border border-[rgb(82,74,90)] text-[rgb(201,196,186)] hover:text-white hover:border-red-500/50 rounded-xl text-sm font-semibold transition-all cursor-pointer">
+            İptal
+          </button>
+          <button (click)="finishEditing()"
+                  class="px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-emerald-500 text-white font-bold rounded-xl shadow-[0_0_15px_rgba(16,185,129,0.3)] hover:shadow-[0_0_25px_rgba(16,185,129,0.5)] transition-all cursor-pointer">
+            <i class="fas fa-check mr-2"></i> Bitti
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Edit Mode Banner -->
+    <div *ngIf="editMode" 
+         class="mb-6 p-4 rounded-2xl bg-[rgb(var(--accent-primary))]/5 border border-[rgb(var(--accent-primary))]/20 backdrop-blur-sm flex items-center justify-between animate-slide-down shadow-[0_0_30px_rgb(var(--accent-primary)/0.15)]">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-[rgb(var(--accent-primary))]/10 border border-[rgb(var(--accent-primary))]/30 flex items-center justify-center shadow-[0_0_15px_rgb(var(--accent-primary)/0.2)]">
+          <i class="fas fa-satellite text-[rgb(var(--accent-primary))] animate-pulse"></i>
+        </div>
+        <div>
+          <span class="text-sm font-bold text-white tracking-wide">Nova Matrix Düzenleme Modu</span>
+          <p class="text-[10px] text-[rgb(163,154,137)]">Kataloktan modüller ekleyin · İstasyonları hizalayın</p>
+        </div>
+      </div>
+      <span class="text-xs text-[rgb(var(--accent-primary))] font-mono bg-[rgb(var(--accent-primary))]/10 px-3 py-1 rounded-lg border border-[rgb(var(--accent-primary))]/20">
+        {{ activeWidgets.length }} widget aktif
+      </span>
+    </div>
+    
+    <!-- Top Metrics KPI Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+      <div *ngFor="let m of metrics"
+           class="relative group overflow-hidden rounded-2xl border border-[rgb(82,74,90)]/60 bg-[rgb(31,27,38)]/60 backdrop-blur-md p-5 shadow-[0_10px_30px_rgba(0,0,0,0.4)] hover:border-[rgb(var(--accent-primary))]/40 transition-all duration-300">
+        <!-- Gradient Accent Bar -->
+        <div class="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-[rgb(var(--accent-primary))] via-[rgb(var(--accent-soft))] to-transparent opacity-60"></div>
+        
+        <div class="flex items-center justify-between mb-3">
+          <div class="w-10 h-10 rounded-xl flex items-center justify-center border border-[rgb(82,74,90)] bg-[rgb(20,17,27)]">
+            <i [class]="m.icon" class="text-[rgb(var(--accent-primary))]"></i>
+          </div>
+          <span class="flex items-center text-xs font-bold px-2 py-1 rounded-lg border"
+                [ngClass]="{
+                  'text-emerald-400 bg-emerald-500/10 border-emerald-500/20': m.trend === 'up',
+                  'text-rose-400 bg-rose-500/10 border-rose-500/20': m.trend === 'down',
+                  'text-amber-400 bg-amber-500/10 border-amber-500/20': m.trend === 'stable'
+                }">
+            <i class="fas mr-1 text-[10px]"
+               [ngClass]="{'fa-arrow-up': m.trend==='up', 'fa-arrow-down': m.trend==='down', 'fa-minus': m.trend==='stable'}"></i>
+            {{ m.trendValue }}
+          </span>
+        </div>
+        <p class="text-2xl font-black text-white tracking-tight">{{ m.value }}</p>
+        <p class="text-xs text-[rgb(163,154,137)] mt-1 font-medium uppercase tracking-wider">{{ m.title }}</p>
+      </div>
+    </div>
+
+    <!-- Empty Dashboard State -->
+    <div *ngIf="activeWidgets.length === 0" 
+         class="flex flex-col items-center justify-center py-24 text-center border border-dashed border-[rgb(82,74,90)] rounded-3xl bg-[rgb(31,27,38)]/20 backdrop-blur-sm">
+      <div class="w-24 h-24 rounded-full flex items-center justify-center mb-6 bg-gradient-to-br from-[rgb(47,41,52)] to-black border border-[rgb(82,74,90)] shadow-[0_0_30px_rgb(var(--accent-primary)/0.1)]">
+        <i class="fas fa-meteor text-4xl text-[rgb(var(--accent-primary))] opacity-80"></i>
+      </div>
+      <h3 class="text-2xl font-bold text-white mb-2">Matrix Boş</h3>
+      <p class="text-[rgb(163,154,137)] mb-6 max-w-md">Nova Edit modunu açarak sol panelden modüller ekleyebilirsiniz.</p>
+      <button (click)="toggleEditMode()" class="px-6 py-2.5 rounded-xl border border-[rgb(var(--accent-primary))] text-[rgb(var(--accent-primary))] hover:bg-[rgb(var(--accent-primary))]/10 hover:shadow-[0_0_20px_rgb(var(--accent-primary)/0.2)] transition-all font-semibold tracking-wide cursor-pointer flex items-center">
+        <i class="fas fa-meteor mr-2"></i> Edit Nova Matrix
+      </button>
+    </div>
+
+    <!-- Dashboard Widget Grid -->
+    <div *ngIf="activeWidgets.length > 0" 
+         cdkDropList
+         [cdkDropListSortingDisabled]="!editMode"
+         [cdkDropListData]="activeWidgets"
+         (cdkDropListDropped)="onDragDrop($event)"
+         class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 auto-rows-[minmax(180px,auto)]">
+        
+      <div *ngFor="let widget of activeWidgets; let i = index" 
+           [cdkDragDisabled]="!editMode"
+           cdkDrag
+           class="group relative bg-[rgb(31,27,38)]/50 backdrop-blur-md rounded-3xl border border-[rgb(82,74,90)]/60 shadow-[0_10px_40px_rgba(0,0,0,0.5)] hover:border-[rgb(var(--accent-primary))]/40 transition-all duration-300 flex flex-col overflow-hidden"
+           [class.widget-float]="editMode"
+           [class.edit-mode-widget]="editMode"
+           [style.grid-column]="'span ' + widget.w"
+           [style.grid-row]="'span ' + widget.h"
+           [style.animation-delay]="(i * 80) + 'ms'">
+           
+        <!-- Delete Button (Edit Mode) -->
+        <div *ngIf="editMode" class="absolute top-3 left-3 z-30">
+          <button (click)="removeWidget(widget.id)" 
+                  class="w-8 h-8 rounded-full bg-[rgb(20,17,27)]/80 backdrop-blur-md text-red-400 flex items-center justify-center shadow-[0_0_15px_rgba(239,68,68,0.3)] hover:text-white hover:bg-red-500 hover:shadow-[0_0_20px_rgba(239,68,68,0.6)] transition-all cursor-pointer border border-red-500/50 hover:scale-110">
+            <i class="fas fa-trash-can text-[11px] font-bold"></i>
+          </button>
+        </div>
+
+        <!-- Config Button (Edit Mode) -->
+        <div *ngIf="editMode" class="absolute top-3 left-[44px] z-30">
+          <button (click)="openWidgetConfig(widget)" 
+                  class="w-8 h-8 rounded-full bg-[rgb(20,17,27)]/80 backdrop-blur-md text-emerald-400 flex items-center justify-center shadow-[0_0_15px_rgba(16,185,129,0.3)] hover:text-white hover:bg-emerald-500 hover:shadow-[0_0_20px_rgba(16,185,129,0.6)] transition-all cursor-pointer border border-emerald-500/50 hover:scale-110">
+            <i class="fas fa-cog text-[11px] font-bold"></i>
+          </button>
+        </div>
+
+        <!-- Drag Handle (Edit Mode) -->
+        <div *ngIf="editMode" cdkDragHandle 
+             class="absolute top-3 right-3 z-20 cursor-move w-7 h-7 rounded-full bg-[rgb(58,52,64)]/80 text-[rgb(201,196,186)] hover:text-white flex items-center justify-center border border-[rgb(82,74,90)] transition-colors">
+          <i class="fas fa-grip-vertical text-[10px]"></i>
+        </div>
+
+        <!-- Widget Header -->
+        <div class="px-5 pt-4 pb-2 border-b border-[rgb(58,52,64)]/50 flex justify-center">
+          <div class="flex items-center space-x-2">
+            <i [class]="widget.icon" class="text-[rgb(var(--accent-primary))] text-sm"></i>
+            <h4 class="font-bold text-[rgb(244,241,234)] text-sm tracking-wide">{{ widget.title }}</h4>
+          </div>
+        </div>
+
+        <!-- Widget Content area placeholder -->
+        <div class="flex-1 p-5 relative overflow-hidden bg-gradient-to-b from-transparent to-[rgb(var(--accent-primary))]/5 flex flex-col justify-between">
+          
+          <!-- Subtle Grid Background -->
+          <div class="absolute inset-0 pointer-events-none opacity-20" 
+               style="background-image: linear-gradient(rgb(var(--accent-primary)) 1px, transparent 1px), linear-gradient(90deg, rgb(var(--accent-primary)) 1px, transparent 1px); background-size: 24px 24px; background-position: center center; mask-image: radial-gradient(circle at center, black, transparent 80%); -webkit-mask-image: radial-gradient(circle at center, black, transparent 80%);">
+          </div>
+
+          <!-- Scanning Line Animation -->
+          <div class="absolute top-0 left-0 right-0 h-[2px] bg-[rgb(var(--accent-primary))] opacity-50 shadow-[0_0_10px_rgb(var(--accent-primary))] animate-scan pointer-events-none z-0"></div>
+
+          <!-- Center Preview Mockup -->
+          <div class="relative z-10 flex-1 flex flex-col items-center justify-center w-full" [ngSwitch]="widget.config?.visualType">
+            
+            <!-- Line Chart Preview -->
+            <div *ngSwitchCase="'Line Chart'" class="w-full h-24 relative flex flex-col justify-between p-2">
+              <svg class="w-full h-16 text-[rgb(var(--accent-primary))]" viewBox="0 0 100 40" preserveAspectRatio="none">
+                <!-- Grid Lines -->
+                <line x1="0" y1="10" x2="100" y2="10" stroke="rgba(255,255,255,0.05)" stroke-width="0.5" />
+                <line x1="0" y1="20" x2="100" y2="20" stroke="rgba(255,255,255,0.05)" stroke-width="0.5" />
+                <line x1="0" y1="30" x2="100" y2="30" stroke="rgba(255,255,255,0.05)" stroke-width="0.5" />
+                <!-- Line Path -->
+                <path d="M0,35 Q15,5 30,25 T60,15 T90,30 L100,10" fill="none" stroke="currentColor" stroke-width="2" class="drop-shadow-[0_0_4px_rgb(var(--accent-primary))]" />
+              </svg>
+              <div class="flex justify-between items-center text-[10px] text-slate-400 font-mono mt-1 border-t border-slate-700/30 pt-1">
+                <span>08:00</span>
+                <span class="text-[rgb(var(--accent-primary))] font-bold">Trend OEE: 81.3%</span>
+                <span>16:00</span>
+              </div>
+            </div>
+            
+            <!-- Area Chart Preview -->
+            <div *ngSwitchCase="'Area Chart'" class="w-full h-24 relative flex flex-col justify-between p-2">
+              <svg class="w-full h-16 text-emerald-400" viewBox="0 0 100 40" preserveAspectRatio="none">
+                <defs>
+                  <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="currentColor" stop-opacity="0.3"/>
+                    <stop offset="100%" stop-color="currentColor" stop-opacity="0.0"/>
+                  </linearGradient>
+                </defs>
+                <path d="M0,40 L0,25 Q20,5 45,28 T80,10 L100,20 L100,40 Z" fill="url(#areaGrad)" />
+                <path d="M0,25 Q20,5 45,28 T80,10 L100,20" fill="none" stroke="currentColor" stroke-width="2" class="drop-shadow-[0_0_4px_rgba(52,211,153,0.5)]" />
+              </svg>
+              <div class="flex justify-between items-center text-[10px] text-slate-400 font-mono mt-1 border-t border-slate-700/30 pt-1">
+                <span>Temp Live</span>
+                <span class="text-emerald-400 font-bold">68.4 °C</span>
+                <span>Normal</span>
+              </div>
+            </div>
+
+            <!-- Bar Chart Preview -->
+            <div *ngSwitchCase="'Bar Chart'" class="w-full h-24 flex flex-col justify-between p-2">
+              <div class="flex items-end justify-around h-16 w-full px-2">
+                <div class="flex flex-col items-center w-6">
+                  <span class="text-[8px] text-slate-400 mb-1">120k</span>
+                  <div class="w-3 bg-indigo-500/20 border border-indigo-500/40 h-8 rounded-t-sm shadow-[0_0_10px_rgba(99,102,241,0.2)]"></div>
+                  <span class="text-[8px] text-slate-500 mt-1">L1</span>
+                </div>
+                <div class="flex flex-col items-center w-6">
+                  <span class="text-[8px] text-emerald-400 mb-1">450k</span>
+                  <div class="w-3 bg-emerald-500 h-12 rounded-t-sm shadow-[0_0_10px_rgba(16,185,129,0.4)]"></div>
+                  <span class="text-[8px] text-slate-500 mt-1">L2</span>
+                </div>
+                <div class="flex flex-col items-center w-6">
+                  <span class="text-[8px] text-slate-400 mb-1">280k</span>
+                  <div class="w-3 bg-indigo-500/40 border border-indigo-500/60 h-10 rounded-t-sm shadow-[0_0_10px_rgba(99,102,241,0.3)]"></div>
+                  <span class="text-[8px] text-slate-500 mt-1">L3</span>
+                </div>
+                <div class="flex flex-col items-center w-6">
+                  <span class="text-[8px] text-amber-500 mb-1">310k</span>
+                  <div class="w-3 bg-amber-500 h-11 rounded-t-sm shadow-[0_0_10px_rgba(245,158,11,0.4)]"></div>
+                  <span class="text-[8px] text-slate-500 mt-1">L4</span>
+                </div>
+              </div>
+              <div class="text-center text-[10px] text-slate-400 font-mono border-t border-slate-700/30 pt-1">
+                Total Energy: <span class="text-emerald-400 font-bold">1,160 kW</span>
+              </div>
+            </div>
+
+            <!-- Gauge Preview -->
+            <div *ngSwitchCase="'Gauge Chart'" class="w-full h-24 flex flex-col items-center justify-center p-2">
+              <div class="relative w-24 h-12 overflow-hidden flex items-end justify-center">
+                <!-- Gauge Arc -->
+                <div class="absolute top-0 left-0 w-24 h-24 rounded-full border-[6px] border-slate-800 border-t-indigo-500 border-l-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.2)]"></div>
+                <!-- Reading Text -->
+                <div class="relative z-10 text-xl font-black text-white tracking-wider mb-0.5">85.2%</div>
+              </div>
+              <div class="text-[9px] text-slate-400 font-mono uppercase tracking-wider mt-2">
+                OEE Target Status: <span class="text-emerald-400 font-bold">OPTIMAL</span>
+              </div>
+            </div>
+
+            <!-- Donut Chart Preview -->
+            <div *ngSwitchCase="'Donut Chart'" class="w-full h-24 flex items-center justify-center gap-4 p-2">
+              <div class="relative w-16 h-16 flex items-center justify-center shrink-0">
+                <svg class="w-full h-full -rotate-90" viewBox="0 0 36 36">
+                  <!-- Grey background ring -->
+                  <path class="text-slate-800" stroke="currentColor" stroke-width="3" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                  <!-- Colored foreground rings -->
+                  <path class="text-emerald-500 drop-shadow-[0_0_4px_rgba(16,185,129,0.4)]" stroke-dasharray="75, 100" stroke="currentColor" stroke-width="3" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                </svg>
+                <div class="absolute text-xs font-black text-white">75%</div>
+              </div>
+              <div class="flex flex-col space-y-1 text-[9px] font-mono text-slate-400">
+                <div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-emerald-500"></span> Active (15)</div>
+                <div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-amber-500"></span> Warn (2)</div>
+                <div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-rose-500"></span> Down (4)</div>
+              </div>
+            </div>
+
+            <!-- Data Grid Preview -->
+            <div *ngSwitchCase="'Data Grid'" class="w-full flex flex-col space-y-2 px-4 opacity-60">
+              <div class="h-1.5 w-full bg-[rgb(var(--accent-primary))]/40 rounded-full"></div>
+              <div class="h-1.5 w-5/6 bg-[rgb(var(--accent-primary))]/20 rounded-full"></div>
+              <div class="h-1.5 w-4/6 bg-[rgb(var(--accent-primary))]/20 rounded-full"></div>
+              <div class="h-1.5 w-full bg-[rgb(var(--accent-primary))]/20 rounded-full"></div>
+            </div>
+            
+            <!-- List View Preview -->
+            <div *ngSwitchCase="'List View'" class="w-full flex flex-col space-y-2 px-4 opacity-60">
+              <div class="h-1.5 w-full bg-[rgb(var(--accent-primary))]/40 rounded-full"></div>
+              <div class="h-1.5 w-5/6 bg-[rgb(var(--accent-primary))]/20 rounded-full"></div>
+              <div class="h-1.5 w-4/6 bg-[rgb(var(--accent-primary))]/20 rounded-full"></div>
+            </div>
+
+            <!-- KPI Card Preview -->
+            <div *ngSwitchCase="'KPI Card'" class="w-full h-24 flex flex-col items-center justify-center p-2">
+              <div class="text-3xl font-black text-emerald-400 tracking-wider drop-shadow-[0_0_12px_rgba(52,211,153,0.3)]">
+                12.4 t
+              </div>
+              <div class="text-[9px] text-[rgb(163,154,137)] uppercase tracking-widest mt-1.5 font-bold">
+                CO2 Emissions · Saved 15%
+              </div>
+            </div>
+
+            <!-- Default / Fallback Preview (Orb) -->
+            <div *ngSwitchDefault class="w-12 h-12 rounded-full border border-[rgb(var(--accent-primary))]/50 bg-[rgb(var(--accent-primary))]/10 flex items-center justify-center shadow-[0_0_20px_rgb(var(--accent-primary)/0.2)]">
+               <i [class]="widget.icon" class="text-xl text-[rgb(var(--accent-primary))] drop-shadow-[0_0_5px_rgb(var(--accent-primary))]"></i>
+            </div>
+            
+            <!-- Type Label (centered underneath preview) -->
+            <div class="mt-4 px-3 py-1 bg-[rgb(20,17,27)]/80 backdrop-blur border border-[rgb(var(--accent-primary))]/30 rounded-lg shadow-[0_0_10px_rgb(var(--accent-primary)/0.1)]">
+              <span class="text-[9px] font-mono text-[rgb(var(--accent-primary))] uppercase tracking-widest">{{ widget.config?.visualType || 'Module' }}</span>
+            </div>
+
+          </div>
+          
+          <!-- Bottom Metadata -->
+          <div class="relative z-10 w-full flex items-end justify-between mt-2 pt-2 border-t border-[rgb(82,74,90)]/30">
+            <p class="text-[9px] text-[rgb(163,154,137)] uppercase tracking-wider font-semibold">{{ widget.category }}</p>
+            <div class="flex items-center space-x-1.5">
+              <div class="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_5px_#10b981] animate-pulse"></div>
+              <p class="text-[7px] text-[rgb(163,154,137)] uppercase tracking-widest">Sys_OK</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Nova Data Core Configuration Modal -->
+  <div *ngIf="showConfigModal && configuringWidget" 
+       class="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-modal-in">
+    <div class="relative w-full max-w-lg bg-[rgb(20,17,27)] rounded-3xl border border-[rgb(82,74,90)] shadow-[0_20px_50px_rgba(0,0,0,0.8)] overflow-hidden flex flex-col">
+      <!-- Header -->
+      <div class="px-6 py-4 border-b border-[rgb(82,74,90)] bg-[rgb(31,27,38)]/80 flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-xl bg-[rgb(var(--accent-primary))]/10 border border-[rgb(var(--accent-primary))]/30 flex items-center justify-center shadow-[0_0_15px_rgb(var(--accent-primary)/0.2)]">
+            <i class="fas fa-satellite-dish text-[rgb(var(--accent-primary))] animate-pulse"></i>
+          </div>
+          <div>
+            <h3 class="text-white font-bold tracking-wide">Nova Data Core</h3>
+            <p class="text-[10px] text-[rgb(163,154,137)] uppercase tracking-widest">[{{ configuringWidget.category }}] {{ configuringWidget.title }}</p>
+          </div>
+        </div>
+        <button (click)="closeWidgetConfig()" class="text-[rgb(163,154,137)] hover:text-white transition-colors cursor-pointer w-8 h-8 flex items-center justify-center rounded-full hover:bg-[rgb(82,74,90)]/30">
+          <i class="fas fa-times text-lg"></i>
+        </button>
+      </div>
+      
+      <!-- Body -->
+      <div class="p-6 flex-1 space-y-6">
+        <p class="text-sm text-[rgb(201,196,186)]">Modülün besleneceği veri kaynağını (Data Source) seçin. Seçtiğiniz sorgunun veya betiğin çıktıları doğrudan bu modüle aktarılır.</p>
+        
+        <!-- Source Type Toggle -->
+        <div class="space-y-2">
+          <label class="text-xs font-bold text-[rgb(163,154,137)] uppercase tracking-wider">Source Type</label>
+          <div class="flex rounded-xl bg-[rgb(31,27,38)] p-1 border border-[rgb(82,74,90)]">
+            <button class="flex-1 py-2 text-sm font-semibold rounded-lg transition-all cursor-pointer"
+                    [ngClass]="configuringWidget.dataSourceType === 'sql' ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 shadow-[0_0_15px_rgba(99,102,241,0.2)]' : 'text-[rgb(163,154,137)] hover:text-white border border-transparent'"
+                    (click)="configuringWidget.dataSourceType = 'sql'">
+              <i class="fas fa-database mr-2"></i> SQL Query
+            </button>
+            <button class="flex-1 py-2 text-sm font-semibold rounded-lg transition-all cursor-pointer"
+                    [ngClass]="configuringWidget.dataSourceType === 'python' ? 'bg-[rgb(var(--accent-primary))]/20 text-[rgb(var(--accent-primary))] border border-[rgb(var(--accent-primary))]/30 shadow-[0_0_15px_rgb(var(--accent-primary)/0.2)]' : 'text-[rgb(163,154,137)] hover:text-white border border-transparent'"
+                    (click)="configuringWidget.dataSourceType = 'python'">
+              <i class="fab fa-python mr-2"></i> Python Script
+            </button>
+          </div>
+        </div>
+
+        <!-- Selection Dropdowns -->
+        <div class="space-y-2" *ngIf="configuringWidget.dataSourceType === 'sql'">
+          <label class="text-xs font-bold text-[rgb(163,154,137)] uppercase tracking-wider">Available Queries</label>
+          <select [(ngModel)]="configuringWidget.assignedQueryId" class="w-full bg-[rgb(31,27,38)] border border-[rgb(82,74,90)] text-white text-sm rounded-xl px-4 py-3 focus:outline-none focus:border-indigo-500 focus:shadow-[0_0_15px_rgba(99,102,241,0.2)] transition-all cursor-pointer">
+            <option [ngValue]="undefined" disabled>-- Select a SQL Query --</option>
+            <option *ngFor="let q of availableSqlQueries" [ngValue]="q.id">{{ q.name }}</option>
+          </select>
+        </div>
+
+        <div class="space-y-2" *ngIf="configuringWidget.dataSourceType === 'python'">
+          <label class="text-xs font-bold text-[rgb(163,154,137)] uppercase tracking-wider">Available Scripts</label>
+          <select [(ngModel)]="configuringWidget.assignedPythonId" class="w-full bg-[rgb(31,27,38)] border border-[rgb(82,74,90)] text-white text-sm rounded-xl px-4 py-3 focus:outline-none focus:border-[rgb(var(--accent-primary))] focus:shadow-[0_0_15px_rgb(var(--accent-primary)/0.2)] transition-all cursor-pointer">
+            <option [ngValue]="undefined" disabled>-- Select a Python Script --</option>
+            <option *ngFor="let p of availablePythonScripts" [ngValue]="p.id">{{ p.name }}</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="px-6 py-4 border-t border-[rgb(82,74,90)] bg-[rgb(20,17,27)] flex justify-end space-x-3">
+        <button (click)="closeWidgetConfig()" class="px-5 py-2.5 rounded-xl border border-[rgb(82,74,90)] text-[rgb(201,196,186)] hover:bg-[rgb(82,74,90)] hover:text-white transition-all font-semibold cursor-pointer">
+          İptal
+        </button>
+        <button (click)="saveWidgetConfig()" class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[rgb(var(--accent-primary))] to-[rgb(var(--accent-soft))] text-white shadow-[0_0_15px_rgb(var(--accent-primary)/0.3)] hover:shadow-[0_0_25px_rgb(var(--accent-primary)/0.5)] transition-all font-bold cursor-pointer border border-[rgb(var(--accent-secondary))]/50">
+          <i class="fas fa-link mr-2"></i> Veriyi Bağla
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

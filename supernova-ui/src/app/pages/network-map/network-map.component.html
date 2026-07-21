@@ -1,0 +1,141 @@
+<!-- ============================================================================ -->
+<!-- Space Map — sade, otomatik, path-definer beslemeli hiyerarşi görselleştirmesi -->
+<!-- ============================================================================ -->
+<div class="space-map" [class.loading]="isLoading">
+
+  <!-- ===================== TOPBAR (tek satır) ===================== -->
+  <header class="sm-topbar">
+    <div class="sm-brand">
+      <div class="sm-brand-icon"><i class="fas fa-satellite"></i></div>
+      <div class="sm-brand-text">
+        <h1>{{ 'NETWORK_MAP.TITLE' | translate }}</h1>
+        <p>{{ selectedPath?.name || ('NETWORK_MAP.SUBTITLE' | translate) }}</p>
+      </div>
+    </div>
+
+    <!-- Arama -->
+    <div class="sm-search">
+      <i class="fas fa-search"></i>
+      <input
+        type="text"
+        [(ngModel)]="searchTerm"
+        (ngModelChange)="onSearch()"
+        [placeholder]="'NETWORK_MAP.SEARCH_PLACEHOLDER' | translate" />
+      <ul class="sm-search-results" *ngIf="searchResults.length">
+        <li *ngFor="let r of searchResults" (click)="focusSearchResult(r)">
+          <span class="lvl">L{{ r.depth + 1 }}</span>
+          <span class="lbl">{{ r.label }}</span>
+        </li>
+      </ul>
+      <span class="sm-search-hint" *ngIf="searchHint && !searchResults.length">{{ searchHint }}</span>
+    </div>
+
+    <!-- DB seçimi -->
+    <label class="sm-field">
+      <i class="fas fa-database"></i>
+      <select [(ngModel)]="selectedDataSourceId" (ngModelChange)="onDataSourceChange()">
+        <option [ngValue]="null">{{ 'NETWORK_MAP.SELECT_DATASOURCE' | translate }}</option>
+        <option *ngFor="let ds of dataSources" [ngValue]="ds.id">{{ ds.name }}</option>
+      </select>
+    </label>
+
+    <!-- Path seçimi -->
+    <label class="sm-field">
+      <i class="fas fa-route"></i>
+      <select [(ngModel)]="selectedPathId" (ngModelChange)="onSelectPath($event)">
+        <option [ngValue]="null">{{ 'NETWORK_MAP.SELECT_PATH' | translate }}</option>
+        <option *ngFor="let p of filteredPaths" [ngValue]="p.id">{{ p.name }}</option>
+      </select>
+    </label>
+
+    <button class="sm-icon-btn" (click)="refresh()" [disabled]="!selectedPathId || isLoading"
+            [title]="'NETWORK_MAP.REFRESH' | translate">
+      <i class="fas fa-sync-alt" [class.spinning]="isLoading"></i>
+    </button>
+  </header>
+
+  <!-- ===================== CANVAS ALANI ===================== -->
+  <main class="sm-canvas-wrap" #mapContainer>
+    <canvas #networkCanvas class="sm-canvas"></canvas>
+
+    <!-- Focus başlığı (sol-üst, canvas üstü) -->
+    <div class="sm-focus-chip" *ngIf="focusTitle && !isLoading && !error">
+      <i class="fas fa-crosshairs"></i>
+      <span>{{ focusTitle }}</span>
+      <button class="sm-up" *ngIf="focusId" (click)="navigateUp()" [title]="'NETWORK_MAP.UP' | translate">
+        <i class="fas fa-arrow-up"></i>
+      </button>
+    </div>
+
+    <!-- İstatistik çipi (sağ-üst) -->
+    <div class="sm-stats-chip" *ngIf="totalNodes">
+      <span><i class="fas fa-sitemap"></i> {{ totalNodes }}</span>
+      <span class="dot">·</span>
+      <span><i class="fas fa-layer-group"></i> {{ maxDepth + 1 }}</span>
+    </div>
+
+    <!-- Zoom kontrolleri (sağ-alt) -->
+    <div class="sm-zoom" *ngIf="!isLoading">
+      <button (click)="zoomOut()" [title]="'NETWORK_MAP.ZOOM_OUT' | translate"><i class="fas fa-minus"></i></button>
+      <span class="sm-zoom-val">{{ zoomPercent }}%</span>
+      <button (click)="zoomIn()" [title]="'NETWORK_MAP.ZOOM_IN' | translate"><i class="fas fa-plus"></i></button>
+      <button class="fit" (click)="fitView()" [title]="'NETWORK_MAP.FIT_VIEW' | translate"><i class="fas fa-expand"></i></button>
+    </div>
+
+    <!-- Yükleniyor -->
+    <div class="sm-overlay" *ngIf="isLoading">
+      <div class="spinner"><i class="fas fa-satellite-dish"></i></div>
+      <p>{{ 'NETWORK_MAP.LOADING' | translate }}</p>
+    </div>
+
+    <!-- Hata -->
+    <div class="sm-overlay sm-error" *ngIf="error && !isLoading">
+      <i class="fas fa-exclamation-triangle"></i>
+      <p>{{ error }}</p>
+      <button class="sm-btn" (click)="refresh()">{{ 'NETWORK_MAP.TRY_AGAIN' | translate }}</button>
+    </div>
+
+    <!-- Boş durum: datasource seçili değil veya bu DB'de path yok -->
+    <div class="sm-overlay sm-empty" *ngIf="!isLoading && !error && !totalNodes">
+      <i class="fas fa-network-wired"></i>
+      <p *ngIf="!selectedDataSourceId">{{ 'NETWORK_MAP.SELECT_DATASOURCE_HINT' | translate }}</p>
+      <p *ngIf="selectedDataSourceId">{{ 'NETWORK_MAP.NO_PATH_FOR_DB' | translate }}</p>
+    </div>
+  </main>
+
+  <!-- ===================== DETAY PANELİ (sağ, slide-in) ===================== -->
+  <aside class="sm-detail" *ngIf="selectedNode">
+    <div class="sm-detail-head">
+      <span class="sm-level">{{ selectedLevelLabel }}</span>
+      <button class="sm-close" (click)="closeDetail()" title="×"><i class="fas fa-times"></i></button>
+    </div>
+    <h2 class="sm-detail-title">{{ selectedNode.label }}</h2>
+
+    <div class="sm-breadcrumb">
+      <ng-container *ngFor="let crumb of selectedBreadcrumb; let last = last">
+        <span [class.active]="last">{{ crumb }}</span>
+        <i class="fas fa-chevron-right sep" *ngIf="!last"></i>
+      </ng-container>
+    </div>
+
+    <div class="sm-detail-meta">
+      <div><span>{{ 'NETWORK_MAP.CHILDREN' | translate }}</span><strong>{{ selectedNode.children.length }}</strong></div>
+      <div><span>{{ 'NETWORK_MAP.LEAVES' | translate }}</span><strong>{{ selectedNode.leafCount }}</strong></div>
+    </div>
+
+    <div class="sm-detail-actions">
+      <button class="sm-btn primary" (click)="addToDashboard()">
+        <i class="fas fa-tachometer-alt"></i> {{ 'NETWORK_MAP.ADD_TO_DASHBOARD' | translate }}
+      </button>
+      <button class="sm-btn" (click)="createReport()">
+        <i class="fas fa-file-signature"></i> {{ 'NETWORK_MAP.CREATE_REPORT' | translate }}
+      </button>
+      <button class="sm-icon-btn ghost" (click)="copyPath()" [title]="'NETWORK_MAP.COPY_PATH' | translate">
+        <i class="fas fa-copy"></i>
+      </button>
+    </div>
+  </aside>
+
+  <!-- Toast -->
+  <div class="sm-toast" *ngIf="toast" [class.err]="toastType === 'error'">{{ toast }}</div>
+</div>

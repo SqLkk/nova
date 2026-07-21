@@ -1,0 +1,25 @@
+/* Modern App Layout — sidebar + içerik (flex) */
+.app-layout {
+  display: flex;
+  align-items: flex-start;
+  width: 100%;
+  min-height: 100vh;
+  // --bg-primary bir "R G B" triplet'tir; rgb() sarmalamadan geçersiz CSS olur.
+  background: rgb(var(--bg-primary));
+  transition: background-color 0.25s ease;
+}
+
+.content-area {
+  flex: 1 1 0%;
+  // İçteki geniş tablolar / network map / grafikler yatay kayabilsin diye
+  // min-width: 0 şart (aksi halde flex öğesi içeriğe göre büyür, sayfa kayar).
+  min-width: 0;
+  min-height: 100vh;
+
+  &.no-nav {
+    flex: 1 1 100%;
+  }
+}
+
+// Not: Global scrollbar ve yüzey kuralları styles.scss içinde merkezî olarak
+// tanımlıdır (token tabanlı). Burada tekrar tanımlamaya gerek yoktur.

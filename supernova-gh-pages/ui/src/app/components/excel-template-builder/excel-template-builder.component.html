@@ -1,0 +1,150 @@
+<div class="min-h-screen bg-[rgb(20,17,27)] relative overflow-hidden text-slate-100 font-sans pt-16">
+  
+  <!-- Subtle Space Background Effect -->
+  <div class="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+    <div class="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-indigo-900/10 via-[rgb(var(--bg-primary))] to-[rgb(var(--bg-primary))]"></div>
+    <!-- Asteroids/Dots -->
+    <div class="absolute inset-0" style="background-image: radial-gradient(circle, rgba(255,255,255,0.03) 1.5px, transparent 1.5px); background-size: 80px 80px;"></div>
+  </div>
+
+  <main class="relative z-10 p-8 h-[calc(100vh-64px)] flex flex-col">
+    
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-6 shrink-0">
+      <div>
+        <h2 class="text-3xl font-black tracking-tight text-white flex items-center">
+          <i class="fas fa-file-invoice text-[rgb(var(--accent-primary))] mr-3"></i>
+          Template Builder
+        </h2>
+        <p class="text-[rgb(201,196,186)] mt-1 font-medium text-sm tracking-wide">Design dynamic report layouts using drag-and-drop</p>
+      </div>
+      
+      <div class="flex items-center space-x-3">
+        <button class="px-5 py-2.5 rounded-xl border border-[rgb(82,74,90)] bg-[rgb(31,27,38)] text-[rgb(201,196,186)] font-semibold hover:text-white hover:bg-[rgb(47,41,52)] transition-colors">
+          Preview
+        </button>
+        <button class="px-5 py-2.5 bg-gradient-to-r from-[rgb(var(--accent-primary))] to-[rgb(var(--accent-secondary))] text-[rgb(var(--on-accent))] rounded-xl font-bold shadow-[0_0_15px_rgb(var(--accent-primary)/0.2)] hover:shadow-[0_0_25px_rgb(var(--accent-primary)/0.4)] transition-all">
+          <i class="fas fa-save mr-2"></i> Save Template
+        </button>
+      </div>
+    </div>
+
+    <div class="flex space-x-6 flex-1 min-h-0">
+      
+      <!-- Toolbox Sidebar -->
+      <div class="w-72 flex flex-col bg-[rgb(31,27,38)]/60 backdrop-blur-md border border-[rgb(82,74,90)] rounded-3xl overflow-hidden shadow-2xl">
+        <div class="p-4 border-b border-[rgb(58,52,64)] bg-[rgb(20,17,27)]/30">
+          <h4 class="font-bold text-white uppercase tracking-wider text-xs">Elements Library</h4>
+        </div>
+        
+        <div class="flex-1 overflow-y-auto custom-scrollbar p-4"
+             cdkDropList
+             id="toolboxList"
+             [cdkDropListData]="availableElements"
+             [cdkDropListConnectedTo]="['canvasList']"
+             [cdkDropListEnterPredicate]="false"> <!-- Prevent dropping back into toolbox -->
+          
+          <div *ngFor="let item of availableElements" 
+               cdkDrag
+               class="p-4 mb-3 rounded-xl bg-[rgb(20,17,27)]/80 border border-[rgb(82,74,90)] shadow-md cursor-grab hover:border-[rgb(var(--accent-primary))]/50 transition-colors group">
+            
+            <div class="flex items-center space-x-3">
+              <div class="w-10 h-10 rounded-lg bg-[rgb(47,41,52)] flex items-center justify-center border border-[rgb(58,52,64)]">
+                <i class="fas" [ngClass]="{
+                  'fa-heading text-indigo-400': item.type === 'header',
+                  'fa-table text-emerald-400': item.type === 'table',
+                  'fa-chart-pie text-amber-400': item.type === 'chart',
+                  'fa-align-left text-slate-400': item.type === 'text'
+                }"></i>
+              </div>
+              <div>
+                <h5 class="text-white font-semibold text-sm">{{ item.content }}</h5>
+                <p class="text-[10px] text-[rgb(163,154,137)] uppercase font-bold">{{ item.type }}</p>
+              </div>
+            </div>
+            
+            <!-- Drag Placeholder -->
+            <div *cdkDragPlaceholder class="p-4 mb-3 rounded-xl bg-[rgb(var(--accent-primary))]/20 border-2 border-dashed border-[rgb(var(--accent-primary))] opacity-50"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Canvas Area -->
+      <div class="flex-1 flex flex-col bg-[rgb(20,17,27)]/40 border border-dashed border-[rgb(82,74,90)] rounded-3xl overflow-hidden relative">
+        
+        <!-- Canvas Grid Background -->
+        <div class="absolute inset-0 pointer-events-none opacity-20" style="background-image: linear-gradient(rgb(var(--accent-primary)/0.5) 1px, transparent 1px), linear-gradient(90deg, rgb(var(--accent-primary)/0.5) 1px, transparent 1px); background-size: 20px 20px;"></div>
+
+        <div class="absolute top-4 left-4 z-10 px-3 py-1.5 bg-[rgb(31,27,38)]/80 backdrop-blur-md rounded-lg border border-[rgb(58,52,64)] shadow-lg flex items-center text-xs font-bold text-[rgb(201,196,186)]">
+          <i class="fas fa-vector-square mr-2 text-[rgb(var(--accent-primary))]"></i> A4 Portrait Layout
+        </div>
+        
+        <div class="flex-1 overflow-y-auto p-12 flex justify-center custom-scrollbar z-10">
+          
+          <!-- The Page -->
+          <div class="w-[800px] min-h-[1100px] bg-white rounded-md shadow-[0_20px_50px_rgba(0,0,0,0.5)] flex flex-col"
+               cdkDropList
+               id="canvasList"
+               [cdkDropListData]="templateElements"
+               (cdkDropListDropped)="drop($event)">
+               
+            <!-- Empty Canvas State -->
+            <div *ngIf="templateElements.length === 0" class="flex-1 flex flex-col items-center justify-center border-4 border-dashed border-slate-200 m-8 rounded-2xl bg-slate-50">
+              <div class="w-20 h-20 rounded-full bg-slate-100 flex items-center justify-center mb-4">
+                <i class="fas fa-layer-group text-3xl text-slate-300"></i>
+              </div>
+              <h3 class="text-xl font-bold text-slate-700">Drag & Drop Elements Here</h3>
+              <p class="text-slate-500 mt-2">Build your report structure by dragging blocks from the left</p>
+            </div>
+
+            <!-- Canvas Items -->
+            <div class="p-8 flex flex-col space-y-4">
+              <div *ngFor="let item of templateElements; let i = index" 
+                   cdkDrag
+                   class="relative border-2 border-transparent hover:border-blue-400 p-4 rounded-lg group transition-colors cursor-move bg-slate-50">
+                   
+                <!-- Hover Actions -->
+                <div class="absolute -top-3 -right-3 hidden group-hover:flex space-x-1 z-20">
+                  <button class="w-8 h-8 bg-blue-500 text-white rounded-full shadow-md flex items-center justify-center hover:bg-blue-600">
+                    <i class="fas fa-cog text-xs"></i>
+                  </button>
+                  <button (click)="removeElement(i)" class="w-8 h-8 bg-red-500 text-white rounded-full shadow-md flex items-center justify-center hover:bg-red-600">
+                    <i class="fas fa-trash text-xs"></i>
+                  </button>
+                </div>
+
+                <!-- Render Element Based on Type -->
+                <div [ngSwitch]="item.type" class="w-full">
+                  <div *ngSwitchCase="'header'" class="text-2xl font-bold text-slate-800 border-b-2 border-slate-200 pb-2">
+                    {{ item.content }}
+                  </div>
+                  
+                  <div *ngSwitchCase="'table'" class="w-full">
+                    <div class="bg-slate-200 p-2 text-center text-slate-600 font-semibold rounded-t-md">{{ item.content }}</div>
+                    <div class="border border-slate-200 rounded-b-md p-4 bg-white flex flex-col space-y-2">
+                      <div class="h-4 bg-slate-100 rounded w-full"></div>
+                      <div class="h-4 bg-slate-100 rounded w-5/6"></div>
+                      <div class="h-4 bg-slate-100 rounded w-full"></div>
+                    </div>
+                  </div>
+
+                  <div *ngSwitchCase="'chart'" class="w-full flex flex-col items-center justify-center bg-slate-100 h-48 rounded-md border border-slate-200">
+                    <i class="fas fa-chart-line text-4xl text-slate-300 mb-2"></i>
+                    <span class="text-slate-500 font-medium">{{ item.content }} Placeholder</span>
+                  </div>
+
+                  <div *ngSwitchCase="'text'" class="w-full text-slate-600">
+                    Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam.
+                  </div>
+                </div>
+
+                <div *cdkDragPlaceholder class="p-4 rounded-lg bg-blue-50 border-2 border-dashed border-blue-400 opacity-70 min-h-[100px]"></div>
+              </div>
+            </div>
+            
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>

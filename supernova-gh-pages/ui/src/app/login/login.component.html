@@ -1,0 +1,82 @@
+<div class="login-page">
+  <!-- Language Selector -->
+  <div class="fixed top-5 right-5 z-50">
+    <select
+      [(ngModel)]="selectedLanguage"
+      (change)="changeLanguage($any($event.target).value)"
+      class="lang-select">
+      <option value="tr">🇹🇷 Türkçe</option>
+      <option value="en">🇬🇧 English</option>
+      <option value="de">🇩🇪 Deutsch</option>
+    </select>
+  </div>
+
+  <!-- Decorative background -->
+  <div class="grid-bg"></div>
+  <div class="glow glow-1"></div>
+  <div class="glow glow-2"></div>
+
+  <div class="login-card">
+    <!-- Header -->
+    <div class="text-center mb-8">
+      <div class="login-logo inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-4">
+        <i class="fas fa-wave-square text-2xl"></i>
+      </div>
+      <h1 class="text-2xl font-bold text-ink">{{ 'LOGIN.TITLE' | translate }}</h1>
+      <p class="text-ink-muted text-sm mt-1">{{ 'LOGIN.SUBTITLE' | translate }}</p>
+    </div>
+
+    <!-- Error -->
+    <div *ngIf="errorMessage"
+         class="mb-4 p-3 rounded-xl bg-danger/10 border border-danger/30 text-danger text-sm flex items-center gap-2">
+      <i class="fas fa-exclamation-circle"></i>
+      <span>{{ errorMessage }}</span>
+    </div>
+
+    <!-- Form -->
+    <form [formGroup]="loginForm" (ngSubmit)="onSubmit()" class="space-y-5">
+      <div>
+        <label class="block text-sm font-medium text-ink-secondary mb-2">
+          <i class="fas fa-user text-brand mr-2 text-xs"></i>{{ 'LOGIN.USERNAME' | translate }}
+        </label>
+        <input formControlName="username" type="text" autocomplete="username"
+               [placeholder]="'LOGIN.USERNAME_PLACEHOLDER' | translate"
+               class="login-input" [class.error]="hasError('username')" />
+        <p *ngIf="hasError('username')" class="text-danger text-xs mt-1.5">{{ getErrorMessage('username') }}</p>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-ink-secondary mb-2">
+          <i class="fas fa-lock text-brand mr-2 text-xs"></i>{{ 'LOGIN.PASSWORD' | translate }}
+        </label>
+        <input formControlName="password" type="password" autocomplete="current-password"
+               [placeholder]="'LOGIN.PASSWORD_PLACEHOLDER' | translate"
+               class="login-input" [class.error]="hasError('password')" />
+        <p *ngIf="hasError('password')" class="text-danger text-xs mt-1.5">{{ getErrorMessage('password') }}</p>
+      </div>
+
+      <label class="flex items-center gap-2 cursor-pointer select-none">
+        <input type="checkbox" formControlName="rememberMe"
+               class="w-4 h-4 rounded border-edge bg-surface-raised text-brand focus:ring-brand/30" />
+        <span class="text-ink-muted text-sm">{{ 'LOGIN.REMEMBER_ME' | translate }}</span>
+      </label>
+
+      <button type="submit" [disabled]="loading" class="login-btn">
+        <div *ngIf="loading" class="login-spinner animate-spin"></div>
+        <i *ngIf="!loading" class="fas fa-sign-in-alt"></i>
+        {{ loading ? ('LOGIN.LOGGING_IN' | translate) : ('LOGIN.LOGIN_BUTTON' | translate) }}
+      </button>
+      
+      <div class="mt-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl text-center">
+        <p class="text-xs text-blue-500 font-medium">Demo Mode Credentials Pre-filled</p>
+        <p class="text-[10px] text-ink-muted/80 mt-1">Username: <strong>admin</strong> / Password: <strong>Sp7_Admin#9841</strong></p>
+      </div>
+    </form>
+
+    <!-- Footer -->
+    <div class="mt-6 pt-4 border-t border-edge/10 text-center">
+      <p class="text-[11px] text-ink-muted/70">{{ 'LOGIN.COPYRIGHT' | translate }}</p>
+      <p class="text-[10px] text-ink-muted/40 mt-1">{{ 'LOGIN.VERSION' | translate }} · Build {{ currentYear }}</p>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,51 @@
+@keyframes pythonWindowOpen {
+  from {
+    opacity: 0;
+    transform: scale(0.97) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+:host {
+  display: block;
+  width: 100%;
+  animation: pythonWindowOpen 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* Kod editörü — sekme tuşu indent yapsın, taşma gizlensin */
+textarea {
+  tab-size: 4;
+  line-height: 1.55;
+  white-space: pre;
+  overflow: auto;
+}
+
+textarea:focus {
+  outline: none;
+}
+
+kbd {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* Özel ince scrollbar (sayfanın diğer kısımlarıyla uyum) */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(82, 74, 90, 0.5);
+  border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(82, 74, 90, 0.8);
+}

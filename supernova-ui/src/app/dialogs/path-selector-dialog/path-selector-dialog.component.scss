@@ -1,0 +1,42 @@
+// Path Selector Dialog Custom Styles
+
+// Custom Scrollbar
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--text-muted) / 0.4) rgb(var(--bg-secondary) / 0.3);
+
+  &::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: rgb(var(--bg-secondary) / 0.3);
+    border-radius: 4px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgb(var(--text-muted) / 0.4);
+    border-radius: 4px;
+
+    &:hover {
+      background: rgb(var(--text-muted) / 0.6);
+    }
+  }
+}
+
+// Smooth Animations
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-2px); }
+  20%, 40%, 60%, 80% { transform: translateX(2px); }
+}
+
+.animate-shake {
+  animation: shake 0.5s ease-in-out;
+}
+
+// Dialog Backdrop
+.backdrop-blur-sm {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}

@@ -1,0 +1,165 @@
+:host {
+  display: contents;
+}
+
+// Scrollbar styling
+.scrollbar-thin {
+  &::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: rgb(var(--bg-elevated) / 0.4);
+    border-radius: 4px;
+    &:hover {
+      background: rgb(var(--border-strong) / 0.5);
+    }
+  }
+}
+
+// Color input styling
+input[type="color"] {
+  -webkit-appearance: none;
+  border: none;
+  cursor: pointer;
+
+  &::-webkit-color-swatch-wrapper {
+    padding: 2px;
+  }
+  &::-webkit-color-swatch {
+    border: 1px solid rgb(var(--border-color) / 0.5);
+    border-radius: 6px;
+  }
+}
+
+// Fade in animation
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.2s ease-out;
+}
+
+// Light theme overrides for sub-modal
+::ng-deep html:not(.dark) {
+  app-chart-manager {
+    // Background overrides
+    .bg-gray-950 {
+      background-color: rgb(var(--bg-secondary)) !important;
+    }
+    .bg-gray-900 {
+      background-color: rgb(var(--bg-secondary)) !important;
+    }
+    .bg-gray-900\/50 {
+      background-color: rgb(var(--bg-tertiary)) !important;
+    }
+    .bg-gray-900\/80 {
+      background-color: rgb(var(--bg-secondary)) !important;
+    }
+    .bg-gray-800 {
+      background-color: rgb(var(--bg-tertiary)) !important;
+    }
+    .bg-gray-800\/80 {
+      background-color: rgb(var(--bg-tertiary)) !important;
+    }
+    .bg-gray-800\/60 {
+      background-color: rgb(var(--bg-tertiary)) !important;
+    }
+    .bg-gray-800\/40 {
+      background-color: rgb(var(--bg-secondary)) !important;
+    }
+    .bg-gray-800\/30 {
+      background-color: rgb(var(--bg-secondary)) !important;
+    }
+    .bg-gray-700 {
+      background-color: rgb(var(--bg-elevated)) !important;
+    }
+    .bg-gray-700\/60 {
+      background-color: rgb(var(--bg-tertiary)) !important;
+    }
+    .bg-gray-700\/50 {
+      background-color: rgb(var(--bg-tertiary)) !important;
+    }
+
+    // Text overrides
+    .text-white {
+      color: rgb(var(--text-primary)) !important;
+    }
+    .text-gray-300 {
+      color: rgb(var(--text-primary)) !important;
+    }
+    .text-gray-400 {
+      color: rgb(var(--text-secondary)) !important;
+    }
+    .text-gray-500 {
+      color: rgb(var(--text-muted)) !important;
+    }
+
+    // Interactive / Hover states
+    .hover\:bg-gray-800:hover {
+      background-color: rgb(var(--bg-tertiary)) !important;
+    }
+    .hover\:bg-gray-900:hover {
+      background-color: rgb(var(--bg-secondary)) !important;
+    }
+    .hover\:text-white:hover {
+      color: rgb(var(--text-primary)) !important;
+    }
+    .hover\:text-gray-300:hover {
+      color: rgb(var(--text-primary)) !important;
+    }
+    .hover\:bg-gray-700\/50:hover {
+      background-color: rgb(var(--bg-elevated)) !important;
+    }
+
+    // Border overrides
+    .border-gray-800 {
+      border-color: rgb(var(--border-strong)) !important;
+    }
+    .border-gray-800\/80 {
+      border-color: rgb(var(--border-strong)) !important;
+    }
+    .border-gray-800\/60 {
+      border-color: rgb(var(--border-strong)) !important;
+    }
+    .border-gray-800\/40 {
+      border-color: rgb(var(--border-color)) !important;
+    }
+    .border-gray-700\/50 {
+      border-color: rgb(var(--border-strong)) !important;
+    }
+    .border-gray-700\/40 {
+      border-color: rgb(var(--border-strong)) !important;
+    }
+    .border-gray-700\/30 {
+      border-color: rgb(var(--border-color)) !important;
+    }
+    .border-gray-600\/40 {
+      border-color: rgb(var(--border-strong)) !important;
+    }
+    .border-gray-600\/50 {
+      border-color: rgb(var(--text-secondary)) !important;
+    }
+
+    // Focus states
+    .focus\:ring-teal-500\/50:focus {
+      --tw-ring-color: rgb(var(--accent-primary) / 0.4) !important;
+    }
+
+    // Text colored states to look better in light theme
+    .text-teal-400 {
+      color: rgb(var(--accent-primary)) !important;
+    }
+  }
+}

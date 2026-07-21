@@ -1,0 +1,577 @@
+<div class="space-y-6 pb-20">
+  <!-- Voltage Chart -->
+  <div class="bg-gradient-to-br from-gray-800/90 via-gray-800/95 to-slate-800/90 p-6 rounded-2xl shadow-2xl w-full animate__animated animate__fadeInUp border border-gray-700/50 relative overflow-hidden backdrop-blur-sm">
+    <!-- Arkaplan efekti -->
+    <div class="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-transparent to-purple-500/5 pointer-events-none"></div>
+    
+    <!-- Ayarlar ve Kontrol Butonları -->
+    <div class="absolute top-3 right-3 flex space-x-3 z-10">
+      <!-- Ayarlar butonu -->
+      <button 
+        (click)="openSettingsDialog('voltage')"
+        class="p-2 rounded-full bg-blue-600 hover:bg-blue-700 text-white transition-all duration-300 transform hover:scale-110 shadow-lg hover:shadow-xl flex items-center justify-center"
+        [title]="'REALTIME.VOLTAGE_SETTINGS' | translate"
+      >
+        <i class="fas fa-cog text-sm"></i>
+      </button>
+      
+      <!-- Tam ekran butonu -->
+      <button 
+        (click)="toggleFullscreen('voltage')"
+        class="p-2 rounded-full bg-purple-600 hover:bg-purple-700 text-white transition-all duration-300 transform hover:scale-110 shadow-lg hover:shadow-xl flex items-center justify-center"
+        [title]="'REALTIME.FULLSCREEN' | translate"
+      >
+        <i class="fas fa-expand text-sm"></i>
+      </button>
+    </div>
+    
+    <div class="flex justify-between mb-4">
+      <div>
+        <h3 class="text-white font-semibold text-lg">{{ 'REALTIME.THREE_PHASE_VOLTAGE' | translate }}</h3>
+        <p class="text-xs text-gray-400">{{ 'REALTIME.THREE_PHASE_DESC' | translate }}</p>
+      </div>
+      <div class="flex space-x-2">
+        <span class="text-xs text-gray-400 bg-gray-700/60 px-2.5 py-1.5 rounded-lg flex items-center cursor-pointer hover:bg-gray-600/60 transition-all duration-200 shadow-sm"
+              [ngClass]="{'opacity-40': !phaseAVisible, 'ring-1 ring-cyan-300/50 bg-cyan-950/30': phaseAVisible}"
+              (click)="togglePhaseVisibility(0)">
+          <span class="w-2.5 h-2.5 bg-cyan-300 rounded-full inline-block mr-1.5 shadow-[0_0_6px_rgba(34,211,238,0.5)]"></span>
+          {{ 'REALTIME.PHASE_A' | translate }}
+        </span>
+        <span class="text-xs text-gray-400 bg-gray-700/60 px-2.5 py-1.5 rounded-lg flex items-center cursor-pointer hover:bg-gray-600/60 transition-all duration-200 shadow-sm"
+              [ngClass]="{'opacity-40': !phaseBVisible, 'ring-1 ring-rose-300/50 bg-rose-950/30': phaseBVisible}"
+              (click)="togglePhaseVisibility(1)">
+          <span class="w-2.5 h-2.5 bg-rose-400 rounded-full inline-block mr-1.5 shadow-[0_0_6px_rgba(251,113,133,0.5)]"></span>
+          {{ 'REALTIME.PHASE_B' | translate }}
+        </span>
+        <span class="text-xs text-gray-400 bg-gray-700/60 px-2.5 py-1.5 rounded-lg flex items-center cursor-pointer hover:bg-gray-600/60 transition-all duration-200 shadow-sm"
+              [ngClass]="{'opacity-40': !phaseCVisible, 'ring-1 ring-amber-300/50 bg-amber-950/30': phaseCVisible}"
+              (click)="togglePhaseVisibility(2)">
+          <span class="w-2.5 h-2.5 bg-amber-400 rounded-full inline-block mr-1.5 shadow-[0_0_6px_rgba(251,191,36,0.5)]"></span>
+          {{ 'REALTIME.PHASE_C' | translate }}
+        </span>
+      </div>
+    </div>
+    
+    <!-- Eşik değerleri açıklaması -->
+    <div class="flex mb-4 text-xs gap-2">
+      <div class="bg-gray-800/50 px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 border border-gray-700/20">
+        <span class="w-2 h-2 bg-cyan-300 rounded-full shadow-[0_0_4px_rgba(34,211,238,0.5)]"></span>
+        <span class="text-gray-400">{{ 'REALTIME.NORMAL' | translate }}</span>
+      </div>
+      <div class="bg-amber-900/20 px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 shadow-sm border border-amber-700/30">
+        <span class="w-2 h-2 bg-amber-400 rounded-full"></span>
+        <span class="text-amber-300">{{ 'ALARMS.WARNING' | translate }}: {{voltageThresholds.warning}}{{voltageThresholds.unit}}</span>
+      </div>
+      <div class="bg-red-900/20 px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 shadow-sm border border-red-700/30">
+        <span class="w-2 h-2 bg-red-400 rounded-full"></span>
+        <span class="text-red-300">{{ 'ALARMS.CRITICAL' | translate }}: {{voltageThresholds.danger}}{{voltageThresholds.unit}}</span>
+      </div>
+    </div>
+    
+    <!-- Chart Container -->
+    <div class="h-[40rem] bg-slate-900/80 rounded-xl p-4 border border-gray-700/30 relative overflow-hidden transition-all duration-300">
+      <!-- Dinamik arka plan efekti -->
+      <div class="absolute inset-0 bg-gradient-to-b from-blue-950/20 via-transparent to-transparent pointer-events-none"></div>
+      
+      <canvas baseChart
+              #voltageChart
+              [data]="voltageChartData"
+              [options]="chartOptions"
+              [type]="'line'">
+      </canvas>
+      
+      <!-- Canlı veri göstergesi -->
+      <div class="absolute right-3 bottom-3 flex items-center gap-1.5 bg-gray-800/80 px-2.5 py-1 rounded-full border border-gray-700/50">
+        <span class="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>
+        <span class="text-[10px] text-emerald-400 font-medium">LIVE</span>
+      </div>
+    </div>
+    <div class="mt-3 text-[11px] text-slate-500 flex justify-between items-center px-1">
+      <span class="flex items-center gap-1.5"><i class="fas fa-signal text-[9px]"></i>{{ 'REALTIME.REALTIME_UPDATES' | translate }}</span>
+      <span class="font-mono text-slate-400">{{ 'REALTIME.THREE_PHASE_VOLTAGE' | translate }}</span>
+    </div>
+  </div>
+  <!-- Frequency Chart -->
+  <div class="bg-gradient-to-br from-gray-800/90 via-gray-800/95 to-slate-800/90 p-6 rounded-2xl shadow-2xl w-full animate__animated animate__fadeInUp border border-gray-700/50 relative overflow-hidden backdrop-blur-sm">
+    <!-- Arkaplan efekti -->
+    <div class="absolute inset-0 bg-gradient-to-br from-purple-500/5 via-transparent to-blue-500/5 pointer-events-none"></div>
+    
+    <!-- Ayarlar ve Kontrol Butonları -->
+    <div class="absolute top-3 right-3 flex space-x-3 z-10">
+      <!-- Ayarlar butonu -->
+      <button 
+        (click)="openSettingsDialog('frequency')"
+        class="p-2 rounded-full bg-blue-600 hover:bg-blue-700 text-white transition-all duration-300 transform hover:scale-110 shadow-lg hover:shadow-xl flex items-center justify-center"
+        [title]="'REALTIME.FREQUENCY_SETTINGS' | translate"
+      >
+        <i class="fas fa-cog text-sm"></i>
+      </button>
+      
+      <!-- Tam ekran butonu -->
+      <button 
+        (click)="toggleFullscreen('frequency')"
+        class="p-2 rounded-full bg-purple-600 hover:bg-purple-700 text-white transition-all duration-300 transform hover:scale-110 shadow-lg hover:shadow-xl flex items-center justify-center"
+        [title]="'REALTIME.FULLSCREEN' | translate"
+      >
+        <i class="fas fa-expand text-sm"></i>
+      </button>
+    </div>
+    
+    <div class="flex justify-between items-center mb-4">
+      <div>
+        <h3 class="text-white font-semibold text-lg">{{ 'REALTIME.GRID_FREQUENCY' | translate }}</h3>
+        <p class="text-xs text-gray-400">{{ 'REALTIME.GRID_FREQ_DESC' | translate }}</p>
+      </div>
+      <div class="flex space-x-2">
+        <span class="text-xs text-gray-400 bg-gray-700/60 px-2.5 py-1.5 rounded-lg flex items-center cursor-pointer hover:bg-gray-600/60 transition-all duration-200 shadow-sm"
+              [ngClass]="{'opacity-40': !frequencyVisible, 'ring-1 ring-violet-300/50 bg-violet-950/30': frequencyVisible}"
+              (click)="toggleFrequencyVisibility()">
+          <span class="w-2.5 h-2.5 bg-violet-400 rounded-full inline-block mr-1.5 shadow-[0_0_6px_rgba(167,139,250,0.5)]"></span>
+          {{ 'REALTIME.FREQUENCY' | translate }}
+        </span>
+      </div>
+    </div>
+    
+    <!-- Eşik değerleri açıklaması -->
+    <div class="flex mb-4 text-xs gap-2">
+      <div class="bg-gray-800/50 px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 border border-gray-700/20">
+        <span class="w-2 h-2 bg-violet-400 rounded-full shadow-[0_0_4px_rgba(167,139,250,0.5)]"></span>
+        <span class="text-gray-300">{{ 'DASHBOARD.NORMAL' | translate }}</span>
+      </div>
+      <div class="bg-amber-900/20 px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 shadow-sm border border-amber-700/30">
+        <span class="w-2 h-2 bg-amber-400 rounded-full"></span>
+        <span class="text-amber-300">Min: 49.5Hz / Max: {{frequencyThresholds.warning}}Hz</span>
+      </div>
+      <div class="bg-red-900/20 px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 shadow-sm border border-red-700/30">
+        <span class="w-2 h-2 bg-red-400 rounded-full"></span>
+        <span class="text-red-300">{{ 'ALARMS.CRITICAL' | translate }}: {{frequencyThresholds.danger}}Hz</span>
+      </div>
+    </div>
+    
+    <!-- Chart Container -->
+    <div class="h-[40rem] bg-slate-900/80 rounded-xl p-4 border border-gray-700/30 relative overflow-hidden transition-all duration-300">
+      <!-- Dinamik arka plan efekti -->
+      <div class="absolute inset-0 bg-gradient-to-b from-indigo-950/20 via-transparent to-transparent pointer-events-none"></div>
+      
+      <canvas baseChart
+              #frequencyChart
+              [data]="frequencyChartData"
+              [options]="frequencyChartOptions"
+              [type]="'line'">
+      </canvas>
+      
+      <!-- Canlı veri göstergesi -->
+      <div class="absolute right-3 bottom-3 flex items-center gap-1.5 bg-gray-800/80 px-2.5 py-1 rounded-full border border-gray-700/50">
+        <span class="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>
+        <span class="text-[10px] text-emerald-400 font-medium">LIVE</span>
+      </div>
+    </div>
+    <div class="mt-3 text-[11px] text-slate-500 flex justify-between items-center px-1">
+      <span class="flex items-center gap-1.5"><i class="fas fa-signal text-[9px]"></i>{{ 'REALTIME.REALTIME_UPDATES' | translate }}</span>
+      <span class="font-mono text-slate-400">{{ 'REALTIME.FREQUENCY' | translate }}</span>
+    </div>
+  </div>
+</div>
+
+<!-- Tam Ekran Modalı - İyileştirilmiş Sürüm -->
+<div *ngIf="isFullscreenActive" class="fixed inset-0 bg-black bg-opacity-95 flex items-center justify-center z-50 p-6 animate__animated animate__fadeIn">
+  <div class="bg-gray-800 rounded-xl p-6 w-full max-w-7xl max-h-[90vh] overflow-hidden flex flex-col border border-gray-700 shadow-2xl animate__animated animate__zoomIn">
+    <div class="flex justify-between items-center mb-6">
+      <div class="flex items-center bg-gray-900/50 px-4 py-2 rounded-lg border border-gray-700/50">
+        <i class="fas fa-chart-line text-3xl mr-3" [ngClass]="{
+          'text-blue-400': currentFullscreenType === 'voltage',
+          'text-purple-400': currentFullscreenType === 'frequency'
+        }"></i>
+        <div>
+          <h3 class="text-xl font-bold text-white">
+            {{ currentFullscreenType === 'voltage' ? ('REALTIME.THREE_PHASE_VOLTAGE' | translate) : ('REALTIME.GRID_FREQUENCY' | translate) }} 
+          </h3>
+          <p class="text-sm text-gray-400">{{ 'REALTIME.REALTIME_MONITORING' | translate }}</p>
+        </div>
+      </div>
+      
+      <div class="flex items-center space-x-4">
+        <!-- İsteğe bağlı ekstra kontroller buraya eklenebilir -->
+        <div class="flex space-x-2">
+          <button *ngIf="currentFullscreenType === 'voltage'" 
+                 class="text-xs text-gray-300 bg-gray-700 px-3 py-1.5 rounded flex items-center cursor-pointer hover:bg-gray-600 transition-colors shadow-sm"
+                 [ngClass]="{'opacity-50': !phaseAVisible, 'ring-1 ring-teal-400': phaseAVisible}"
+                 (click)="togglePhaseVisibility(0)">
+            <span class="w-3 h-3 bg-teal-400 rounded-full inline-block mr-1"></span>
+            {{ 'REALTIME.PHASE_A' | translate }}
+          </button>
+          <button *ngIf="currentFullscreenType === 'voltage'" 
+                 class="text-xs text-gray-300 bg-gray-700 px-3 py-1.5 rounded flex items-center cursor-pointer hover:bg-gray-600 transition-colors shadow-sm"
+                 [ngClass]="{'opacity-50': !phaseBVisible, 'ring-1 ring-rose-400': phaseBVisible}"
+                 (click)="togglePhaseVisibility(1)">
+            <span class="w-3 h-3 bg-rose-400 rounded-full inline-block mr-1"></span>
+            {{ 'REALTIME.PHASE_B' | translate }}
+          </button>
+          <button *ngIf="currentFullscreenType === 'voltage'" 
+                 class="text-xs text-gray-300 bg-gray-700 px-3 py-1.5 rounded flex items-center cursor-pointer hover:bg-gray-600 transition-colors shadow-sm"
+                 [ngClass]="{'opacity-50': !phaseCVisible, 'ring-1 ring-amber-400': phaseCVisible}"
+                 (click)="togglePhaseVisibility(2)">
+            <span class="w-3 h-3 bg-amber-400 rounded-full inline-block mr-1"></span>
+            {{ 'REALTIME.PHASE_C' | translate }}
+          </button>
+        </div>
+        
+        <button 
+          (click)="closeFullscreen()"
+          class="text-gray-400 hover:text-white text-2xl transition-colors transform hover:scale-110 bg-gray-900/70 rounded-full w-10 h-10 flex items-center justify-center hover:bg-gray-800"
+        >
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+    </div>
+    
+    <div class="flex-grow overflow-hidden relative rounded-lg bg-gray-900/50 border border-gray-700/50 shadow-inner p-4">
+      <!-- Arkaplan gradyan efekti -->
+      <div class="absolute inset-0 bg-gradient-to-b from-blue-900/5 to-gray-900/30 pointer-events-none"></div>
+      
+      <!-- Gerilim grafik içeriği -->
+      <div *ngIf="currentFullscreenType === 'voltage'" class="h-full">
+        <canvas baseChart
+                [data]="voltageChartData"
+                [options]="fullscreenChartOptions"
+                [type]="'line'">
+        </canvas>
+      </div>
+      
+      <!-- Frekans grafik içeriği -->
+      <div *ngIf="currentFullscreenType === 'frequency'" class="h-full">
+        <canvas baseChart
+                [data]="frequencyChartData"
+                [options]="fullscreenChartOptions"
+                [type]="'line'">
+        </canvas>
+      </div>
+    </div>
+    
+    <div class="mt-4 flex justify-between items-center text-xs text-gray-400 bg-gray-900/30 p-3 rounded-md border border-gray-700/30">
+      <div>
+        <span class="font-medium text-gray-300 mr-1">{{ 'REALTIME.UPDATE_LABEL' | translate }}</span> {{ 'REALTIME.REALTIME_LABEL' | translate }}
+      </div>
+      <div>
+        <span class="font-medium text-gray-300 mr-1">{{ 'REALTIME.LAST_DATA' | translate }}</span> 
+        {{ 'REALTIME.NOW' | translate }}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Ayarlar Diyalogu - İyileştirilmiş Tasarım -->
+<div *ngIf="isSettingsDialogOpen" class="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4 animate__animated animate__fadeIn">
+  <div class="bg-gray-800 rounded-xl p-6 w-full max-w-xl overflow-hidden flex flex-col border border-gray-700 shadow-2xl animate__animated animate__zoomIn">
+    <div class="flex justify-between items-center mb-5">
+      <div class="flex items-center">
+        <i class="fas fa-sliders-h text-xl mr-3 text-blue-400"></i>
+        <h3 class="text-lg font-bold text-white">
+          {{ currentDialogType === 'voltage' ? ('REALTIME.VOLTAGE_SETTINGS' | translate) : ('REALTIME.FREQUENCY_SETTINGS' | translate) }}
+        </h3>
+      </div>
+      <button 
+        (click)="closeSettingsDialog()"
+        class="text-gray-400 hover:text-white transition-colors transform hover:scale-110"
+      >
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    
+    <div class="overflow-y-auto max-h-[70vh] space-y-8">
+      <!-- Eşik değeri ayarları -->
+      <div class="bg-gray-900/40 p-5 rounded-lg border border-gray-700/50">
+        <h4 class="text-blue-300 font-medium mb-4 flex items-center">
+          <i class="fas fa-exclamation-triangle mr-2 text-yellow-400"></i>
+          {{ 'REALTIME.THRESHOLD_VALUES' | translate }}
+        </h4>
+        
+        <!-- Uyarı eşiği -->
+        <div class="mb-5">
+          <label class="block text-gray-300 text-sm mb-2 font-medium">{{ 'DASHBOARD.WARNING_THRESHOLD' | translate }}</label>
+          <div class="flex items-center">
+            <div class="relative flex-grow">
+              <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <i class="fas fa-bell-exclamation text-yellow-500 opacity-70"></i>
+              </div>
+              <input 
+                type="number" 
+                [value]="currentDialogType === 'voltage' ? tempVoltageThresholds.warning : tempFrequencyThresholds.warning"
+                (input)="updateThresholdValue($event, 'warning')"
+                class="bg-gray-700 text-white rounded-md px-10 py-2.5 w-full border border-gray-600 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                [min]="currentDialogType === 'voltage' ? 200 : 49"
+                [max]="currentDialogType === 'voltage' ? 250 : 52"
+                [step]="currentDialogType === 'voltage' ? 1 : 0.1"
+              >
+            </div>
+            <span class="ml-3 text-gray-400 font-medium text-lg min-w-[30px]">{{ currentDialogType === 'voltage' ? (tempVoltageThresholds.unit || '') : (tempFrequencyThresholds.unit || '') }}</span>
+          </div>
+          <p class="mt-1.5 text-xs text-gray-400 italic">
+            {{ currentDialogType === 'voltage' ? ('DASHBOARD.VOLTAGE_WARNING_DESC' | translate) : ('DASHBOARD.FREQUENCY_WARNING_DESC' | translate) }}
+          </p>
+        </div>
+        
+        <!-- Kritik eşiği -->
+        <div class="mb-2">
+          <label class="block text-gray-300 text-sm mb-2 font-medium">{{ 'DASHBOARD.CRITICAL_THRESHOLD' | translate }}</label>
+          <div class="flex items-center">
+            <div class="relative flex-grow">
+              <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <i class="fas fa-exclamation-circle text-red-500 opacity-70"></i>
+              </div>
+              <input 
+                type="number" 
+                [value]="currentDialogType === 'voltage' ? tempVoltageThresholds.danger : tempFrequencyThresholds.danger"
+                (input)="updateThresholdValue($event, 'danger')"
+                class="bg-gray-700 text-white rounded-md px-10 py-2.5 w-full border border-gray-600 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                [min]="currentDialogType === 'voltage' ? 230 : 50"
+                [max]="currentDialogType === 'voltage' ? 260 : 53"
+                [step]="currentDialogType === 'voltage' ? 1 : 0.1"
+              >
+            </div>
+            <span class="ml-3 text-gray-400 font-medium text-lg min-w-[30px]">{{ currentDialogType === 'voltage' ? (tempVoltageThresholds.unit || '') : (tempFrequencyThresholds.unit || '') }}</span>
+          </div>
+          <p class="mt-1.5 text-xs text-gray-400 italic">
+            {{ currentDialogType === 'voltage' ? ('DASHBOARD.VOLTAGE_CRITICAL_DESC' | translate) : ('DASHBOARD.FREQUENCY_CRITICAL_DESC' | translate) }}
+          </p>
+        </div>
+      </div>
+      
+      <!-- Görsel Ayarlar -->
+      <div class="bg-gray-900/40 p-5 rounded-lg border border-gray-700/50">
+        <h4 class="text-blue-300 font-medium mb-4 flex items-center">
+          <i class="fas fa-paint-brush mr-2 text-purple-400"></i>
+          {{ 'REALTIME.VISUAL_SETTINGS' | translate }}
+        </h4>
+        
+        <!-- Animasyon hızı -->
+        <div class="mb-5">
+          <label class="block text-gray-300 text-sm mb-2 font-medium">{{ 'REALTIME.ANIMATION_SPEED' | translate }}</label>
+          <div class="flex items-center space-x-3">
+            <i class="fas fa-tachometer-alt text-gray-500"></i>
+            <input 
+              type="range" 
+              min="0" 
+              max="1000" 
+              step="50"
+              [(ngModel)]="animationDuration"
+              class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+            >
+            <div class="bg-gray-700 px-2 py-1 rounded text-gray-300 text-sm w-20 text-center">
+              {{ animationDuration }}ms
+            </div>
+          </div>
+          <p class="mt-1.5 text-xs text-gray-400 italic">{{ 'REALTIME.ANIMATION_DESC' | translate }}</p>
+        </div>
+        
+        <!-- Gösterge noktaları -->
+        <div class="mb-2">
+          <div class="flex items-center justify-between bg-gray-700/50 p-3 rounded-md">
+            <div class="flex items-center">
+              <input 
+                type="checkbox" 
+                id="showDataPoints"
+                [(ngModel)]="showDataPoints"
+                class="w-5 h-5 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 focus:ring-2"
+              >
+              <label for="showDataPoints" class="ml-3 text-sm text-gray-300 font-medium">{{ 'REALTIME.SHOW_DATA_POINTS' | translate }}</label>
+            </div>
+            <div class="text-xs text-gray-500 bg-gray-800 px-2 py-1 rounded">
+              {{ showDataPoints ? ('REALTIME.ON' | translate) : ('REALTIME.OFF' | translate) }}
+            </div>
+          </div>
+          <p class="mt-1.5 text-xs text-gray-400 italic">{{ 'REALTIME.SHOW_DATA_DESC' | translate }}</p>
+        </div>
+      </div>
+        <!-- Veri Kaynağı (Path Selector) -->
+      <div class="bg-gray-900/40 p-5 rounded-lg border border-gray-700/50">
+        <h4 class="text-blue-300 font-medium mb-4 flex items-center">
+          <i class="fas fa-database mr-2 text-green-400"></i>
+          {{ 'REALTIME.DATA_SOURCE' | translate }}
+        </h4>
+
+        <!-- Geçmiş Veri Süresi -->
+        <div class="mb-5">
+          <label class="block text-gray-300 text-sm mb-2 font-medium">{{ 'REALTIME.HISTORY_DURATION' | translate }}</label>
+          <div class="flex items-center space-x-3">
+            <i class="fas fa-clock text-gray-500"></i>
+            <input 
+              type="range" 
+              min="1" 
+              max="60" 
+              step="1"
+              [(ngModel)]="historyMinutes"
+              class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-green-500"
+            >
+            <div class="bg-gray-700 px-2 py-1 rounded text-gray-300 text-sm w-20 text-center">
+              {{ historyMinutes }} dk
+            </div>
+          </div>
+          <p class="mt-1.5 text-xs text-gray-400 italic">{{ 'REALTIME.HISTORY_DURATION_DESC' | translate }}</p>
+        </div>
+
+        <button 
+          (click)="openPathSelector()"
+          class="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-700 text-white py-3 px-4 rounded-md transition-all flex items-center justify-center shadow-lg hover:shadow-xl transform hover:scale-102 duration-300"
+        >
+          <i class="fas fa-sitemap mr-2 text-blue-200"></i> {{ 'REALTIME.CHANGE_DATA_SOURCE' | translate }}
+        </button>
+        <p class="mt-3 text-xs text-gray-400 text-center italic">
+          {{ 'REALTIME.DATA_SOURCE_DESC' | translate }}
+        </p>
+      </div>
+    </div>
+    
+    <!-- Footer actions -->
+    <div class="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-700">
+      <button 
+        (click)="closeSettingsDialog()" 
+        class="px-5 py-2.5 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-md transition-colors flex items-center"
+      >
+        <i class="fas fa-times mr-2"></i> {{ 'REALTIME.CANCEL' | translate }}
+      </button>
+      <button 
+        (click)="saveSettings()" 
+        class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors flex items-center shadow-md"
+      >
+        <i class="fas fa-save mr-2"></i> {{ 'REALTIME.SAVE' | translate }}
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Path Selector Diyalogu - Diğer widgetlar ile uyumlu -->
+<div *ngIf="isPathSelectorDialogOpen" class="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50 p-4">
+  <div class="bg-gray-800 rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col border border-gray-700 shadow-2xl">
+    <div class="flex justify-between items-center mb-4">
+      <div class="flex items-center">
+        <i class="fas fa-sitemap text-2xl mr-3 text-blue-400"></i>
+        <h3 class="text-xl font-bold text-white">
+          {{ 'REALTIME.DATA_SOURCE_SELECTION' | translate }}
+          <span class="text-sm ml-2 text-gray-400">{{ 'REALTIME.CONNECTION_POINT' | translate }}</span>
+        </h3>
+      </div>
+      <button 
+        (click)="closePathSelector()"
+        class="text-gray-400 hover:text-white transition-colors"
+      >
+        <i class="fas fa-times text-xl"></i>
+      </button>
+    </div>
+    
+    <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-5">
+      <div class="md:col-span-3">
+        <div class="bg-gray-900/50 p-3 rounded-lg border border-gray-700 h-full overflow-y-auto max-h-[450px]">
+          <h4 class="text-blue-400 font-medium mb-3 flex items-center">
+            <i class="fas fa-project-diagram mr-2"></i>
+            {{ 'REALTIME.DATA_POINTS' | translate }}
+          </h4>
+
+          <!-- Path Arama ve Filtreleme -->
+          <div class="mb-4 relative">
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <i class="fas fa-search text-gray-400"></i>
+            </div>
+            <input 
+              type="text" 
+              [placeholder]="'REALTIME.SEARCH_DATA_PATHS' | translate"
+              class="w-full pl-10 pr-3 py-2 bg-gray-700 text-white rounded-md border border-gray-600 focus:border-blue-500 focus:outline-none text-sm"
+            >
+          </div>
+          
+          <!-- Path Ağacı -->
+          <div class="space-y-2">
+            <div *ngFor="let path of availablePaths" 
+                class="p-2 rounded-md transition-colors cursor-pointer"
+                [ngClass]="{'bg-blue-900/30 border border-blue-500': isPathSelected(path), 'hover:bg-gray-800 border border-transparent': !isPathSelected(path)}"
+                (click)="togglePathSelection(path)">
+              <div class="flex items-center">
+                <div class="w-5 h-5 rounded-sm border-2 flex items-center justify-center mr-3" 
+                    [ngClass]="isPathSelected(path) ? 'border-blue-500 bg-blue-500' : 'border-gray-500'">
+                  <i *ngIf="isPathSelected(path)" class="fas fa-check text-white text-xs"></i>
+                </div>
+                <div class="flex-grow">
+                  <div class="flex items-center">
+                    <i class="mr-2" [ngClass]="{
+                      'fas fa-bolt text-yellow-400': path.path.includes('Gerilim'),
+                      'fas fa-random text-blue-400': path.path.includes('Akım'),
+                      'fas fa-wave-square text-purple-400': path.path.includes('Frekans'),
+                      'fas fa-plug text-green-400': path.path.includes('Güç'),
+                      'fas fa-chart-line text-gray-400': !path.path.includes('Gerilim') && !path.path.includes('Akım') && !path.path.includes('Frekans') && !path.path.includes('Güç')
+                    }"></i>
+                    <span class="text-sm font-medium text-gray-200">{{ path.path }}</span>
+                  </div>
+                  <div class="text-xs text-gray-400 mt-1 pl-5">
+                    <span>{{ 'REALTIME.MEASUREMENT_TYPE' | translate }} {{ path.path.includes('Gerilim') ? ('HARDCODED.VOLTAGE_V' | translate) : path.path.includes('Akım') ? ('HARDCODED.CURRENT_A' | translate) : path.path.includes('Frekans') ? ('HARDCODED.FREQUENCY_HZ' | translate) : path.path.includes('Güç') ? ('HARDCODED.POWER_W' | translate) : ('HARDCODED.OTHER' | translate) }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="md:col-span-2">
+        <div class="bg-gray-900/50 p-3 rounded-lg border border-gray-700 h-full flex flex-col">
+          <h4 class="text-blue-400 font-medium mb-3 flex items-center">
+            <i class="fas fa-check-circle mr-2"></i>
+            {{ 'REALTIME.SELECTED_POINTS' | translate }}
+          </h4>
+          
+          <div class="overflow-y-auto flex-grow mb-3 min-h-[200px]">
+            <div *ngIf="selectedPathsCount === 0" class="flex items-center justify-center h-full">
+              <div class="text-center p-4">
+                <i class="fas fa-info-circle text-gray-500 text-3xl mb-2"></i>
+                <p class="text-gray-500">{{ 'REALTIME.NO_DATA_POINT' | translate }}</p>
+                <p class="text-gray-600 text-xs mt-2">{{ 'REALTIME.NO_DATA_POINT_DESC' | translate }}</p>
+              </div>
+            </div>
+            
+            <div *ngIf="selectedPathsCount > 0" class="space-y-2">
+              <div *ngFor="let path of selectedPathItems" class="flex items-center justify-between bg-gray-800 p-2 rounded-md text-sm">
+                <div class="flex items-center">
+                  <i class="mr-2" [ngClass]="{
+                    'fas fa-bolt text-yellow-400': path.path.includes('Gerilim'),
+                    'fas fa-random text-blue-400': path.path.includes('Akım'),
+                    'fas fa-wave-square text-purple-400': path.path.includes('Frekans'),
+                    'fas fa-plug text-green-400': path.path.includes('Güç'),
+                    'fas fa-chart-line text-gray-400': !path.path.includes('Gerilim') && !path.path.includes('Akım') && !path.path.includes('Frekans') && !path.path.includes('Güç')
+                  }"></i>
+                  <span class="text-gray-300 truncate max-w-[200px]">{{ path.path }}</span>
+                </div>
+                <button (click)="togglePathSelection(path)" class="text-gray-500 hover:text-red-400">
+                  <i class="fas fa-times"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+          
+          <div class="mt-auto">
+            <div class="p-3 bg-blue-900/20 rounded-md border border-blue-800/30 mb-3">
+              <div class="flex justify-between items-center text-sm">
+                <span class="text-gray-300">{{ 'REALTIME.TOTAL_SELECTED' | translate }}</span>
+                <span class="font-semibold text-blue-300">{{ selectedPathsCount }}</span>
+              </div>
+            </div>
+            
+            <button 
+              (click)="savePathSelection()" 
+              [disabled]="selectedPathsCount === 0"
+              [ngClass]="{'opacity-50 cursor-not-allowed': selectedPathsCount === 0, 'hover:bg-blue-600 shadow-lg': selectedPathsCount > 0}"
+              class="w-full py-2.5 bg-blue-700 text-white rounded-md transition-all flex items-center justify-center"
+            >
+              <i class="fas fa-save mr-2"></i>
+              {{ 'REALTIME.SAVE_CHANGES' | translate }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Başarılı mesajı -->
+    <div *ngIf="pathSelectionSuccess" class="bg-green-800/40 text-green-300 px-4 py-3 rounded-md border border-green-600/30 flex items-center">
+      <i class="fas fa-check-circle mr-2"></i>
+      <span>{{ 'REALTIME.SOURCE_CHANGED' | translate }}</span>
+    </div>
+  </div>
+</div>

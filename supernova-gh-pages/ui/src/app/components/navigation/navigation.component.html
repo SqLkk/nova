@@ -1,0 +1,230 @@
+<!-- Nov4 — daraltılabilir sol sidebar (token-tabanlı) -->
+<aside class="sidebar" [class.collapsed]="!isExpanded" [class.edit-mode-sidebar]="dashboardEditMode">
+
+  <!-- Marka -->
+  <div class="brand">
+    <div class="brand-mark">
+      <img src="assets/logo.png" alt="" aria-hidden="true" />
+    </div>
+    <span class="brand-name" *ngIf="isExpanded">Nov4</span>
+    <button type="button" class="collapse-btn" (click)="toggleSidebar()"
+            [title]="isExpanded ? ('HARDCODED.COLLAPSE' | translate) : ('HARDCODED.EXPAND' | translate)"
+            *ngIf="!dashboardEditMode">
+      <i class="fas" [ngClass]="isExpanded ? 'fa-angles-left' : 'fa-angles-right'"></i>
+    </button>
+  </div>
+
+  <!-- Normal Navigasyon (edit mode kapalıyken) -->
+  <nav class="nav" *ngIf="!dashboardEditMode">
+    <ng-container *ngFor="let item of navigationItems">
+      <a *ngIf="hasAccess(item.pageKey)"
+         [routerLink]="item.route"
+         routerLinkActive="active"
+         class="nav-item"
+         [title]="item.title">
+        <i [class]="item.icon + ' nav-icon'"></i>
+        <span class="nav-label" *ngIf="isExpanded">{{ item.title }}</span>
+        <span class="nav-tooltip" *ngIf="!isExpanded">{{ item.title }}</span>
+      </a>
+    </ng-container>
+
+    <!-- Admin & Table Explorer -->
+    <div class="nav-divider" *ngIf="hasAccess('admin') || hasAccess('table-explorer')"></div>
+
+    <!-- Table Explorer: accordion group (DB listesi altında) -->
+    <div *ngIf="hasAccess('table-explorer')" class="nav-group" [class.nav-group--active]="isTableExplorerActive()">
+
+      <!-- Expanded sidebar: accordion header -->
+      <button *ngIf="isExpanded" type="button" class="nav-item nav-group-header"
+              [class.active]="isTableExplorerActive()"
+              (click)="toggleTableExplorerGroup()">
+        <i [class]="tableExplorerItem.icon + ' nav-icon'"></i>
+        <span class="nav-label">{{ tableExplorerItem.title }}</span>
+        <i class="fas fa-chevron-down nav-group-chevron" [class.rotated]="expandedTableExplorer"></i>
+      </button>
+
+      <!-- Expanded sidebar: DB sub-items -->
+      <div *ngIf="isExpanded && expandedTableExplorer" class="nav-group-children">
+        <a *ngFor="let ds of navDataSources"
+           class="nav-sub-item"
+           [class.nav-sub-item--selected]="navSelectedId === ds.id"
+           (click)="selectSource(ds.id)">
+          <span class="status-dot"
+                [class.dot-online]="statusFor(ds.id) === 'online'"
+                [class.dot-offline]="statusFor(ds.id) === 'offline'"
+                [class.dot-checking]="statusFor(ds.id) === 'checking'"></span>
+          <span class="nav-sub-label">{{ ds.name }}</span>
+        </a>
+        <div *ngIf="!navDataSources.length" class="nav-sub-empty">No datasources</div>
+      </div>
+
+      <!-- Collapsed sidebar: icon + hover flyout -->
+      <div *ngIf="!isExpanded" class="nav-item nav-group-collapsed"
+           [class.active]="isTableExplorerActive()"
+           [routerLink]="['/table-explorer']">
+        <i [class]="tableExplorerItem.icon + ' nav-icon'"></i>
+        <!-- Flyout popover -->
+        <div class="nav-flyout">
+          <div class="nav-flyout-title">{{ tableExplorerItem.title }}</div>
+          <a *ngFor="let ds of navDataSources"
+             class="nav-flyout-item"
+             [class.nav-flyout-item--selected]="navSelectedId === ds.id"
+             (click)="selectSource(ds.id); $event.stopPropagation()">
+            <span class="status-dot"
+                  [class.dot-online]="statusFor(ds.id) === 'online'"
+                  [class.dot-offline]="statusFor(ds.id) === 'offline'"
+                  [class.dot-checking]="statusFor(ds.id) === 'checking'"></span>
+            <span>{{ ds.name }}</span>
+          </a>
+          <div *ngIf="!navDataSources.length" class="nav-flyout-empty">No datasources</div>
+        </div>
+      </div>
+    </div>
+
+    <a *ngIf="hasAccess('admin')"
+       [routerLink]="adminItem.route"
+       routerLinkActive="active"
+       class="nav-item nav-item--admin"
+       [title]="adminItem.title">
+      <i [class]="adminItem.icon + ' nav-icon'"></i>
+      <span class="nav-label" *ngIf="isExpanded">{{ adminItem.title }}</span>
+      <span class="nav-tooltip" *ngIf="!isExpanded">{{ adminItem.title }}</span>
+    </a>
+  </nav>
+
+  <!-- Widget Kataloğu (edit mode açıkken) -->
+  <div class="widget-catalog" *ngIf="dashboardEditMode && isExpanded">
+    <!-- Catalog Header -->
+    <div class="catalog-header">
+      <div class="catalog-title-row">
+        <div class="catalog-icon-wrap">
+          <i class="fas fa-puzzle-piece"></i>
+        </div>
+        <div>
+          <h4 class="catalog-title">Widget Catalog</h4>
+          <p class="catalog-subtitle">Click to add</p>
+        </div>
+      </div>
+      <div class="catalog-search">
+        <i class="fas fa-search catalog-search-icon"></i>
+        <input type="text" [(ngModel)]="catalogSearchTerm" placeholder="Search widget..."
+               class="catalog-search-input" />
+      </div>
+    </div>
+
+    <!-- Category accordion list -->
+    <div class="catalog-categories">
+      <div *ngFor="let cat of filteredCatalog" class="catalog-category">
+        <!-- Category header -->
+        <button type="button" class="category-header" (click)="toggleCategory(cat.category)">
+          <div class="category-left">
+            <i [class]="cat.icon + ' category-icon'"></i>
+            <span class="category-name">{{ cat.category }}</span>
+          </div>
+          <div class="category-right">
+            <span class="category-count">{{ cat.widgets.length }}</span>
+            <i class="fas fa-chevron-down category-chevron" [class.rotated]="expandedCategory === cat.category"></i>
+          </div>
+        </button>
+        <!-- Category widgets -->
+        <div class="category-widgets" *ngIf="expandedCategory === cat.category">
+          <button *ngFor="let w of cat.widgets" type="button" class="widget-catalog-item" (click)="addWidgetToDashboard(w)">
+            <div class="widget-item-icon">
+              <i [class]="w.icon"></i>
+            </div>
+            <div class="widget-item-info">
+              <span class="widget-item-name">{{ w.title }}</span>
+              <span class="widget-item-desc">{{ w.description }}</span>
+              <div class="mt-1 flex items-center space-x-1">
+                <span class="widget-item-type">{{ w.config?.visualType || w.type }}</span>
+                <span class="widget-item-size">{{ w.w }}x{{ w.h }}</span>
+              </div>
+            </div>
+            <div class="widget-item-add">
+              <i class="fas fa-plus"></i>
+            </div>
+          </button>
+        </div>
+      </div>
+      <div *ngIf="filteredCatalog.length === 0" class="catalog-empty">
+        <i class="fas fa-search"></i>
+        <span>Widget not found</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Alt alan: araçlar + kullanıcı (edit modda gizle) -->
+  <div class="sidebar-footer" *ngIf="!dashboardEditMode">
+    <!-- Tema & Dil -->
+    <div class="tools">
+      <button type="button" class="tool-btn" (click)="toggleTheme()"
+              [title]="'HARDCODED.TOGGLE_THEME' | translate">
+        <i class="fas" [ngClass]="theme === 'dark' ? 'fa-sun' : 'fa-moon'"></i>
+        <span class="tool-label" *ngIf="isExpanded">{{ theme === 'dark' ? ('HARDCODED.LIGHT' | translate) : ('HARDCODED.DARK' | translate) }}</span>
+      </button>
+
+      <div class="relative" #languageMenuRef>
+        <button type="button" class="tool-btn" (click)="toggleLanguageMenu()"
+                [title]="'HARDCODED.LANGUAGE' | translate">
+          <span class="tool-flag">{{ getCurrentLanguageFlag() }}</span>
+          <span class="tool-label" *ngIf="isExpanded">{{ currentLanguage | uppercase }}</span>
+        </button>
+
+        <div *ngIf="isLanguageMenuOpen" class="lang-menu">
+          <button *ngFor="let lang of languages" type="button"
+                  (click)="changeLanguage(lang.code)"
+                  class="lang-option"
+                  [class.active]="currentLanguage === lang.code">
+            <span class="lang-flag">{{ lang.flag }}</span>
+            <span class="lang-name">{{ lang.name }}</span>
+            <i *ngIf="currentLanguage === lang.code" class="fas fa-check lang-check"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Kullanıcı -->
+    <div class="relative" #userMenuRef>
+      <button type="button" class="user-btn" (click)="toggleUserMenu()">
+        <span class="user-avatar">
+          <i class="fas fa-user-astronaut"></i>
+        </span>
+        <span class="user-meta" *ngIf="isExpanded">
+          <span class="user-name">{{ currentUser?.username || ('HARDCODED.USER' | translate) }}</span>
+          <span class="user-role">{{ (currentUser?.role ? 'HARDCODED.ROLE_' + currentUser.role.toUpperCase() : 'HARDCODED.USER') | translate }}</span>
+        </span>
+        <i class="fas fa-chevron-up user-chev" *ngIf="isExpanded" [class.rotate]="isUserMenuOpen"></i>
+      </button>
+
+      <div *ngIf="isUserMenuOpen" class="user-menu">
+        <div class="user-menu-head">
+          <p class="user-menu-name">{{ currentUser?.username || ('HARDCODED.USER' | translate) }}</p>
+          <p class="user-menu-role">{{ (currentUser?.role ? 'HARDCODED.ROLE_' + currentUser.role.toUpperCase() : 'HARDCODED.USER') | translate }}</p>
+        </div>
+        <button type="button" class="user-menu-item danger" (click)="logout()">
+          <i class="fas fa-right-from-bracket"></i>
+          <span>{{ 'HARDCODED.LOGOUT' | translate }}</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<!-- Çıkış Onay Modalı -->
+<div *ngIf="showLogoutModal" class="modal-backdrop">
+  <div class="modal-card">
+    <div class="modal-icon">
+      <i class="fas fa-right-from-bracket"></i>
+    </div>
+    <h3 class="modal-title">{{ 'HARDCODED.LOGOUT_CONFIRM' | translate }}</h3>
+    <p class="modal-text">{{ 'HARDCODED.LOGOUT_CONFIRM_SUBTITLE' | translate }}</p>
+    <div class="modal-actions">
+      <button type="button" class="btn-secondary" (click)="cancelLogout()">
+        {{ 'HARDCODED.CANCEL' | translate }}
+      </button>
+      <button type="button" class="btn-danger" (click)="confirmLogout()">
+        {{ 'HARDCODED.LOGOUT' | translate }}
+      </button>
+    </div>
+  </div>
+</div>

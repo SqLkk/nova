@@ -1,0 +1,307 @@
+<div class="tb flex flex-col h-screen bg-surface text-ink">
+
+  <!-- ============================================================= -->
+  <!-- GALERİ — şablon kütüphanesi                                    -->
+  <!-- ============================================================= -->
+  <div *ngIf="mode === 'gallery'" class="tb-gallery flex-1 flex flex-col min-h-0 overflow-y-auto">
+
+    <header class="tb-g-head flex items-center gap-3 px-6 py-5 bg-surface-card border-b border-edge shrink-0">
+      <div class="tb-logo tb-logo-lg"><i class="fas fa-file-spreadsheet"></i></div>
+      <div>
+        <h1 class="tb-g-title">Template Builder</h1>
+        <p class="tb-g-sub">Choose your template, edit like Excel, generate with one click.</p>
+      </div>
+      <div class="flex items-center gap-2 ml-auto">
+        <button class="tb-btn" (click)="backToApp()" title="Return to panel"><i class="fas fa-arrow-left"></i><span>Return to Panel</span></button>
+        <button class="tb-btn tb-btn-accent" (click)="newTemplate()"><i class="fas fa-plus"></i><span>New Template</span></button>
+      </div>
+    </header>
+
+    <div class="tb-g-toolbar flex items-center gap-3 px-6 py-3 border-b border-edge shrink-0">
+      <div class="tb-g-search flex items-center gap-2">
+        <i class="fas fa-search text-ink-muted"></i>
+        <input [(ngModel)]="searchTemplates" placeholder="Search template..." />
+      </div>
+      <span class="ml-auto text-xs text-ink-muted">{{ filteredTemplates.length }} template(s)</span>
+    </div>
+
+    <div class="tb-g-grid p-6 grid gap-4">
+      <button class="tb-card tb-card-new" (click)="newTemplate()">
+        <i class="fas fa-plus"></i><span>Blank Template</span>
+      </button>
+
+      <div *ngFor="let t of filteredTemplates" class="tb-card" (click)="open(t)">
+        <div class="tb-card-top">
+          <div class="tb-card-icon"><i class="fas fa-file-circle-check"></i></div>
+          <span class="tb-card-ver">v{{ t.version || 1 }}</span>
+        </div>
+        <h3 class="tb-card-name truncate">{{ t.name }}</h3>
+        <p class="tb-card-desc">{{ t.description || 'No description' }}</p>
+        <div class="tb-card-foot">
+          <span class="tb-card-date"><i class="far fa-clock"></i> {{ relTime(t.updated_at) }}</span>
+          <div class="tb-card-actions" (click)="$event.stopPropagation()">
+            <button class="tb-card-act" (click)="open(t)" title="Open"><i class="fas fa-pen"></i></button>
+            <button class="tb-card-act" (click)="duplicateTemplate(t, $event)" title="Duplicate"><i class="fas fa-copy"></i></button>
+            <button class="tb-card-act tb-card-del" (click)="deleteTemplate(t, $event)" title="Delete"><i class="fas fa-trash"></i></button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div *ngIf="!templates.length" class="tb-g-empty mx-auto my-auto text-center">
+      <i class="fas fa-folder-open"></i>
+      <p>No templates yet.</p>
+      <button class="tb-btn tb-btn-accent mt-3" (click)="newTemplate()"><i class="fas fa-plus"></i><span>Create first template</span></button>
+    </div>
+  </div>
+
+  <!-- ============================================================= -->
+  <!-- EDITÖR — grid                                                  -->
+  <!-- ============================================================= -->
+  <ng-container *ngIf="mode === 'editor'">
+
+    <!-- ===== Üst bar ===== -->
+    <header class="tb-header flex items-center gap-3 px-4 py-2.5 bg-surface-card border-b border-edge shrink-0">
+      <button class="tb-btn" (click)="openGallery()" title="Return to gallery"><i class="fas fa-arrow-left"></i></button>
+      <div class="flex items-center gap-2">
+        <div class="tb-logo"><i class="fas fa-file-spreadsheet"></i></div>
+        <input class="tb-name" [(ngModel)]="doc.name" placeholder="Template name" />
+      </div>
+
+      <div class="flex items-center gap-1.5 ml-auto">
+        <button class="tb-btn" (click)="newDoc()" title="New"><i class="fas fa-file"></i><span>New</span></button>
+        <button class="tb-btn tb-btn-primary" (click)="save()" [disabled]="busy">
+          <i class="fas" [ngClass]="busy ? 'fa-spinner fa-spin' : 'fa-save'"></i><span>Save</span>
+        </button>
+        <button class="tb-btn tb-btn-accent" (click)="render()" [disabled]="busy">
+          <i class="fas fa-file-excel"></i><span>Generate Excel</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- ===== Formula bar ===== -->
+    <div class="tb-formula flex items-center gap-2 px-4 py-1.5 bg-surface-card border-b border-edge shrink-0">
+      <span class="tb-addr">{{ selectedAddress }}</span>
+      <span class="tb-fx">fx</span>
+      <input class="tb-formula-input" [(ngModel)]="formulaValue" [placeholder]="'Enter value or {{field_name}}'" />
+    </div>
+
+    <!-- ===== Toolbar ===== -->
+    <div class="tb-toolbar flex items-center gap-1 px-4 py-1.5 bg-surface-card border-b border-edge shrink-0 flex-wrap">
+      <button class="tb-tool" (click)="toggleBold()" title="Bold"><i class="fas fa-bold"></i></button>
+      <span class="tb-sep"></span>
+      <input type="color" class="tb-color" (change)="setFill($any($event.target).value)" title="Fill color" />
+      <span class="tb-sep"></span>
+
+      <button class="tb-tool" (click)="mergeRange()" [disabled]="!hasRange" title="Merge selected range">
+        <i class="fas fa-object-group"></i><span class="tb-tool-text">Merge</span>
+      </button>
+      <button class="tb-tool" (click)="unmergeAt()" [disabled]="!selectedMerge" title="Unmerge">
+        <i class="fas fa-object-ungroup"></i>
+      </button>
+      <span class="tb-sep"></span>
+
+      <select class="tb-select" (change)="insertBuiltin($any($event.target).value); $any($event.target).value = ''">
+        <option value="">Built-in...</option>
+        <option value="report_date">Date</option>
+        <option value="report_datetime">Date & Time</option>
+        <option value="report_name">Report Name</option>
+      </select>
+
+      <select class="tb-select" (change)="bindSummary($any($event.target).value); $any($event.target).value = ''"
+        [disabled]="!activeSource">
+        <option value="">Summary...</option>
+        <option *ngFor="let op of summaryOps" [value]="op">{{ op }}</option>
+      </select>
+
+      <button class="tb-tool" (click)="makeBand()" [disabled]="!hasRange || !activeSource"
+        title="Make selected range detail band">
+        <i class="fas fa-table"></i><span class="tb-tool-text">Band</span>
+      </button>
+
+      <div class="relative">
+        <button class="tb-tool" (click)="chartMenuOpen = !chartMenuOpen" [disabled]="!activeSource" title="Add chart">
+          <i class="fas fa-chart-column"></i><span class="tb-tool-text">Chart</span>
+        </button>
+        <div *ngIf="chartMenuOpen" class="tb-menu tb-menu-right">
+          <button *ngFor="let ct of chartTypes" class="tb-menu-item" (click)="insertChart(ct); chartMenuOpen = false">
+            <i class="fas"
+              [ngClass]="{'fa-chart-column': ct==='bar', 'fa-chart-line': ct==='line', 'fa-chart-pie': ct==='pie'}"></i>
+            <span>{{ ct | uppercase }}</span>
+          </button>
+        </div>
+      </div>
+
+      <button class="tb-tool ml-auto" (click)="clearCell()" title="Clear cell"><i class="fas fa-eraser"></i></button>
+    </div>
+
+    <!-- ===== Gövde ===== -->
+    <div class="flex flex-1 min-h-0">
+
+      <!-- Sol: sekme paneli -->
+      <aside class="tb-side flex flex-col w-72 bg-surface-card border-r border-edge shrink-0">
+
+        <!-- Sekmeler -->
+        <div class="tb-side-tabs flex shrink-0">
+          <button class="tb-side-tab" [class.active]="sideTab === 'queries'" (click)="sideTab = 'queries'">
+            <i class="fas fa-database"></i><span>Queries</span>
+          </button>
+          <button class="tb-side-tab" [class.active]="sideTab === 'python'" (click)="sideTab = 'python'">
+            <i class="fas fa-file-code"></i><span>Python</span>
+          </button>
+        </div>
+
+        <!-- Sorgular sekmesi -->
+        <ng-container *ngIf="sideTab === 'queries'">
+          <div class="tb-side-head flex items-center justify-between px-3 py-2 border-b border-edge">
+            <span class="tb-side-title">Saved Queries</span>
+            <button class="tb-icon-btn" (click)="toggleQueryForm()" [title]="showQueryForm ? 'Close' : 'New query'">
+              <i class="fas" [ngClass]="showQueryForm ? 'fa-minus' : 'fa-plus'"></i>
+            </button>
+          </div>
+
+          <div *ngIf="showQueryForm" class="tb-qform p-3 border-b border-edge bg-surface-raised/40 flex flex-col gap-2">
+            <input class="tb-input" [(ngModel)]="newQuery.name" placeholder="Query name" />
+            <select class="tb-input" [(ngModel)]="newQuery.dataSourceId">
+              <option *ngFor="let ds of dataSources" [value]="ds.id">{{ ds.name }} ({{ ds.dbType }})</option>
+            </select>
+            <textarea class="tb-input tb-sql" [(ngModel)]="newQuery.sql" placeholder="SELECT … FROM …" rows="4"></textarea>
+            <button class="tb-btn tb-btn-accent tb-btn-sm" (click)="saveQuery()">Save</button>
+          </div>
+
+          <div class="flex-1 overflow-y-auto p-2 flex flex-col gap-1">
+            <button *ngFor="let q of queries" class="tb-query"
+              [class.active]="activeSource?.id === q.id" (click)="selectQuery(q)">
+              <i class="fas fa-circle text-[7px]"
+                [style.color]="activeSource?.id === q.id ? 'rgb(var(--accent-primary))' : 'rgb(var(--text-muted))'"></i>
+              <span class="flex-1 text-left truncate">{{ q.name }}</span>
+              <span class="tb-query-meta">{{ q.dataSourceId }}</span>
+            </button>
+            <p *ngIf="!queries.length" class="tb-empty">No queries yet.</p>
+          </div>
+        </ng-container>
+
+        <!-- Python sekmesi -->
+        <ng-container *ngIf="sideTab === 'python'">
+          <div class="tb-side-head flex items-center justify-between px-3 py-2 border-b border-edge">
+            <span class="tb-side-title">Python Scripts</span>
+            <span class="tb-side-hint">click → run</span>
+          </div>
+
+          <div class="flex-1 overflow-y-auto p-2 flex flex-col gap-1">
+            <button *ngFor="let s of pythonScripts" class="tb-query"
+              [class.active]="s.id === activePythonId" (click)="selectPythonScript(s)">
+              <i class="fas fa-file-code text-brand"></i>
+              <span class="flex-1 text-left truncate">{{ s.name }}</span>
+            </button>
+            <p *ngIf="!pythonScripts.length" class="tb-empty">No scripts yet.</p>
+            <span *ngIf="pyLoading" class="tb-empty"><i class="fas fa-spinner fa-spin"></i> Running...</span>
+            <span *ngIf="pyError" class="tb-empty tb-error-text">{{ pyError }}</span>
+          </div>
+
+          <!-- Çıktı datasetleri -->
+          <div *ngIf="pyDatasetNames.length" class="tb-py-datasets border-t border-edge">
+            <div class="tb-side-head px-3 py-2 border-b border-edge">
+              <span class="tb-side-title">Outputs</span>
+            </div>
+            <div class="p-2 flex flex-col gap-1">
+              <button *ngFor="let ds of pyDatasetNames" class="tb-query tb-query-sub"
+                [class.active]="activeSource?.id === ('py:' + activePythonId + ':' + ds)"
+                (click)="selectPythonDataset(ds)">
+                <i class="fas fa-table text-brand"></i>
+                <span class="flex-1 text-left truncate">{{ ds }}</span>
+                 <span class="tb-query-meta">{{ pyPreview[ds].rows?.length || 0 }} row(s)</span>
+              </button>
+            </div>
+          </div>
+        </ng-container>
+
+        <!-- Aktif kaynak alanları (her iki sekme için ortak) -->
+        <div *ngIf="activeSource" class="tb-fields border-t border-edge">
+          <div class="tb-side-head px-3 py-2 border-b border-edge">
+            <span class="tb-side-title"><i class="fas fa-columns text-brand"></i> Fields</span>
+            <span class="tb-side-hint truncate ml-1">{{ activeSource.label }}</span>
+          </div>
+          <div class="p-2 flex flex-wrap gap-1.5">
+            <button *ngFor="let col of activeSource.columns" class="tb-chip"
+              (click)="bindField(col.name)" [title]="'Bind to selected cell: ' + col.name">
+              {{ col.name }}
+            </button>
+            <span *ngIf="sourceLoading" class="tb-empty">Loading...</span>
+            <span *ngIf="!sourceLoading && !activeSource.columns?.length" class="tb-empty">No columns.</span>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Merkez: Grid -->
+      <section class="flex-1 flex flex-col min-w-0 bg-surface">
+        <div class="tb-grid-scroll flex-1 overflow-auto">
+          <table class="tb-grid">
+            <thead>
+              <tr>
+                <th class="tb-corner"></th>
+                <th *ngFor="let c of colsArray()" class="tb-colhead"
+                  [style.min-width.px]="colWidthPx(c)" [style.width.px]="colWidthPx(c)">
+                  {{ colLetter(c) }}
+                  <span class="tb-resize tb-resize-col" (mousedown)="startColResize(c, $event)"></span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let r of rowsArray()">
+                <td class="tb-rowhead" [style.height.px]="rowHeightPx(r)">
+                  {{ r }}
+                  <span class="tb-resize tb-resize-row" (mousedown)="startRowResize(r, $event)"></span>
+                </td>
+                <ng-container *ngFor="let c of colsArray()">
+                  <td *ngIf="!isMergeCovered(r, c)" class="tb-cell"
+                    [class.selected]="isSelected(r, c)"
+                    [class.in-range]="inRange(r, c)"
+                    [class.has-binding]="!!cellAt(r, c)?.binding"
+                    [style.width.px]="colWidthPx(c)"
+                    [style.height.px]="rowHeightPx(r)"
+                    [attr.rowspan]="mergeRowspan(r, c)"
+                    [attr.colspan]="mergeColspan(r, c)"
+                    [ngStyle]="styleOf(cellAt(r, c))"
+                    (click)="select(r, c, $event.shiftKey)"
+                    (dblclick)="startEdit()">
+                    <input *ngIf="editing && editing.row === r && editing.col === c"
+                      id="tb-edit-input" class="tb-edit-input" [(ngModel)]="editValue"
+                      (keydown.enter)="commitEdit()" (keydown.escape)="cancelEdit()" (blur)="commitEdit()" />
+                    <ng-container *ngIf="!(editing && editing.row === r && editing.col === c)">
+                      {{ displayValue(cellAt(r, c)) }}
+                    </ng-container>
+                  </td>
+                </ng-container>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Bant rozetleri + boyut kontrolleri -->
+        <div class="tb-statusbar flex items-center gap-2 px-3 py-1.5 border-t border-edge bg-surface-card text-xs text-ink-muted shrink-0">
+          <span *ngIf="hasRange" class="tb-badge"><i class="fas fa-vector-square"></i> Range selected — Band / Merge</span>
+          <span *ngIf="!hasRange" class="text-ink-muted">Select cell • shift+click range • double click to edit • use arrow keys to navigate</span>
+          <span class="ml-auto flex items-center gap-2">
+            <button class="tb-mini" (click)="addRows()"><i class="fas fa-plus"></i> 10 rows</button>
+            <button class="tb-mini" (click)="addCols()"><i class="fas fa-plus"></i> 4 columns</button>
+            <span class="text-brand"><i class="fas fa-table"></i> {{ sheet.bands?.length || 0 }} band(s)</span>
+            <span class="text-brand"><i class="fas fa-chart-column"></i> {{ sheet.charts?.length || 0 }} chart(s)</span>
+          </span>
+        </div>
+
+        <!-- Sheet sekmeleri -->
+        <div class="tb-sheets flex items-center gap-1 px-2 py-1.5 border-t border-edge bg-surface-card shrink-0">
+          <button *ngFor="let s of doc.sheets; let i = index" class="tb-sheet" [class.active]="i === sheetIndex"
+            (click)="selectSheet(i)">
+            {{ s.name }}
+          </button>
+          <button class="tb-sheet-add" (click)="addSheet()"><i class="fas fa-plus"></i></button>
+        </div>
+      </section>
+    </div>
+  </ng-container>
+
+  <!-- Geri bildirim toast -->
+  <div *ngIf="feedback" class="tb-toast">{{ feedback }}</div>
+</div>

@@ -1,0 +1,115 @@
+// Dialog container styling
+.dialog-backdrop {
+  backdrop-filter: blur(4px);
+  animation: fadeIn 0.2s ease-out;
+}
+
+// Animation keyframes
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+// Dialog content animation
+.dialog-content {
+  animation: slideIn 0.3s ease-out;
+}
+
+// Custom scrollbar for file list
+.files-scroll {
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: rgb(var(--bg-tertiary) / 0.3);
+    border-radius: 3px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgb(var(--text-muted) / 0.6);
+    border-radius: 3px;
+
+    &:hover {
+      background: rgb(var(--text-muted) / 0.8);
+    }
+  }
+}
+
+// File card hover effects
+.file-card {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgb(var(--shadow-color) / 0.3);
+  }
+}
+
+// File type specific colors
+.file-excel {
+  --file-color: rgb(var(--success));
+}
+
+.file-pdf {
+  --file-color: rgb(var(--danger));
+}
+
+.file-csv {
+  --file-color: rgb(var(--accent-primary));
+}
+
+.file-json {
+  --file-color: rgb(var(--accent-tertiary));
+}
+
+// Button hover effects
+.action-button {
+  transition: all 0.2s ease;
+
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgb(var(--shadow-color) / 0.15);
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+}
+
+// Responsive design
+@media (max-width: 768px) {
+  .dialog-content {
+    margin: 1rem;
+    max-height: calc(100vh - 2rem);
+  }
+
+  .files-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .file-actions {
+    flex-direction: column;
+    gap: 0.5rem;
+
+    button {
+      width: 100%;
+      justify-content: center;
+    }
+  }
+}

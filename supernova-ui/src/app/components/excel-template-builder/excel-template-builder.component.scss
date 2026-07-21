@@ -1,0 +1,326 @@
+// ============================================================================
+// EXCEL TEMPLATE BUILDER — Nov4 Gold token-based
+// ============================================================================
+:host {
+  display: block;
+}
+
+// Toolbar button
+.toolbar-btn {
+  @apply px-2 py-1 hover:bg-gray-700/50 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-xs flex items-center gap-0.5;
+  color: rgb(var(--text-muted));
+  &:hover { color: rgb(var(--text-primary)); }
+}
+
+// Style button
+.style-btn {
+  @apply px-2 py-1.5 rounded transition-colors;
+  background: rgb(var(--bg-tertiary) / 0.5);
+  color: rgb(var(--text-muted));
+  &:hover { color: rgb(var(--text-primary)); background: rgb(var(--bg-elevated) / 0.5); }
+}
+.style-btn-active {
+  background: rgb(var(--accent-primary) / 0.2);
+  color: rgb(var(--accent-primary));
+  box-shadow: 0 0 0 1px rgb(var(--accent-primary) / 0.3);
+}
+
+// Preset button
+.preset-btn {
+  @apply flex flex-col items-center gap-1 px-2 py-2 rounded-lg text-[10px] cursor-pointer;
+  background: rgb(var(--bg-tertiary) / 0.5);
+  border: 1px solid rgb(var(--border-color) / 0.3);
+  color: rgb(var(--text-muted));
+  transition: all 0.15s;
+  &:hover {
+    background: rgb(var(--bg-elevated) / 0.5);
+    color: rgb(var(--text-secondary));
+    border-color: rgb(var(--border-strong));
+  }
+}
+
+// Quick insert button
+.quick-insert-btn {
+  @apply px-1.5 py-0.5 rounded text-[9px] font-bold transition-colors cursor-pointer;
+  background: rgb(var(--bg-elevated) / 0.4);
+  &:hover { background: rgb(var(--bg-elevated) / 0.6); }
+}
+
+// Background for dark sidebar panels
+.bg-gray-850 {
+  background-color: rgb(var(--bg-secondary));
+}
+
+// Grid selection animation
+td.ring-2 {
+  animation: cellPulse 0.3s ease-out;
+}
+
+// Drag over visual feedback
+td.drag-over {
+  background-color: rgb(var(--accent-primary) / 0.1) !important;
+  outline: 2px dashed rgb(var(--accent-primary) / 0.5);
+  outline-offset: -2px;
+}
+
+@keyframes cellPulse {
+  0% { box-shadow: 0 0 0 0 rgb(var(--accent-primary) / 0.4); }
+  100% { box-shadow: 0 0 0 3px rgb(var(--accent-primary) / 0); }
+}
+
+// Scrollbar styling for sidebar panels (vertical)
+:host ::ng-deep .scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--bg-elevated)) transparent;
+
+  &::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: rgb(var(--bg-elevated));
+    border-radius: 3px;
+    &:hover {
+      background: rgb(var(--accent-primary));
+    }
+  }
+}
+
+// Hide native scrollbar on sheet tabs (we use arrow buttons instead)
+#sheet-tabs-scroll {
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+// Grid area scrollbar
+#grid-scroll-area {
+  &::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  &::-webkit-scrollbar-track {
+    background: rgb(var(--bg-secondary));
+  }
+  &::-webkit-scrollbar-thumb {
+    background: rgb(var(--border-color));
+    border-radius: 4px;
+    &:hover {
+      background: rgb(var(--border-strong));
+    }
+  }
+  &::-webkit-scrollbar-corner {
+    background: rgb(var(--bg-secondary));
+  }
+}
+
+// Fade-in animation for modal
+:host > div:first-child {
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+// Color input fix
+input[type="color"] {
+  -webkit-appearance: none;
+  padding: 0;
+  &::-webkit-color-swatch-wrapper {
+    padding: 2px;
+  }
+  &::-webkit-color-swatch {
+    border: none;
+    border-radius: 3px;
+  }
+}
+
+// Cell hover effect in grid
+td.cursor-cell:hover:not(.ring-2) {
+  outline: 1px dashed rgb(var(--accent-primary) / 0.3);
+  outline-offset: -1px;
+}
+
+// Drag preview
+[draggable="true"] {
+  user-select: none;
+  &:active {
+    opacity: 0.6;
+  }
+}
+
+// Chart overlay hover
+.border-dashed:hover {
+  border-color: rgb(var(--accent-secondary) / 0.8);
+  background-color: rgb(var(--accent-secondary) / 0.05);
+}
+
+// Light theme overrides (when html does not have .dark)
+::ng-deep html:not(.dark) {
+  app-excel-template-builder {
+    // Modal backgrounds
+    .bg-gray-900 {
+      background-color: rgb(var(--bg-secondary)) !important;
+      border-color: rgb(var(--border-color)) !important;
+    }
+
+    // Header
+    .bg-gray-800\/90 {
+      background-color: rgb(var(--bg-tertiary)) !important;
+      border-color: rgb(var(--border-color)) !important;
+    }
+    .text-white {
+      color: rgb(var(--text-primary)) !important;
+    }
+    .text-gray-400 {
+      color: rgb(var(--text-muted)) !important;
+    }
+    .text-gray-500 {
+      color: rgb(var(--text-secondary)) !important;
+    }
+    .border-gray-700\/50, .border-gray-700\/30, .border-gray-700\/20, .border-gray-750 {
+      border-color: rgb(var(--border-color)) !important;
+    }
+
+    // Toolbar buttons
+    .toolbar-btn {
+      color: rgb(var(--text-muted)) !important;
+      &:hover:not(:disabled) {
+        color: rgb(var(--text-primary)) !important;
+        background-color: rgb(var(--bg-tertiary)) !important;
+      }
+      &:disabled {
+        opacity: 0.35 !important;
+      }
+    }
+
+    // Dividers
+    .bg-gray-700 {
+      background-color: rgb(var(--border-color)) !important;
+    }
+
+    // Left & Right Panels
+    .bg-gray-850 {
+      background-color: rgb(var(--bg-secondary)) !important;
+      border-color: rgb(var(--border-color)) !important;
+    }
+    .hover\:bg-gray-700\/30:hover {
+      background-color: rgb(var(--bg-tertiary)) !important;
+    }
+    .bg-gray-800\/50, .bg-gray-800\/40 {
+      background-color: rgb(var(--bg-tertiary)) !important;
+      border-color: rgb(var(--border-strong)) !important;
+      color: rgb(var(--text-secondary)) !important;
+    }
+    .bg-gray-900\/60, .bg-gray-950\/80 {
+      background-color: rgb(var(--bg-secondary)) !important;
+      border-color: rgb(var(--border-color)) !important;
+    }
+
+    // Style presets
+    .style-btn {
+      background-color: rgb(var(--bg-tertiary)) !important;
+      color: rgb(var(--text-secondary)) !important;
+      &:hover {
+        background-color: rgb(var(--bg-elevated)) !important;
+        color: rgb(var(--text-primary)) !important;
+      }
+    }
+    .preset-btn {
+      background-color: rgb(var(--bg-secondary)) !important;
+      border-color: rgb(var(--border-color)) !important;
+      color: rgb(var(--text-muted)) !important;
+      &:hover {
+        background-color: rgb(var(--bg-tertiary)) !important;
+        color: rgb(var(--text-primary)) !important;
+        border-color: rgb(var(--border-strong)) !important;
+      }
+    }
+
+    // Inputs & select elements inside builder panels
+    input[type="text"], select, textarea {
+      background-color: rgb(var(--bg-secondary)) !important;
+      border-color: rgb(var(--border-strong)) !important;
+      color: rgb(var(--text-primary)) !important;
+      &:focus {
+        border-color: rgb(var(--accent-primary)) !important;
+      }
+      &::placeholder {
+        color: rgb(var(--text-secondary)) !important;
+      }
+    }
+
+    // Sheet tabs wrapper and unselected sheets
+    .bg-gray-800\/60 {
+      background-color: rgb(var(--bg-tertiary)) !important;
+      border-color: rgb(var(--border-color)) !important;
+    }
+    .bg-gray-800\/20 {
+      background-color: rgb(var(--bg-elevated)) !important;
+      color: rgb(var(--text-muted)) !important;
+      &:hover {
+        background-color: rgb(var(--border-strong)) !important;
+        color: rgb(var(--text-primary)) !important;
+      }
+    }
+    .bg-gray-900.text-white.border-teal-500 {
+      background-color: rgb(var(--bg-secondary)) !important;
+      color: rgb(var(--text-primary)) !important;
+      border-bottom-color: rgb(var(--accent-primary)) !important;
+    }
+
+    // Grid Canvas area
+    .bg-gray-950 {
+      background-color: rgb(var(--bg-elevated)) !important;
+    }
+    #grid-scroll-area {
+      &::-webkit-scrollbar-track {
+        background: rgb(var(--bg-secondary)) !important;
+      }
+      &::-webkit-scrollbar-thumb {
+        background: rgb(var(--border-strong)) !important;
+        &:hover {
+          background: rgb(var(--text-secondary)) !important;
+        }
+      }
+    }
+
+    // Spreadsheet Header rows and cell lines
+    th.bg-gray-800, td.bg-gray-800, .bg-gray-800 {
+      background-color: rgb(var(--bg-tertiary)) !important;
+      border-color: rgb(var(--border-strong)) !important;
+      color: rgb(var(--text-secondary)) !important;
+    }
+    td.min-w-\[100px\] {
+      border-color: rgb(var(--border-strong)) !important;
+      color: rgb(var(--text-primary)) !important;
+      // Default cell bg color when style.bgColor is not set
+      &:not([style*="background-color"]) {
+        background-color: rgb(var(--bg-secondary)) !important;
+      }
+    }
+    .bg-gray-900\/30 {
+      background-color: rgb(var(--bg-secondary)) !important;
+      border-color: rgb(var(--border-color)) !important;
+    }
+
+    // Draggable elements list
+    .hover\:bg-gray-700\/40:hover {
+      background-color: rgb(var(--bg-tertiary)) !important;
+    }
+    .text-gray-300 {
+      color: rgb(var(--text-primary)) !important;
+    }
+
+    // Inline edit cell input
+    .cell-inline-input {
+      background-color: rgb(var(--bg-secondary)) !important;
+      color: rgb(var(--text-primary)) !important;
+    }
+  }
+}

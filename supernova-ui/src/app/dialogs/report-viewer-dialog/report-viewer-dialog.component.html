@@ -1,0 +1,232 @@
+<div *ngIf="visible" class="fixed inset-0 z-[99999] flex items-center justify-center bg-black/70 backdrop-blur-sm">
+  <div class="bg-white dark:bg-slate-950 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800/80 w-full max-w-4xl max-h-[90vh] flex flex-col m-4">
+    
+    <!-- Header -->
+    <div class="bg-gradient-to-r from-blue-600/10 via-purple-600/10 to-blue-700/10 px-6 py-4 border-b border-slate-200 dark:border-slate-800/80 rounded-t-2xl">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-4">
+          <div class="p-2 bg-blue-500/10 dark:bg-blue-500/20 rounded-xl border border-blue-200 dark:border-blue-500/30">
+            <i class="fas fa-eye text-blue-600 dark:text-blue-400 text-lg"></i>
+          </div>
+          <div>
+            <h2 class="text-xl font-bold text-slate-800 dark:text-white">{{ 'REPORTS.REPORT_FILES' | translate }}</h2>
+            <p class="text-slate-500 dark:text-slate-300 text-sm">{{report?.name}}</p>
+          </div>
+        </div>
+        <button 
+          (click)="onClose()"
+          class="p-2 hover:bg-slate-100 dark:hover:bg-slate-700/50 rounded-xl transition-all duration-200 group"
+        >
+          <i class="fas fa-times text-slate-400 group-hover:text-slate-600 dark:group-hover:text-white"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Content -->
+    <div class="flex-1 overflow-y-auto p-6 text-slate-800 dark:text-slate-100 bg-white dark:bg-slate-950">
+      
+      <!-- Excel Preview Mode -->
+      <div *ngIf="showExcelPreview" class="space-y-4">
+        <!-- Back to Files List Header -->
+        <div class="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-600/30">
+          <div class="flex items-center gap-2">
+            <button 
+              (click)="showExcelPreview = false"
+              class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-700/80 dark:hover:bg-slate-700 dark:hover:text-white dark:text-slate-300 rounded-lg text-sm transition-all duration-200 border border-slate-200 dark:border-slate-600"
+            >
+              <i class="fas fa-arrow-left mr-1.5"></i>{{ 'REPORTS.BACK' | translate }}
+            </button>
+            <span class="text-sm font-semibold text-slate-700 dark:text-slate-300 truncate max-w-xs sm:max-w-md">{{ previewFileName }}</span>
+          </div>
+          <span class="text-[10px] text-slate-500 dark:text-gray-500 bg-slate-50 dark:bg-gray-800/30 px-2 py-1 rounded-lg">
+            {{ 'REPORTS.PREVIEW_ROW_LIMIT_WARNING' | translate }}
+          </span>
+        </div>
+
+        <!-- Loader -->
+        <div *ngIf="previewLoading" class="flex flex-col items-center justify-center py-12">
+          <div class="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-purple-500 mb-3"></div>
+          <p class="text-slate-500 dark:text-slate-400 text-sm">{{ 'REPORTS.PREVIEW_LOADING' | translate }}</p>
+        </div>
+
+        <!-- Excel Viewer Sheet & Grid Grid -->
+        <div *ngIf="!previewLoading && previewExcelData?.sheets" class="space-y-4 animate-fade-in">
+          <!-- Sheet Tabs -->
+          <div class="flex flex-wrap gap-1 border-b border-slate-200 dark:border-gray-700/50 pb-2 overflow-x-auto">
+            <button 
+              *ngFor="let sheet of previewExcelData.sheets; let idx = index"
+              (click)="activeSheetIdx = idx"
+              [class]="activeSheetIdx === idx ? 'bg-purple-600 text-white shadow-md' : 'bg-slate-100 dark:bg-gray-800 text-slate-600 dark:text-gray-400 hover:bg-slate-200 dark:hover:bg-gray-700/80 dark:hover:text-gray-200 border border-slate-200 dark:border-gray-750'"
+              class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200"
+            >
+              <i class="fas fa-table mr-1.5 opacity-70"></i>{{ sheet.name }}
+            </button>
+          </div>
+
+          <!-- Active Sheet Data Table -->
+          <div class="overflow-x-auto rounded-xl border border-slate-200 dark:border-gray-700/50 bg-slate-50/50 dark:bg-gray-950/20">
+            <table class="w-full text-left border-collapse">
+              <tbody>
+                <tr 
+                  *ngFor="let row of previewExcelData.sheets[activeSheetIdx].rows; let rIdx = index"
+                  class="border-b border-slate-200 dark:border-gray-800/50 hover:bg-slate-50 dark:hover:bg-gray-800/20 transition-colors"
+                >
+                  <td 
+                    *ngFor="let cell of row; let cIdx = index"
+                    [style.background-color]="cell.bg_color ? '#' + cell.bg_color : null"
+                    [style.color]="cell.text_color ? '#' + cell.text_color : null"
+                    [style.font-weight]="cell.bold ? 'bold' : 'normal'"
+                    [style.font-style]="cell.italic ? 'italic' : 'normal'"
+                    [style.text-align]="cell.align || 'left'"
+                    class="px-3.5 py-2.5 text-xs border-r border-slate-200 dark:border-gray-800/30 whitespace-nowrap min-w-[110px] text-slate-800 dark:text-gray-300 bg-white dark:bg-slate-900"
+                  >
+                    {{ cell.value }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Files List (Hidden when showExcelPreview is true) -->
+      <div *ngIf="!showExcelPreview">
+        <!-- Loading State -->
+        <div *ngIf="isLoading" class="flex items-center justify-center py-12">
+          <div class="text-center">
+            <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto mb-4"></div>
+            <p class="text-slate-500 dark:text-slate-400">{{ 'REPORTS.FILES_LOADING' | translate }}</p>
+          </div>
+        </div>
+
+        <!-- Error State -->
+        <div *ngIf="error && !isLoading" class="flex items-center justify-center py-12">
+          <div class="text-center">
+            <div class="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+              <i class="fas fa-exclamation-triangle text-red-450 dark:text-red-400 text-2xl"></i>
+            </div>
+            <h3 class="text-lg font-semibold text-slate-800 dark:text-white mb-2">{{ 'REPORTS.ERROR_OCCURRED' | translate }}</h3>
+            <p class="text-slate-500 dark:text-slate-400 mb-4">{{error}}</p>
+            <button 
+              (click)="loadReportFiles()"
+              class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg text-white transition-colors"
+            >
+              <i class="fas fa-sync-alt mr-2"></i>{{ 'REPORTS.RETRY' | translate }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Empty State -->
+        <div *ngIf="!isLoading && !error && reportFiles.length === 0" class="flex items-center justify-center py-12">
+          <div class="text-center">
+            <div class="w-16 h-16 bg-slate-100 dark:bg-slate-700/50 rounded-full flex items-center justify-center mx-auto mb-4">
+              <i class="fas fa-folder-open text-slate-400 dark:text-slate-400 text-2xl"></i>
+            </div>
+            <h3 class="text-lg font-semibold text-slate-800 dark:text-white mb-2">{{ 'REPORTS.FILE_NOT_FOUND' | translate }}</h3>
+            <p class="text-slate-500 dark:text-slate-400">{{ 'REPORTS.NO_FILES_DESC' | translate }}</p>
+          </div>
+        </div>
+
+        <!-- Files Grid -->
+        <div *ngIf="!isLoading && !error && reportFiles.length > 0" class="grid gap-4">
+          <div 
+            *ngFor="let file of reportFiles; trackBy: trackByFileName"
+            class="group bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/80 rounded-xl p-6 hover:border-slate-400 dark:hover:border-slate-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-slate-900/20"
+          >
+            <div class="flex items-start gap-4">
+              <!-- File Icon -->
+              <div class="flex-shrink-0">
+                <div class="w-12 h-12 bg-slate-100 dark:bg-slate-700/50 rounded-xl flex items-center justify-center">
+                  <i [class]="getFileIcon(file.type) + ' ' + getFileIconColor(file.type) + ' text-xl'"></i>
+                </div>
+              </div>
+
+              <!-- File Info -->
+              <div class="flex-1 min-w-0">
+                <div class="flex items-start justify-between mb-2">
+                  <div class="flex-1 min-w-0">
+                    <h3 class="text-lg font-semibold text-slate-800 dark:text-white mb-1 truncate group-hover:text-blue-600 dark:group-hover:text-blue-300 transition-colors" [title]="file.name">
+                      {{getDisplayName(file.name)}}
+                    </h3>
+                    <div class="flex items-center gap-3 mb-2">
+                      <span class="text-slate-600 dark:text-slate-300 text-sm">{{getFileTypeText(file.type)}}</span>
+                      <span class="text-slate-500 dark:text-slate-400 text-sm">{{formatFileSize(file.size)}}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- File Meta -->
+                <div class="flex items-center gap-4 text-xs text-slate-500 dark:text-slate-400 mb-4">
+                  <div class="flex items-center gap-1">
+                    <i class="fas fa-calendar-alt"></i>
+                    <span>{{formatDate(file.createdAt)}}</span>
+                  </div>
+                  <div class="flex items-center gap-1">
+                    <i class="fas fa-folder"></i>
+                    <span class="truncate max-w-xs">{{file.path}}</span>
+                  </div>
+                </div>
+
+                <!-- Actions -->
+                <div class="flex items-center gap-2">
+                  <!-- Preview Button -->
+                  <button 
+                    (click)="onPreviewFile(file)"
+                    class="flex items-center gap-2 px-3 py-2 bg-purple-50 hover:bg-purple-100 border border-purple-200 dark:bg-purple-600/20 dark:hover:bg-purple-600/40 dark:border-purple-500/30 dark:hover:border-purple-500/60 rounded-lg text-purple-700 dark:text-purple-300 dark:hover:text-purple-200 transition-all duration-200 hover:scale-105 text-sm"
+                    [title]="getPreviewTooltip(file.type)"
+                  >
+                    <i class="fas fa-external-link-alt"></i>
+                    <span>{{ 'REPORTS.PREVIEW' | translate }}</span>
+                  </button>
+
+                  <!-- Download Button -->
+                  <button 
+                    (click)="onDownloadFile(file)"
+                    class="flex items-center gap-2 px-3 py-2 bg-blue-50 hover:bg-blue-100 border border-blue-200 dark:bg-blue-600/20 dark:hover:bg-blue-600/40 dark:border-blue-500/30 dark:hover:border-blue-500/60 rounded-lg text-blue-750 dark:text-blue-300 dark:hover:text-blue-200 transition-all duration-200 hover:scale-105 text-sm"
+                  >
+                    <i class="fas fa-download"></i>
+                    <span>{{ 'REPORTS.DOWNLOAD' | translate }}</span>
+                  </button>
+
+                  <!-- Delete File Button -->
+                  <button 
+                    (click)="onDeleteFile(file)"
+                    class="flex items-center gap-2 px-3 py-2 bg-red-50 hover:bg-red-100 border border-red-200 dark:bg-red-600/20 dark:hover:bg-red-600/40 dark:border-red-500/30 dark:hover:border-red-500/60 rounded-lg text-red-700 dark:text-red-300 dark:hover:text-red-200 transition-all duration-200 hover:scale-105 text-sm"
+                  >
+                    <i class="fas fa-trash-alt"></i>
+                    <span>{{ 'REPORTS.DELETE' | translate }}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Footer -->
+    <div class="px-6 py-4 border-t border-slate-200 dark:border-slate-800/80 bg-white dark:bg-slate-950 rounded-b-2xl">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <span class="text-sm text-slate-500 dark:text-slate-400" *ngIf="reportFiles.length > 0">{{ 'REPORTS.FILES_FOUND' | translate:{ count: reportFiles.length } }}</span>
+          <button 
+            *ngIf="reportFiles.length > 0"
+            (click)="onDeleteAllFiles()"
+            class="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 hover:bg-red-100 border border-red-200 dark:bg-red-600/20 dark:hover:bg-red-600/40 dark:border-red-500/30 dark:hover:bg-red-500/60 rounded-lg text-red-700 dark:text-red-300 dark:hover:text-red-200 transition-all duration-200 text-xs"
+          >
+            <i class="fas fa-trash-alt"></i>
+            <span>{{ 'REPORTS.DELETE_ALL_FILES' | translate }}</span>
+          </button>
+        </div>
+        <button 
+          (click)="onClose()"
+          class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 rounded-lg border border-slate-200 dark:border-slate-700 transition-colors"
+        >
+          {{ 'REPORTS.CLOSE' | translate }}
+        </button>
+      </div>
+    </div>
+
+  </div>
+</div>

@@ -1,0 +1,293 @@
+<div class="h-full flex flex-col">
+  <!-- Loading State -->
+  <div *ngIf="isLoading" class="flex-1 flex items-center justify-center">
+    <div class="text-center">
+      <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto mb-4"></div>
+      <p class="text-slate-400">{{ 'REPORTS.LOADING_REPORTS' | translate }}</p>
+    </div>
+  </div>
+
+  <!-- Error State -->
+  <div *ngIf="error && !isLoading" class="flex-1 flex items-center justify-center">
+    <div class="text-center max-w-sm">
+      <div class="w-14 h-14 bg-red-500/10 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-red-500/20">
+        <i class="fas fa-exclamation-triangle text-red-500 dark:text-red-400 text-xl"></i>
+      </div>
+      <h3 class="text-base font-semibold text-slate-800 dark:text-white mb-2">{{ 'REPORTS.ERROR_OCCURRED' | translate }}</h3>
+      <p class="text-slate-500 dark:text-slate-400 text-sm mb-4">{{error}}</p>
+      <button (click)="refresh.emit()" class="bg-blue-600 hover:bg-blue-500 px-5 py-2 rounded-lg text-white text-sm font-medium transition-colors">
+        <i class="fas fa-sync-alt mr-2"></i>{{ 'REPORTS.RETRY' | translate }}
+      </button>
+    </div>
+  </div>
+
+  <!-- Empty State -->
+  <div *ngIf="!isLoading && !error && (!reports || reports.length === 0)" class="flex-1 flex items-center justify-center">
+    <div class="text-center max-w-sm">
+      <div class="w-14 h-14 bg-gray-100 dark:bg-slate-700/50 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-gray-200 dark:border-slate-600/30">
+        <i class="fas fa-file-alt text-slate-400 dark:text-slate-500 text-xl"></i>
+      </div>
+      <h3 class="text-base font-semibold text-slate-800 dark:text-white mb-2">{{ 'REPORTS.NO_REPORTS' | translate }}</h3>
+      <p class="text-slate-500 dark:text-slate-400 text-sm">{{ 'REPORTS.NO_REPORTS_DESC' | translate }}</p>
+    </div>
+  </div>
+
+  <!-- Reports Table View -->
+  <div *ngIf="!isLoading && !error && reports && reports.length > 0" class="flex-1 overflow-y-auto" style="min-height: 0;">
+    <div class="p-4">
+
+      <!-- ══════ FULL TABLE VIEW (when creator is closed) ══════ -->
+      <ng-container *ngIf="!compactMode">
+        <!-- Table Header -->
+        <div class="grid grid-cols-12 gap-3 px-4 py-2.5 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider border-b border-gray-200 dark:border-slate-700/50 mb-1">
+          <div class="col-span-3">{{ 'REPORTS.REPORT_NAME' | translate }}</div>
+          <div class="col-span-1 text-center">{{ 'REPORTS.STATUS' | translate }}</div>
+          <div class="col-span-2">{{ 'REPORTS.DATE_RANGE' | translate }}</div>
+          <div class="col-span-1 text-center">Visibility</div>
+          <div class="col-span-1 text-center">{{ 'REPORTS.TYPE' | translate }}</div>
+          <div class="col-span-4 text-right">{{ 'REPORTS.ACTIONS' | translate }}</div>
+        </div>
+
+        <!-- Report Rows -->
+        <div *ngFor="let report of reports; trackBy: trackByReportId"
+             class="group grid grid-cols-12 gap-3 items-center px-4 py-3.5 rounded-xl mb-1 transition-all duration-200 hover:bg-slate-100/50 dark:hover:bg-slate-700/30 border border-transparent hover:border-gray-200 dark:hover:border-slate-600/30 cursor-default"
+             [ngClass]="{ 'bg-slate-100/60 dark:bg-slate-800/40': isOutputVisible(report.id!) || isReportRunning(report.id!) }">
+          
+          <!-- Report Name & Info -->
+          <div class="col-span-3 flex items-center gap-3 min-w-0">
+            <div [class]="getFileTypeClasses(report.fileType)" class="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0">
+              <i [class]="getFileTypeIcon(report.fileType)" class="text-white text-sm"></i>
+            </div>
+            <div class="min-w-0">
+              <h3 class="text-sm font-semibold text-slate-800 dark:text-white truncate group-hover:text-blue-600 dark:group-hover:text-blue-300 transition-colors">
+                {{report.name}}
+              </h3>
+              <p class="text-xs text-slate-500 truncate mt-0.5">
+                {{formatDate(report.createdAt)}} · {{report.fileSize || '—'}}
+              </p>
+            </div>
+          </div>
+
+          <!-- Status -->
+          <div class="col-span-1 flex justify-center">
+            <span [class]="getStatusClasses(report.status)" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium">
+              <i [class]="getStatusIcon(report.status)" class="text-[10px]"></i>
+              {{getStatusText(report.status)}}
+            </span>
+          </div>
+
+          <!-- Date Range -->
+          <div class="col-span-2">
+            <div class="text-xs text-slate-700 dark:text-slate-300 leading-relaxed" [innerHTML]="formatDateRangeHtml(report)"></div>
+          </div>
+
+          <!-- Visibility Status Badge -->
+          <div class="col-span-1 flex justify-center">
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium animate-pulse-subtle"
+                  [class]="report.is_shared === 1 ? 'bg-brand/20 text-brand border border-brand/30' : 
+                           (report.shared_with && report.shared_with !== '[]' ? 'bg-brand-soft/20 text-brand-soft border border-brand-soft/30' : 
+                           'bg-gray-100 dark:bg-slate-700/60 text-slate-500 dark:text-slate-400 border border-gray-200 dark:border-slate-600/30')">
+              <i class="fas" [class]="report.is_shared === 1 ? 'fa-globe' : 
+                                      (report.shared_with && report.shared_with !== '[]' ? 'fa-users' : 'fa-lock')"></i>
+              <span>{{ report.is_shared === 1 ? 'Global' : 
+                       (report.shared_with && report.shared_with !== '[]' ? 'Shared' : 'Private') }}</span>
+            </span>
+          </div>
+
+          <!-- Type Badge -->
+          <div class="col-span-1 flex justify-center">
+            <span class="px-2 py-0.5 bg-gray-100 dark:bg-slate-700/60 text-slate-600 dark:text-slate-400 rounded text-[10px] font-medium uppercase border border-gray-200 dark:border-transparent">
+              {{getReportTypeText(report.type)}}
+            </span>
+          </div>
+
+          <!-- Actions -->
+          <div class="col-span-4 flex items-center justify-end gap-1.5">
+            <!-- Customize (completed) or Run (not completed) -->
+             <button *ngIf="report.status === 'completed'"
+              (click)="onCustomizeReport(report)"
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-brand-secondary/20 hover:bg-brand-secondary/40 border border-brand-secondary/30 hover:border-brand-secondary/60 rounded-lg text-xs font-medium text-brand-secondary transition-all duration-200"
+              [title]="'REPORTS.CUSTOMIZE' | translate">
+              <i class="fas fa-sliders-h text-[10px]"></i>
+              <span class="hidden xl:inline">{{ 'REPORTS.CUSTOMIZE' | translate }}</span>
+            </button>
+            <button *ngIf="report.status !== 'completed' && canGenerateReport()"
+              (click)="onStartReport(report)"
+              [disabled]="isReportRunning(report.id!)"
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/40 border border-emerald-500/30 hover:border-emerald-500/60 rounded-lg text-xs font-medium text-emerald-500 dark:text-emerald-400 transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
+              [title]="'REPORTS.START_REPORT' | translate">
+              <i [class]="isReportRunning(report.id!) ? 'fas fa-spinner fa-spin' : 'fas fa-play'" class="text-[10px]"></i>
+              <span class="hidden xl:inline">{{ isReportRunning(report.id!) ? ('REPORTS.PROCESSING' | translate) : ('REPORTS.RUN' | translate) }}</span>
+            </button>
+            <!-- Share / Manage Visibility -->
+            <button *ngIf="canManageVisibility()"
+              (click)="onShareReport(report)"
+              class="p-1.5 text-slate-500 dark:text-slate-400 hover:text-brand dark:hover:text-brand hover:bg-brand/10 rounded-lg transition-all duration-200"
+              [title]="'Share / Manage Visibility'">
+              <i class="fas fa-share-alt text-sm"></i>
+            </button>
+            <!-- Edit -->
+            <button *ngIf="canEditReport()"
+              (click)="onEditReport(report)"
+              class="p-1.5 text-slate-500 dark:text-slate-400 hover:text-brand-soft dark:hover:text-brand-soft hover:bg-brand-soft/10 rounded-lg transition-all duration-200"
+              [title]="'REPORTS.EDIT' | translate">
+              <i class="fas fa-pen text-sm"></i>
+            </button>
+            <!-- Schedule -->
+            <button *ngIf="canScheduleReport()"
+              (click)="onScheduleReport(report)"
+              class="p-1.5 text-slate-500 dark:text-slate-400 hover:text-brand dark:hover:text-brand hover:bg-brand/10 rounded-lg transition-all duration-200"
+              [title]="'Schedule Report'">
+              <i class="fas fa-clock text-sm"></i>
+            </button>
+            <!-- View Files / Output -->
+            <button
+              (click)="onViewReport(report)"
+              class="p-1.5 text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-all duration-200"
+              [title]="'REPORTS.VIEW_REPORT' | translate">
+              <i class="fas fa-folder-open text-sm"></i>
+            </button>
+            <!-- Delete -->
+            <button *ngIf="canDeleteReport()"
+              (click)="onDeleteReport(report)"
+              class="p-1.5 text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all duration-200"
+              [title]="'REPORTS.DELETE' | translate">
+              <i class="fas fa-trash-alt text-sm"></i>
+            </button>
+          </div>
+
+          <!-- Expandable Output Section -->
+          <div *ngIf="isOutputVisible(report.id!) && reportOutput[report.id!]" class="col-span-12 mt-2 mb-1">
+            <div class="bg-gray-50/50 dark:bg-slate-900/60 rounded-xl p-4 border border-gray-200 dark:border-slate-700/40 backdrop-blur-sm">
+              <div class="flex items-center gap-2 mb-3">
+                <i class="fas fa-chart-line text-blue-500 dark:text-blue-400 text-sm"></i>
+                <span class="text-sm font-semibold text-slate-800 dark:text-white">{{ 'REPORTS.REPORT_RESULTS' | translate }}</span>
+              </div>
+              <div class="grid grid-cols-4 gap-3 mb-3">
+                <div class="bg-white dark:bg-slate-800/60 border border-gray-100 dark:border-transparent rounded-lg p-2.5 text-center shadow-sm dark:shadow-none">
+                  <div class="text-lg font-bold text-slate-800 dark:text-white">{{reportOutput[report.id!].summary?.total_paths || 0}}</div>
+                  <div class="text-[10px] text-slate-500 uppercase font-medium">{{ 'REPORTS.TOTAL_PATHS' | translate }}</div>
+                </div>
+                <div class="bg-white dark:bg-slate-800/60 border border-gray-100 dark:border-transparent rounded-lg p-2.5 text-center shadow-sm dark:shadow-none">
+                  <div class="text-lg font-bold text-emerald-600 dark:text-emerald-400">{{reportOutput[report.id!].summary?.successful_paths || 0}}</div>
+                  <div class="text-[10px] text-slate-500 uppercase font-medium">{{ 'REPORTS.SUCCESS' | translate }}</div>
+                </div>
+                <div class="bg-white dark:bg-slate-800/60 border border-gray-100 dark:border-transparent rounded-lg p-2.5 text-center shadow-sm dark:shadow-none">
+                  <div class="text-lg font-bold text-red-600 dark:text-red-400">{{reportOutput[report.id!].summary?.failed_paths || 0}}</div>
+                  <div class="text-[10px] text-slate-500 uppercase font-medium">{{ 'REPORTS.FAILED' | translate }}</div>
+                </div>
+                <div class="bg-white dark:bg-slate-800/60 border border-gray-100 dark:border-transparent rounded-lg p-2.5 text-center shadow-sm dark:shadow-none">
+                  <div class="text-lg font-bold text-blue-600 dark:text-blue-400">{{reportOutput[report.id!].summary?.total_records || 0}}</div>
+                  <div class="text-[10px] text-slate-500 uppercase font-medium">{{ 'REPORTS.TOTAL_RECORDS' | translate }}</div>
+                </div>
+              </div>
+              <div class="max-h-32 overflow-y-auto space-y-1.5">
+                <div *ngFor="let result of reportOutput[report.id!].results" 
+                     class="flex items-center justify-between bg-white dark:bg-slate-800/40 rounded-lg px-3 py-2 text-xs border border-gray-100 dark:border-transparent">
+                  <span class="text-slate-700 dark:text-slate-300 font-medium truncate flex-1 mr-3">{{result.path}}</span>
+                  <span [class]="result.error ? 'text-red-500 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'" class="flex-shrink-0 font-semibold font-mono">
+                    {{result.error ? ('REPORTS.ERROR_LABEL' | translate) : result.data_count + ' ' + ('REPORTS.RECORDS_SUFFIX' | translate)}}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Progress Bar -->
+          <div *ngIf="report.status === 'processing' || report.status === 'queued' || report.status === 'running' || isReportRunning(report.id!)" class="col-span-12 mt-1">
+            <div class="flex items-center gap-3">
+              <div class="flex-1 bg-gray-200 dark:bg-slate-700/50 rounded-full h-1.5">
+                <div class="bg-gradient-to-r from-brand to-brand-secondary h-1.5 rounded-full transition-all duration-500" [style.width.%]="report.progress || 0"></div>
+              </div>
+              <span class="text-[10px] text-slate-500 font-medium w-8 text-right">{{report.progress || 0}}%</span>
+            </div>
+          </div>
+        </div>
+      </ng-container>
+
+      <!-- ══════ COMPACT CARD VIEW (when creator is open) ══════ -->
+      <ng-container *ngIf="compactMode">
+        <div class="space-y-2">
+          <div *ngFor="let report of reports; trackBy: trackByReportId"
+               class="group bg-white dark:bg-slate-800/40 hover:bg-gray-50 dark:hover:bg-slate-700/40 rounded-lg border border-gray-200 dark:border-slate-700/30 hover:border-gray-350 dark:hover:border-slate-600/40 p-3 transition-all cursor-default shadow-sm dark:shadow-none">
+            <!-- Row 1: Name + Status -->
+            <div class="flex items-center justify-between gap-2 mb-1.5">
+              <div class="flex items-center gap-2 min-w-0 flex-1">
+                <div [class]="getFileTypeClasses(report.fileType)" class="w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0">
+                  <i [class]="getFileTypeIcon(report.fileType)" class="text-white text-[10px]"></i>
+                </div>
+                <h3 class="text-xs font-semibold text-slate-800 dark:text-white truncate">{{report.name}}</h3>
+                <!-- Compact Visibility Icon -->
+                <i class="fas text-[10px] ml-1.5"                 [class]="report.is_shared === 1 ? 'fa-globe text-brand' : 
+                          (report.shared_with && report.shared_with !== '[]' ? 'fa-users text-brand-soft' : 'fa-lock text-slate-400 dark:text-slate-500')"
+                 [title]="report.is_shared === 1 ? 'Global' : 
+                          (report.shared_with && report.shared_with !== '[]' ? 'Shared' : 'Private')"></i>
+              </div>
+              <span [class]="getStatusClasses(report.status)" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium flex-shrink-0">
+                <i [class]="getStatusIcon(report.status)" class="text-[8px]"></i>
+                {{getStatusText(report.status)}}
+              </span>
+            </div>
+            <!-- Row 2: Date + Type + Actions -->
+            <div class="flex items-center justify-between gap-2">
+              <div class="text-[10px] text-slate-500 dark:text-slate-400 truncate">{{formatDate(report.createdAt)}}</div>
+              <div class="flex items-center gap-0.5 flex-shrink-0">
+                 <button *ngIf="report.status === 'completed'"
+                  (click)="onCustomizeReport(report)"
+                  class="p-1 bg-brand-secondary/20 hover:bg-brand-secondary/40 border border-brand-secondary/30 rounded text-brand-secondary transition-all"
+                  [title]="'REPORTS.CUSTOMIZE' | translate">
+                  <i class="fas fa-sliders-h text-[9px]"></i>
+                </button>
+                <button *ngIf="report.status !== 'completed' && canGenerateReport()"
+                  (click)="onStartReport(report)"
+                  [disabled]="isReportRunning(report.id!)"
+                  class="p-1 bg-emerald-600/20 hover:bg-emerald-600/40 border border-emerald-500/30 rounded text-emerald-500 dark:text-emerald-400 transition-all disabled:opacity-40"
+                  [title]="'REPORTS.RUN' | translate">
+                  <i [class]="isReportRunning(report.id!) ? 'fas fa-spinner fa-spin' : 'fas fa-play'" class="text-[9px]"></i>
+                </button>
+                <!-- Share / Manage Visibility -->
+                <button *ngIf="canManageVisibility()"
+                  (click)="onShareReport(report)"
+                  class="p-1 text-slate-500 dark:text-slate-400 hover:text-brand dark:hover:text-brand hover:bg-brand/10 rounded transition-all"
+                  [title]="'Share / Manage Visibility'">
+                  <i class="fas fa-share-alt text-[9px]"></i>
+                </button>
+                <button *ngIf="canEditReport()"
+                  (click)="onEditReport(report)"
+                  class="p-1 text-slate-500 dark:text-slate-400 hover:text-brand-soft dark:hover:text-brand-soft hover:bg-brand-soft/10 rounded transition-all"
+                  [title]="'REPORTS.EDIT' | translate">
+                  <i class="fas fa-pen text-[9px]"></i>
+                </button>
+                <button *ngIf="canScheduleReport()"
+                  (click)="onScheduleReport(report)"
+                  class="p-1 text-slate-500 dark:text-slate-400 hover:text-brand dark:hover:text-brand hover:bg-brand/10 rounded transition-all"
+                  [title]="'Schedule Report'">
+                  <i class="fas fa-clock text-[9px]"></i>
+                </button>
+                <button
+                  (click)="onViewReport(report)"
+                  class="p-1 text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-500/10 rounded transition-all"
+                  [title]="'REPORTS.VIEW_REPORT' | translate">
+                  <i class="fas fa-folder-open text-[9px]"></i>
+                </button>
+                <button *ngIf="canDeleteReport()"
+                  (click)="onDeleteReport(report)"
+                  class="p-1 text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-500/10 rounded transition-all"
+                  [title]="'REPORTS.DELETE' | translate">
+                  <i class="fas fa-trash-alt text-[9px]"></i>
+                </button>
+              </div>
+            </div>
+            <!-- Progress Bar (compact) -->
+            <div *ngIf="report.status === 'processing' || report.status === 'queued' || report.status === 'running' || isReportRunning(report.id!)" class="mt-1.5">
+              <div class="bg-gray-200 dark:bg-slate-700/50 rounded-full h-1">
+                <div class="bg-gradient-to-r from-brand to-brand-secondary h-1 rounded-full transition-all duration-500" [style.width.%]="report.progress || 0"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </ng-container>
+
+    </div>
+  </div>
+</div>

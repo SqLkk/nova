@@ -1,0 +1,27 @@
+/* Nov4 Gold — Formula Manager (token-tabanlı).
+   HTML artık anlamsal tailwind tokenları (surface/ink/edge/brand) kullandığından
+   light/dark tema geçişi otomatik; eski ::ng-deep sınıf-ezici blok kaldırıldı. */
+
+/* Minimal scrollbar */
+.scrollbar-thin {
+  &::-webkit-scrollbar { width: 3px; }
+  &::-webkit-scrollbar-track { background: transparent; }
+  &::-webkit-scrollbar-thumb { background: rgb(var(--text-primary) / 0.08); border-radius: 2px; }
+  &::-webkit-scrollbar-thumb:hover { background: rgb(var(--text-primary) / 0.15); }
+}
+
+/* Color input reset */
+input[type="color"] {
+  -webkit-appearance: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  &::-webkit-color-swatch-wrapper { padding: 0; }
+  &::-webkit-color-swatch { border: 2px solid rgb(var(--text-primary) / 0.15); border-radius: 8px; }
+}
+
+/* Formula bar monospace */
+input[spellcheck="false"] {
+  font-variant-ligatures: none;
+  letter-spacing: 0.02em;
+}

@@ -1,0 +1,124 @@
+<div *ngIf="visible" class="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-[10001] p-4 overflow-hidden" (click)="$event.stopPropagation()">
+  <div class="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl shadow-2xl w-[480px] max-w-[95vw] h-auto transform transition-all duration-300 overflow-hidden flex flex-col">
+    <!-- Header -->    
+    <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-950/20">
+      <div class="flex items-center space-x-3 flex-1 min-w-0">
+        <div class="p-2 bg-blue-500/10 rounded-lg border border-blue-500/15 shrink-0">
+          <i class="fas fa-table text-blue-500 dark:text-blue-400"></i>
+        </div>
+        <div class="flex flex-col min-w-0">
+          <span class="text-[8px] text-gray-500 font-bold uppercase tracking-wider">Widget Settings</span>
+          <!-- Title Editing -->
+          <div class="flex items-center shrink-0 min-w-0 mt-0.5">
+            <ng-container *ngIf="!isEditingTitle">
+              <h2 class="text-slate-900 dark:text-white text-base font-bold truncate leading-none mr-2">{{ title || 'Query Viewer' }}</h2>
+              <button 
+                type="button"
+                class="text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 focus:outline-none transition-colors p-1 rounded hover:bg-gray-100 dark:hover:bg-slate-800 shrink-0" 
+                (click)="startEditing()"
+                title="Edit Name"
+              >
+                <i class="fas fa-pencil-alt text-[10px]"></i>
+              </button>
+            </ng-container>
+
+            <ng-container *ngIf="isEditingTitle">
+              <input 
+                type="text" 
+                class="bg-slate-50 dark:bg-slate-950/80 text-slate-900 dark:text-white text-sm font-semibold px-2 py-0.5 rounded border border-gray-300 dark:border-blue-500/50 focus:outline-none focus:ring-1 focus:ring-blue-500/20 w-full max-w-[200px]"
+                [(ngModel)]="editedTitle"
+                (keydown.enter)="saveTitle()"
+                (keydown.escape)="cancelEditing()"
+              />
+              <div class="flex items-center space-x-0.5 ml-1.5 shrink-0">
+                <button type="button" class="text-green-600 dark:text-green-400 p-1 hover:bg-green-100 dark:hover:bg-green-500/10 rounded" (click)="saveTitle()"><i class="fas fa-check text-[10px]"></i></button>
+                <button type="button" class="text-red-600 dark:text-red-400 p-1 hover:bg-red-100 dark:hover:bg-red-500/10 rounded" (click)="cancelEditing()"><i class="fas fa-times text-[10px]"></i></button>
+              </div>
+            </ng-container>
+          </div>
+        </div>
+      </div>
+      <button 
+        class="text-slate-500 hover:text-slate-900 dark:hover:text-white focus:outline-none rounded-lg p-1.5 hover:bg-gray-100 dark:hover:bg-slate-800" 
+        (click)="onCancel()"
+      >
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+
+    <!-- Content -->
+    <div class="p-5 space-y-4 text-slate-600 dark:text-slate-300 overflow-y-auto max-h-[70vh]">
+      <!-- Description -->
+      <p class="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+        Select one of your saved explorations/queries to display as a real-time data table directly inside this dashboard widget.
+      </p>
+
+      <!-- Selector dropdown -->
+      <div class="space-y-1.5">
+        <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Select Saved Query</label>
+        <div class="flex items-center gap-2">
+          <div class="relative flex-grow">
+            <select [ngModel]="selectedQueryId" (ngModelChange)="onQuerySelect($event)"
+                    class="bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-800 text-slate-900 dark:text-white rounded-lg px-3 py-2.5 w-full focus:outline-none focus:border-blue-500 text-xs font-semibold appearance-none cursor-pointer">
+              <option value="" disabled selected class="text-slate-500">-- Choose a saved query --</option>
+              <option *ngFor="let q of savedQueries" [value]="q.id" class="text-slate-900 dark:text-white bg-white dark:bg-slate-900">{{ q.name }} ({{ q.source | uppercase }})</option>
+            </select>
+            <div class="absolute right-3 top-3.5 pointer-events-none text-slate-500 text-[10px]">
+              <i class="fas fa-chevron-down"></i>
+            </div>
+          </div>
+          <button 
+            *ngIf="selectedQueryId"
+            (click)="clearSelection()"
+            class="px-3 py-2.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 rounded-lg border border-rose-500/20 text-xs focus:outline-none transition-colors"
+            title="Clear Selection"
+          >
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <div *ngIf="isLoadingQueries" class="text-[10px] text-gray-500 italic pl-1 flex items-center gap-1.5 mt-1">
+          <i class="fas fa-spinner fa-spin text-blue-500 dark:text-blue-400"></i> Loading saved queries...
+        </div>
+      </div>
+
+      <!-- Selected Query Details Metadata -->
+      <div *ngIf="selectedQuery" class="space-y-3 mt-4 border-t border-gray-100 dark:border-slate-800/80 pt-4">
+        <div class="bg-gray-50/50 dark:bg-slate-950/40 p-3.5 border border-gray-200 dark:border-slate-800 rounded-xl space-y-2.5">
+          <div class="flex justify-between items-center text-[10px] text-slate-500 border-b border-gray-200 dark:border-slate-800 pb-1.5 font-bold uppercase tracking-wider">
+            <span>Query Metadata</span>
+            <span class="text-amber-600 dark:text-amber-500 font-mono">{{ selectedQuery.source }}</span>
+          </div>
+          <div class="grid grid-cols-2 gap-4 text-[11px]">
+            <div><span class="text-slate-500">Query Name:</span> <span class="text-slate-800 dark:text-slate-300 font-semibold ml-1">{{ selectedQuery.name }}</span></div>
+            <div><span class="text-slate-500">Table/Type:</span> <span class="text-slate-800 dark:text-slate-300 font-mono ml-1">{{ selectedQuery.table_name }}</span></div>
+          </div>
+        </div>
+        
+        <div class="space-y-1.5">
+          <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Table Columns</label>
+          <div class="flex flex-wrap gap-1 p-2.5 bg-gray-50/50 dark:bg-slate-950/40 rounded-xl border border-gray-200 dark:border-slate-800 max-h-[120px] overflow-y-auto custom-scrollbar">
+            <span *ngFor="let col of selectedQueryColumns" class="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/15 font-mono text-[9px]">{{ col }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="flex items-center justify-end px-5 py-3 border-t border-gray-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-950/20 gap-2">
+      <button 
+        type="button"
+        class="px-4 py-2 bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg transition-colors border border-gray-300/50 dark:border-slate-700/50 text-xs font-semibold cursor-pointer"
+        (click)="onCancel()"
+      >
+        Cancel
+      </button>
+      <button 
+        type="button"
+        class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors border-none text-xs font-semibold cursor-pointer"
+        (click)="onConfirm()"
+      >
+        Save Settings
+      </button>
+    </div>
+  </div>
+</div>

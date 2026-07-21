@@ -1,0 +1,557 @@
+/* Professional Consistent 3x5 Grid System for Both Dashboard and Customizer */
+.grid-layout-container,
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(5, minmax(100px, 1fr));
+  gap: 0.75rem;
+  min-height: 500px;
+  padding: 0.75rem;
+}
+
+/* Stable grid sizing to prevent layout shifts during data refresh */
+.dashboard-grid-fixed {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(5, 360px);
+  grid-auto-rows: 360px;
+  align-content: start;
+}
+
+.dashboard-skeleton-card {
+  border-radius: 1rem;
+  border: 1px solid rgb(var(--accent-primary) / 0.15);
+  background-color: rgb(var(--bg-secondary) / 0.6);
+  min-height: 130px;
+}
+
+/* Professional Widget Card Styles */
+.widget-card,
+.widget-container {
+  border-radius: 0.75rem;
+  overflow: hidden;
+  position: relative;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  background: rgb(var(--bg-secondary) / 0.95);
+  border: 1px solid rgb(var(--border-color) / 0.5);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 6px rgb(var(--shadow-color) / 0.1);
+}
+
+.widget-card:hover,
+.widget-container:hover {
+  box-shadow: 0 10px 25px rgb(var(--accent-primary) / 0.15);
+  border-color: rgb(var(--accent-primary) / 0.4);
+  transform: translateY(-2px);
+}
+
+/* Consistent Grid Span Classes */
+.col-span-1 { grid-column: span 1; }
+.col-span-2 { grid-column: span 2; }
+.col-span-3 { grid-column: span 3; }
+
+.row-span-1 { grid-row: span 1; }
+.row-span-2 { grid-row: span 2; }
+
+/* Enhanced Drag and Drop Styling */
+.widget-drag-preview {
+  background: linear-gradient(135deg, rgb(var(--accent-primary) / 0.9), rgb(var(--accent-primary) / 0.8));
+  border: 2px solid rgb(var(--accent-primary) / 0.9);
+  border-radius: 1rem;
+  box-shadow: 
+    0 20px 40px rgb(var(--shadow-color) / 0.3),
+    0 0 30px rgb(var(--accent-primary) / 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(20px);
+  z-index: 1000;
+}
+
+.widget-drop-placeholder {
+  background: linear-gradient(45deg, 
+    rgb(var(--accent-primary) / 0.1) 0%, 
+    rgb(var(--accent-primary) / 0.1) 50%, 
+    rgb(var(--accent-primary) / 0.1) 100%);
+  border: 2px dashed rgb(var(--accent-primary) / 0.5);
+  border-radius: 1rem;
+  animation: pulse-border 2s infinite ease-in-out;
+}
+
+@keyframes pulse-border {
+  0%, 100% {
+    border-color: rgb(var(--accent-primary) / 0.5);
+    background: rgb(var(--accent-primary) / 0.1);
+  }
+  50% {
+    border-color: rgb(var(--accent-primary) / 0.8);
+    background: rgb(var(--accent-primary) / 0.2);
+  }
+}
+
+/* Professional Animations - Enhanced */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 10px rgb(var(--accent-primary) / 0.3);
+  }
+  50% {
+    box-shadow: 0 0 20px rgb(var(--accent-primary) / 0.6);
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.widget-card {
+  animation: fadeInUp 0.3s ease-out forwards;
+}
+
+/* Enhanced Hover States */
+.group:hover .opacity-0 {
+  opacity: 1;
+  transition: opacity 0.2s ease;
+}
+
+/* Professional Button Styling */
+.btn-professional {
+  background: linear-gradient(135deg, rgb(var(--accent-primary) / 0.8), rgb(var(--accent-primary) / 0.8));
+  border: 1px solid rgb(var(--accent-primary) / 0.3);
+  backdrop-filter: blur(10px);
+  transition: all 0.3s ease;
+}
+
+.btn-professional:hover {
+  background: linear-gradient(135deg, rgb(var(--accent-primary)), rgb(var(--accent-primary)));
+  transform: translateY(-1px);
+  box-shadow: 0 8px 25px rgb(var(--accent-primary) / 0.3);
+}
+
+/* Smooth Loading States */
+@keyframes skeleton-loading {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.loading-skeleton {
+  background: linear-gradient(
+    90deg,
+    rgb(var(--bg-tertiary) / 0.3) 25%,
+    rgb(var(--bg-elevated) / 0.5) 50%,
+    rgb(var(--bg-tertiary) / 0.3) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s ease-in-out infinite;
+}
+
+/* Professional Card Hover Effects */
+.card-hover-effect {
+  position: relative;
+  overflow: hidden;
+  
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.1),
+      transparent
+    );
+    transition: left 0.5s ease;
+  }
+  
+  &:hover::before {
+    left: 100%;
+  }
+}
+
+/* Responsive Grid Adjustments */
+@media (max-width: 1200px) {
+  .grid-layout-container {
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: repeat(7, minmax(100px, 1fr));
+  }
+
+  .dashboard-grid-fixed {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: repeat(7, 320px);
+    grid-auto-rows: 320px;
+  }
+}
+
+@media (max-width: 768px) {
+  .grid-layout-container {
+    grid-template-columns: 1fr;
+    grid-template-rows: repeat(15, minmax(80px, 1fr));
+    gap: 0.5rem;
+  }
+
+  .dashboard-grid-fixed {
+    grid-template-columns: 1fr;
+    grid-template-rows: repeat(15, 300px);
+    grid-auto-rows: 300px;
+    gap: 0.5rem;
+  }
+}
+
+// Professional Toast Notification Styles
+.toast-notification {
+  transform: translateX(100%);
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  
+  &.show {
+    transform: translateX(0);
+  }
+  
+  .toast-content {
+    backdrop-filter: blur(16px);
+    box-shadow: 
+      0 20px 25px -5px rgb(var(--shadow-color) / 0.3),
+      0 10px 10px -5px rgb(var(--shadow-color) / 0.1);
+  }
+  
+  .toast-icon {
+    animation: bounceIn 0.6s ease;
+  }
+}
+
+@keyframes bounceIn {
+  0%, 20%, 40%, 60%, 80% {
+    animation-timing-function: cubic-bezier(0.215, 0.610, 0.355, 1.000);
+  }
+  0% {
+    opacity: 0;
+    transform: scale3d(0.3, 0.3, 0.3);
+  }
+  20% {
+    transform: scale3d(1.1, 1.1, 1.1);
+  }
+  40% {
+    transform: scale3d(0.9, 0.9, 0.9);
+  }
+  60% {
+    opacity: 1;
+    transform: scale3d(1.03, 1.03, 1.03);
+  }
+  80% {
+    transform: scale3d(0.97, 0.97, 0.97);
+  }
+  100% {
+    opacity: 1;
+    transform: scale3d(1, 1, 1);
+  }
+}
+
+// Toast entrance animation
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+// Toast exit animation
+@keyframes slideOutRight {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+/* Professional Gradient Text Animation */
+@keyframes gradient-shift {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+.gradient-text-animated {
+  background: linear-gradient(
+    90deg,
+    rgb(var(--accent-tertiary)),
+    rgb(var(--accent-primary)),
+    rgb(var(--accent-secondary)),
+    rgb(var(--accent-tertiary))
+  );
+  background-size: 200% auto;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: gradient-shift 3s ease infinite;
+}
+
+/* Smooth Transitions for All Interactive Elements */
+button, a, input, select, textarea, [role="button"], .interactive-transition {
+  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+/* Professional Focus States */
+button:focus,
+input:focus,
+select:focus,
+textarea:focus {
+  outline: 2px solid rgb(var(--accent-primary) / 0.5);
+  outline-offset: 2px;
+}
+
+/* Smooth Scroll Behavior */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Professional Shadow Utilities */
+.shadow-glow-blue {
+  box-shadow: 0 0 20px rgb(var(--accent-primary) / 0.4);
+}
+
+.shadow-glow-green {
+  box-shadow: 0 0 20px rgb(var(--success) / 0.4);
+}
+
+.shadow-glow-purple {
+  box-shadow: 0 0 20px rgb(var(--accent-primary) / 0.4);
+}
+
+.shadow-glow-amber {
+  box-shadow: 0 0 20px rgb(var(--accent-primary) / 0.4);
+}
+
+/* Professional Page Transition */
+@keyframes pageLoad {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+main {
+  animation: pageLoad 0.5s ease-out;
+}
+
+/* Enforce fixed widget size and scrollable inner table for Project PE */
+.widget-grid-item {
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: 100% !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.query-viewer-container {
+  display: flex !important;
+  flex-direction: column !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+.query-viewer-table-wrapper {
+  flex: 1 !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  width: 100% !important;
+}
+
+/* Smooth transitions during active sorting dragging */
+.cdk-drop-list-dragging .widget-grid-item:not(.cdk-drag-placeholder) {
+  transition: transform 250ms cubic-bezier(0, 0, 0.2, 1) !important;
+}
+
+/* Real Fullscreen Grow Animation */
+@keyframes fadeInGrow {
+  from {
+    opacity: 0;
+    transform: scale(0.92) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-fade-in-grow {
+  animation: fadeInGrow 0.35s cubic-bezier(0.34, 1.3, 0.64, 1) forwards;
+}
+
+/* =============================================
+   Nova Space Float Animation for Edit Mode
+   ============================================= */
+@keyframes widget-float {
+  0%   { transform: translateY(0); }
+  50%  { transform: translateY(-4px); }
+  100% { transform: translateY(0); }
+}
+
+@keyframes widget-float-alt {
+  0%   { transform: translateY(0); }
+  50%  { transform: translateY(-3px) translateX(1px); }
+  100% { transform: translateY(0); }
+}
+
+@keyframes widget-glow-pulse {
+  0% { box-shadow: 0 0 15px rgb(var(--accent-primary) / 0.2), inset 0 0 0 1px rgb(var(--accent-primary) / 0.3); }
+  50% { box-shadow: 0 0 25px rgb(var(--accent-primary) / 0.4), inset 0 0 0 1px rgb(var(--accent-primary) / 0.6); }
+  100% { box-shadow: 0 0 15px rgb(var(--accent-primary) / 0.2), inset 0 0 0 1px rgb(var(--accent-primary) / 0.3); }
+}
+
+.widget-float {
+  animation: widget-float 3s ease-in-out infinite;
+
+  &:nth-child(even) {
+    animation-name: widget-float-alt;
+    animation-duration: 3.5s;
+    animation-direction: reverse;
+  }
+
+  &:nth-child(3n) {
+    animation-duration: 4s;
+    animation-delay: 0.5s;
+  }
+}
+
+.edit-mode-widget {
+  border-color: transparent !important;
+  animation: widget-float 3s ease-in-out infinite, widget-glow-pulse 2s ease-in-out infinite !important;
+  cursor: grab;
+
+  &:active {
+    cursor: grabbing;
+    transform: scale(0.98);
+  }
+}
+
+/* Edit Mode Banner slide-down */
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-down {
+  animation: slideDown 0.35s cubic-bezier(0.34, 1.3, 0.64, 1) forwards;
+}
+
+/* =============================================
+   HUD Scanline Animation
+   ============================================= */
+@keyframes scanline {
+  0% { transform: translateY(0); opacity: 0; }
+  10% { opacity: 0.5; }
+  90% { opacity: 0.5; }
+  100% { transform: translateY(180px); opacity: 0; }
+}
+
+.animate-scan {
+  animation: scanline 3s linear infinite;
+}
+
+/* =============================================
+   Modal Animation
+   ============================================= */
+@keyframes modalIn {
+  from { opacity: 0; transform: scale(0.95) translateY(20px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.animate-modal-in > div {
+  animation: modalIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}

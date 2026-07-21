@@ -1,0 +1,805 @@
+<!-- Success Toast Notification -->
+<div *ngIf="showSuccessToast" 
+     class="fixed top-4 right-4 z-[60] max-w-md w-full bg-white rounded-lg shadow-2xl border-l-4 border-green-500 transform transition-all duration-500 ease-in-out animate-pulse">
+  <div class="p-4">
+    <div class="flex items-start">
+      <div class="flex-shrink-0">
+        <div class="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
+          <i class="fas fa-check text-white text-sm"></i>
+        </div>
+      </div>
+      <div class="ml-3 flex-1">
+        <h3 class="text-sm font-semibold text-gray-900">{{ successMessage }}</h3>
+        <p class="text-xs text-gray-600 mt-1">{{ successDetails }}</p>
+        <div class="mt-3 flex items-center space-x-2">
+          <button (click)="downloadReport()" 
+                  class="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors flex items-center space-x-1">
+            <i class="fas fa-download"></i>
+            <span>{{ 'REPORTS.DOWNLOAD' | translate }}</span>
+          </button>
+          <button (click)="hideSuccessNotification()" 
+                  class="px-3 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300 transition-colors">
+            {{ 'REPORTS.CLOSE' | translate }}
+          </button>
+        </div>
+      </div>
+      <button (click)="hideSuccessNotification()" 
+              class="ml-4 text-gray-400 hover:text-gray-600 transition-colors">
+        <i class="fas fa-times text-sm"></i>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Report Customizer Modal -->
+<div *ngIf="isVisible" class="report-customizer fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[10000] p-4">
+  <div class="bg-white dark:bg-slate-950 rounded-xl shadow-2xl max-w-5xl w-full flex flex-col border border-slate-200 dark:border-slate-800/80" style="max-height: calc(100vh - 90px); height: calc(100vh - 90px);">
+    
+    <!-- Modal Header -->
+    <div class="bg-slate-50 dark:bg-slate-900 px-6 py-4 border-b border-slate-200 dark:border-slate-800/80 flex-shrink-0 text-slate-900 dark:text-white">
+      <div class="flex justify-between items-center">
+        <div class="flex items-center space-x-3">
+          <div class="w-9 h-9 bg-blue-600 rounded-lg flex items-center justify-center">
+            <i class="fas fa-file-alt text-white"></i>
+          </div>
+          <div>
+            <h2 class="text-slate-900 dark:text-white text-lg font-semibold">{{ 'REPORTS.REPORT_CUSTOMIZATION' | translate }}</h2>
+            <p class="text-xs text-slate-500 dark:text-gray-400">{{ reportId }}</p>
+          </div>
+        </div>
+        <button (click)="closeCustomizer()" 
+                class="text-slate-500 hover:text-slate-900 dark:text-gray-400 dark:hover:text-white w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-200 dark:hover:bg-gray-700 transition-colors">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      
+      <!-- Progress Steps -->
+      <div class="flex items-center mt-4 gap-1">
+        <ng-container *ngFor="let step of stepDefinitions; let last = last">
+          <div class="flex items-center space-x-2 px-3 py-1.5 rounded-full text-xs font-medium transition-colors"
+               [class]="currentStep >= step.n ? 'bg-blue-600/10 text-blue-600 dark:bg-blue-600/20 dark:text-blue-300' : 'text-slate-400 dark:text-gray-500'">
+            <div class="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold border"
+                 [class]="currentStep >= step.n ? 'bg-blue-600 border-blue-500 text-white' : 'border-slate-350 dark:border-gray-600 text-slate-400 dark:text-gray-500'">
+              <i *ngIf="currentStep > step.n" class="fas fa-check text-[8px]"></i>
+              <span *ngIf="currentStep <= step.n">{{ step.n }}</span>
+            </div>
+            <span class="hidden sm:inline">{{ 'REPORTS.' + step.key | translate }}</span>
+          </div>
+          <div *ngIf="!last" class="flex-1 h-px bg-slate-200 dark:bg-gray-700"></div>
+        </ng-container>
+      </div>
+    </div>
+
+    <!-- Modal Content -->
+    <div class="flex-1 overflow-y-auto p-6 bg-white dark:bg-slate-950 text-slate-900 dark:text-white">
+      
+      <!-- Step 1: Analysis -->
+      <div *ngIf="currentStep === 1" class="flex items-center justify-center min-h-[400px]">
+        <div *ngIf="analyzing" class="text-center space-y-4">
+          <div class="animate-spin rounded-full h-12 w-12 border-2 border-blue-400 border-t-transparent mx-auto"></div>
+          <h3 class="text-lg font-semibold text-slate-800 dark:text-gray-100">{{ 'REPORTS.REPORT_ANALYZING' | translate }}</h3>
+          <p class="text-sm text-slate-500 dark:text-gray-400">{{ 'REPORTS.ANALYZING_DESC' | translate }}</p>
+        </div>
+        
+        <div *ngIf="!analyzing && reportAnalysis" class="max-w-3xl w-full space-y-5">
+          <!-- Header -->
+          <div class="text-center space-y-2">
+            <div class="w-14 h-14 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto shadow-lg shadow-blue-600/20">
+              <i class="fas fa-chart-bar text-white text-xl"></i>
+            </div>
+            <h3 class="text-xl font-semibold text-slate-900 dark:text-white">{{ 'REPORTS.CUSTOMIZATION_READY' | translate }}</h3>
+            <p class="text-sm text-slate-500 dark:text-gray-400">{{ customizationOptions.reportTitle || reportAnalysis.customization_defaults.report_title }}</p>
+          </div>
+
+          <!-- Stats Grid -->
+          <div class="grid grid-cols-4 gap-3">
+            <div class="bg-slate-50 dark:bg-slate-900/50 rounded-xl p-3.5 border border-slate-200 dark:border-slate-800/60 text-center">
+              <div class="w-8 h-8 bg-blue-600/15 rounded-lg flex items-center justify-center mx-auto mb-2">
+                <i class="fas fa-columns text-blue-500 dark:text-blue-400 text-sm"></i>
+              </div>
+              <div class="text-xl font-bold text-slate-900 dark:text-white">{{ reportAnalysis.available_columns.length }}</div>
+              <div class="text-[10px] text-slate-500 dark:text-gray-500 mt-0.5">{{ 'REPORTS.COLUMN_SELECTION' | translate }}</div>
+            </div>
+            <div class="bg-slate-50 dark:bg-gray-800/60 rounded-xl p-3.5 border border-slate-200 dark:border-gray-700/40 text-center">
+              <div class="w-8 h-8 bg-emerald-600/15 rounded-lg flex items-center justify-center mx-auto mb-2">
+                <i class="fas fa-database text-emerald-500 dark:text-emerald-400 text-sm"></i>
+              </div>
+              <div class="text-xl font-bold text-slate-900 dark:text-white">{{ reportAnalysis.total_records | number }}</div>
+              <div class="text-[10px] text-slate-500 dark:text-gray-500 mt-0.5">{{ 'REPORTS.TOTAL_RECORDS' | translate }}</div>
+            </div>
+            <div class="bg-slate-50 dark:bg-gray-800/60 rounded-xl p-3.5 border border-slate-200 dark:border-gray-700/40 text-center">
+              <div class="w-8 h-8 bg-amber-600/15 rounded-lg flex items-center justify-center mx-auto mb-2">
+                <i class="fas fa-plug text-amber-600 dark:text-amber-400 text-sm"></i>
+              </div>
+              <div class="text-xl font-bold text-slate-900 dark:text-white">{{ getSourceKeys().length }}</div>
+              <div class="text-[10px] text-slate-500 dark:text-gray-500 mt-0.5">{{ 'REPORTS.DATA_SOURCE' | translate }}</div>
+            </div>
+            <div class="bg-slate-50 dark:bg-gray-800/60 rounded-xl p-3.5 border border-slate-200 dark:border-gray-700/40 text-center">
+              <div class="w-8 h-8 bg-purple-600/15 rounded-lg flex items-center justify-center mx-auto mb-2">
+                <i class="fas fa-file-excel text-purple-500 dark:text-purple-400 text-sm"></i>
+              </div>
+              <div class="text-xl font-bold text-slate-900 dark:text-white uppercase">{{ customizationOptions.fileFormat }}</div>
+              <div class="text-[10px] text-slate-500 dark:text-gray-500 mt-0.5">Output Format</div>
+            </div>
+          </div>
+
+          <!-- Report Config Summary -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <!-- Data Sources -->
+            <div class="bg-slate-50 dark:bg-slate-900/40 rounded-xl p-4 border border-slate-200 dark:border-slate-800/50">
+              <h4 class="text-xs font-semibold text-slate-800 dark:text-gray-300 uppercase tracking-wide mb-3 flex items-center gap-2">
+                <i class="fas fa-layer-group text-blue-500 dark:text-blue-400 text-[10px]"></i> Data Sources
+              </h4>
+              <div class="space-y-2">
+                <ng-container *ngIf="reportAnalysis.source_groups">
+                  <div *ngFor="let src of getSourceKeys()" class="flex items-center justify-between bg-slate-100 dark:bg-gray-700/20 rounded-lg px-3 py-2">
+                    <div class="flex items-center gap-2">
+                      <span class="text-sm">{{ getSourceIcon(src) }}</span>
+                      <span class="text-xs text-slate-700 dark:text-gray-200 font-medium">{{ src | uppercase }}</span>
+                    </div>
+                    <div class="flex items-center gap-3 text-[10px] text-slate-500 dark:text-gray-400">
+                      <span>{{ reportAnalysis.source_groups[src].path_count || reportAnalysis.source_groups[src].paths.length || 0 }} paths</span>
+                      <span class="text-slate-300 dark:text-gray-600">|</span>
+                      <span>{{ reportAnalysis.source_groups[src].columns.length || 0 }} cols</span>
+                      <span class="text-slate-300 dark:text-gray-600">|</span>
+                      <span>{{ reportAnalysis.source_groups[src].record_count || 0 | number }} rows</span>
+                    </div>
+                  </div>
+                </ng-container>
+                <div *ngIf="!reportAnalysis.source_groups" class="flex items-center gap-2 bg-slate-100 dark:bg-gray-700/20 rounded-lg px-3 py-2">
+                  <span class="text-sm">📊</span>
+                  <span class="text-xs text-slate-700 dark:text-gray-200">SYS</span>
+                  <span class="text-[10px] text-slate-500 dark:text-gray-400 ml-auto">{{ reportAnalysis.total_records | number }} records</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Default Columns -->
+            <div class="bg-slate-50 dark:bg-slate-900/40 rounded-xl p-4 border border-slate-200 dark:border-slate-800/50">
+              <h4 class="text-xs font-semibold text-slate-800 dark:text-gray-300 uppercase tracking-wide mb-3 flex items-center gap-2">
+                <i class="fas fa-check-circle text-emerald-650 dark:text-emerald-400 text-[10px]"></i> Selected Columns ({{ customizationOptions.selectedColumns.length }})
+              </h4>
+              <div class="flex flex-wrap gap-1.5">
+                <span *ngFor="let col of customizationOptions.selectedColumns" 
+                      class="inline-flex items-center px-2 py-1 rounded-md text-[10px] font-medium bg-blue-50 text-blue-700 dark:bg-blue-600/15 dark:text-blue-300 border border-blue-200 dark:border-blue-500/20">
+                  {{ col }}
+                </span>
+                <span *ngIf="reportAnalysis.available_columns.length > customizationOptions.selectedColumns.length"
+                      class="inline-flex items-center px-2 py-1 rounded-md text-[10px] text-slate-500 bg-slate-100 dark:bg-gray-700/30 dark:text-gray-500">
+                  +{{ reportAnalysis.available_columns.length - customizationOptions.selectedColumns.length }} more available
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Available Columns Preview -->
+          <div class="bg-slate-50 dark:bg-slate-900/40 rounded-xl p-4 border border-slate-200 dark:border-slate-800/50">
+            <h4 class="text-xs font-semibold text-slate-800 dark:text-gray-300 uppercase tracking-wide mb-3 flex items-center gap-2">
+              <i class="fas fa-th-list text-slate-400 dark:text-gray-400 text-[10px]"></i> All Available Columns
+            </h4>
+            <div class="flex flex-wrap gap-1">
+              <span *ngFor="let col of reportAnalysis.available_columns"
+                    class="inline-flex items-center px-2 py-0.5 rounded text-[10px] transition-colors"
+                    [class]="isColumnSelected(col) ? 'bg-blue-50 text-blue-700 font-medium' : 'bg-slate-100 text-slate-400 dark:bg-gray-700/30 dark:text-gray-500'">
+                <i *ngIf="isColumnSelected(col)" class="fas fa-check text-[7px] mr-1 text-blue-500 dark:text-blue-400"></i>
+                {{ col }}
+              </span>
+            </div>
+          </div>
+
+          <!-- Excel Theme Preview -->
+          <div *ngIf="customizationOptions.fileFormat === 'excel' || customizationOptions.fileFormat === 'ods'" 
+               class="bg-slate-50 dark:bg-slate-900/40 rounded-xl p-4 border border-slate-200 dark:border-slate-800/50">
+            <h4 class="text-xs font-semibold text-slate-800 dark:text-gray-300 uppercase tracking-wide mb-3 flex items-center gap-2">
+              <i class="fas fa-paint-brush text-purple-500 dark:text-purple-400 text-[10px]"></i> Theme Preview
+            </h4>
+            <div class="rounded-lg overflow-hidden border border-slate-200 dark:border-gray-700/30">
+              <table class="w-full text-xs">
+                <thead>
+                  <tr [style.background-color]="customizationOptions.excelOptions.colors.headerBg"
+                      [style.color]="customizationOptions.excelOptions.colors.headerText">
+                    <th *ngFor="let col of customizationOptions.selectedColumns.slice(0, 4)" 
+                        class="px-3 py-2 text-left font-semibold"
+                        [style.font-family]="customizationOptions.excelOptions.fontStyles?.fontFamily">{{ col }}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr class="bg-white">
+                    <td *ngFor="let col of customizationOptions.selectedColumns.slice(0, 4)" 
+                        class="px-3 py-1.5 text-slate-600 italic text-[10px]"
+                        [style.font-family]="customizationOptions.excelOptions.fontStyles?.fontFamily">sample data</td>
+                  </tr>
+                  <tr [style.background-color]="customizationOptions.excelOptions.colors.alternateRow">
+                    <td *ngFor="let col of customizationOptions.selectedColumns.slice(0, 4)" 
+                        class="px-3 py-1.5 text-slate-600 italic text-[10px]"
+                        [style.font-family]="customizationOptions.excelOptions.fontStyles?.fontFamily">sample data</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- ═══ Choose Customization Method ═══ -->
+          <div class="mt-6">
+            <h4 class="text-xs font-semibold text-slate-500 dark:text-gray-400 uppercase tracking-wider text-center mb-4">Choose your method</h4>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <!-- Quick Customize -->
+              <button (click)="goToCustomization()"
+                      class="group bg-slate-50 hover:bg-blue-50/50 dark:bg-gray-800/60 dark:hover:bg-blue-600/10 border border-slate-200 dark:border-gray-700/40 dark:hover:border-blue-500/40 rounded-xl p-5 text-left transition-all duration-200 cursor-pointer">
+                <div class="flex items-start gap-4">
+                  <div class="w-12 h-12 bg-blue-500/10 group-hover:bg-blue-500/20 dark:bg-blue-600/15 dark:group-hover:bg-blue-600/25 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors">
+                    <i class="fas fa-sliders-h text-blue-500 dark:text-blue-400 text-lg"></i>
+                  </div>
+                  <div>
+                    <h5 class="text-sm font-semibold text-slate-800 mb-1 group-hover:text-blue-600 dark:text-white dark:group-hover:text-blue-300 transition-colors">Quick Customize</h5>
+                    <p class="text-[11px] text-slate-500 dark:text-gray-500 leading-relaxed">
+                      Select columns, set sorting, choose colors and format. Fast and simple for standard reports.
+                    </p>
+                  </div>
+                </div>
+              </button>
+              <!-- Template Builder -->
+              <button (click)="openTemplateBuilder()"
+                      class="group bg-slate-50 dark:bg-slate-900/50 hover:bg-teal-50/50 dark:hover:bg-teal-600/10 border border-slate-200 dark:border-slate-800/60 rounded-xl p-5 text-left transition-all duration-200 cursor-pointer">
+                <div class="flex items-start gap-4">
+                  <div class="w-12 h-12 bg-teal-500/10 group-hover:bg-teal-500/20 dark:bg-teal-600/15 dark:group-hover:bg-teal-600/25 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors">
+                    <i class="fas fa-table text-teal-500 dark:text-teal-400 text-lg"></i>
+                  </div>
+                  <div>
+                    <h5 class="text-sm font-semibold text-slate-800 mb-1 group-hover:text-teal-600 dark:text-white dark:group-hover:text-teal-300 transition-colors">Template Builder</h5>
+                    <p class="text-[11px] text-slate-500 dark:text-gray-500 leading-relaxed">
+                      Visual spreadsheet designer. Design cell-by-cell layouts, charts, formulas. Save & reuse templates.
+                    </p>
+                  </div>
+                </div>
+              </button>
+            </div>
+          </div>
+          
+        </div>
+      </div>
+
+      <!-- Step 2: Customization -->
+      <div *ngIf="currentStep === 2 && reportAnalysis" class="space-y-5">
+        
+        <!-- Report Info -->
+        <div class="bg-slate-50 dark:bg-slate-900/50 rounded-lg p-4 border border-slate-200 dark:border-slate-800/60">
+          <h3 class="text-sm font-semibold text-slate-800 dark:text-gray-300 uppercase tracking-wide mb-3">{{ 'REPORTS.REPORT_INFO' | translate }}</h3>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div class="md:col-span-2">
+              <label class="block text-xs text-slate-500 dark:text-gray-400 mb-1">{{ 'REPORTS.REPORT_TITLE' | translate }}</label>
+              <input type="text" [(ngModel)]="customizationOptions.reportTitle"
+                     class="w-full px-3 py-2 text-sm bg-white dark:bg-gray-700/50 border border-slate-200 dark:border-gray-600/50 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500">
+            </div>
+            <div>
+              <label class="block text-xs text-slate-500 dark:text-gray-400 mb-1">{{ 'REPORTS.FILE_FORMAT' | translate }}</label>
+              <select [(ngModel)]="customizationOptions.fileFormat"
+                      class="w-full px-3 py-2 text-sm bg-white dark:bg-gray-700/50 border border-slate-200 dark:border-gray-600/50 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500">
+                <option *ngFor="let format of availableFormats" [value]="format.value">
+                  {{ format.icon }} {{ 'REPORTS.' + format.labelKey | translate }}
+                </option>
+              </select>
+            </div>
+          </div>
+          <div class="mt-3">
+            <label class="block text-xs text-slate-500 dark:text-gray-400 mb-1">{{ 'REPORTS.DESCRIPTION' | translate }}</label>
+            <textarea [(ngModel)]="customizationOptions.reportDescription" rows="2"
+                      class="w-full px-3 py-2 text-sm bg-white dark:bg-gray-700/50 border border-slate-200 dark:border-gray-600/50 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none"></textarea>
+          </div>
+        </div>
+
+        <!-- Column Selection -->
+        <div class="bg-slate-50 dark:bg-slate-900/50 rounded-lg p-4 border border-slate-200 dark:border-slate-800/60">
+          <div class="flex justify-between items-center mb-3">
+            <h3 class="text-sm font-semibold text-slate-800 dark:text-gray-300 uppercase tracking-wide">{{ 'REPORTS.COLUMN_SELECTION' | translate }}</h3>
+            <div class="flex items-center gap-2">
+              <span class="text-xs text-slate-500">{{ customizationOptions.selectedColumns.length }}/{{ reportAnalysis.available_columns.length }}</span>
+              <button (click)="toggleAllColumns()"
+                      class="px-2.5 py-1 text-xs bg-slate-200 text-slate-700 rounded hover:bg-slate-300 dark:bg-gray-700 dark:text-gray-300 hover:dark:bg-gray-600 transition-colors">
+                {{ customizationOptions.selectedColumns.length === reportAnalysis.available_columns.length ? ('REPORTS.DESELECT_ALL' | translate) : ('REPORTS.SELECT_ALL' | translate) }}
+              </button>
+            </div>
+          </div>
+
+          <!-- Source Tabs -->
+          <div *ngIf="reportAnalysis.source_groups && getSourceKeys().length > 1" class="flex gap-1 mb-3">
+            <button *ngFor="let src of getSourceKeys()"
+              (click)="activeSourceTab = src"
+              class="px-3 py-1.5 text-xs font-medium rounded-lg transition-colors flex items-center gap-1.5"
+              [class]="activeSourceTab === src 
+                ? 'bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-600/20 dark:text-blue-300 dark:ring-1 dark:ring-blue-500/30'
+                : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/50 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-700/50'">
+              <span>{{ getSourceIcon(src) }}</span>
+              <span>{{ src | uppercase }}</span>
+              <span class="text-[10px] opacity-60">({{ reportAnalysis.source_groups[src].columns.length }})</span>
+            </button>
+          </div>
+
+          <!-- Column Grid -->
+          <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-1.5 max-h-48 overflow-y-auto pr-1">
+            <ng-container *ngIf="reportAnalysis.source_groups && getSourceKeys().length > 1">
+              <label *ngFor="let column of getColumnsForSource(activeSourceTab)" 
+                     class="flex items-center gap-2 px-2.5 py-1.5 rounded-md cursor-pointer transition-colors text-xs"
+                     [class]="isColumnSelected(column) ? 'bg-blue-50 text-blue-750 dark:bg-blue-600/10 dark:text-blue-200' : 'text-slate-500 hover:bg-slate-100 dark:text-gray-400 dark:hover:bg-gray-700/30'">
+                <input type="checkbox" [checked]="isColumnSelected(column)" (change)="toggleColumn(column)"
+                       class="w-3.5 h-3.5 text-blue-600 rounded focus:ring-blue-500 bg-white border-slate-300 dark:bg-gray-700 dark:border-gray-600">
+                <span class="truncate" [title]="column">{{ column }}</span>
+              </label>
+            </ng-container>
+            <ng-container *ngIf="!reportAnalysis.source_groups || getSourceKeys().length <= 1">
+              <label *ngFor="let column of reportAnalysis.available_columns" 
+                     class="flex items-center gap-2 px-2.5 py-1.5 rounded-md cursor-pointer transition-colors text-xs"
+                     [class]="isColumnSelected(column) ? 'bg-blue-50 text-blue-750 dark:bg-blue-600/10 dark:text-blue-200' : 'text-slate-500 hover:bg-slate-100 dark:text-gray-400 dark:hover:bg-gray-700/30'">
+                <input type="checkbox" [checked]="isColumnSelected(column)" (change)="toggleColumn(column)"
+                       class="w-3.5 h-3.5 text-blue-600 rounded focus:ring-blue-500 bg-white border-slate-300 dark:bg-gray-700 dark:border-gray-600">
+                <span class="truncate" [title]="column">{{ column }}</span>
+              </label>
+            </ng-container>
+          </div>
+        </div>
+
+        <!-- Column Order & Sorting -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div *ngIf="customizationOptions.selectedColumns.length > 0" class="bg-slate-50 dark:bg-slate-900/50 rounded-lg p-4 border border-slate-200 dark:border-slate-800/60">
+            <h3 class="text-sm font-semibold text-slate-800 dark:text-gray-300 uppercase tracking-wide mb-3">{{ 'REPORTS.COLUMN_ORDER' | translate }}</h3>
+            <div class="space-y-1 max-h-40 overflow-y-auto pr-1">
+              <div *ngFor="let column of customizationOptions.columnOrder; let i = index" 
+                   class="flex items-center justify-between bg-slate-100 dark:bg-gray-700/30 px-3 py-1.5 rounded text-xs group">
+                <span class="text-slate-700 dark:text-gray-300 truncate flex-1"><span class="text-slate-400 dark:text-gray-500 mr-1.5">{{ i + 1 }}.</span>{{ column }}</span>
+                <div class="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button (click)="moveColumn(column, 'up')" [disabled]="i === 0"
+                          class="px-1.5 py-0.5 text-slate-400 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white disabled:opacity-30"><i class="fas fa-chevron-up text-[10px]"></i></button>
+                  <button (click)="moveColumn(column, 'down')" [disabled]="i === customizationOptions.columnOrder.length - 1"
+                          class="px-1.5 py-0.5 text-slate-400 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white disabled:opacity-30"><i class="fas fa-chevron-down text-[10px]"></i></button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-slate-50 dark:bg-slate-900/50 rounded-lg p-4 border border-slate-200 dark:border-slate-800/60">
+            <h3 class="text-sm font-semibold text-slate-800 dark:text-gray-300 uppercase tracking-wide mb-3">{{ 'REPORTS.SORTING' | translate }}</h3>
+            <div class="space-y-3">
+              <div>
+                <label class="block text-xs text-slate-500 dark:text-gray-400 mb-1">{{ 'REPORTS.SORT_COLUMN' | translate }}</label>
+                <select [(ngModel)]="customizationOptions.sortBy"
+                        class="w-full px-3 py-2 text-sm bg-white dark:bg-gray-700/50 border border-slate-200 dark:border-gray-600/50 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500">
+                  <option value="">{{ 'REPORTS.NO_SORT' | translate }}</option>
+                  <option *ngFor="let column of customizationOptions.selectedColumns" [value]="column">{{ column }}</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs text-slate-500 dark:text-gray-400 mb-1">{{ 'REPORTS.SORT_DIRECTION' | translate }}</label>
+                <select [(ngModel)]="customizationOptions.sortAscending"
+                        class="w-full px-3 py-2 text-sm bg-white dark:bg-gray-700/50 border border-slate-200 dark:border-gray-600/50 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500">
+                  <option [value]="true">{{ 'REPORTS.ASC' | translate }}</option>
+                  <option [value]="false">{{ 'REPORTS.DESC' | translate }}</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Excel / ODS Options -->
+        <div *ngIf="customizationOptions.fileFormat === 'excel' || customizationOptions.fileFormat === 'ods'" class="bg-slate-50 dark:bg-slate-900/60 rounded-xl p-5 border border-slate-200 dark:border-slate-800/65">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-2.5">
+              <div class="w-8 h-8 bg-emerald-600/20 rounded-lg flex items-center justify-center">
+                <i class="fas fa-file-excel text-emerald-400 text-sm"></i>
+              </div>
+              <div>
+                <h3 class="text-sm font-semibold text-slate-800 dark:text-gray-200">{{ 'REPORTS.EXCEL_OPTIONS' | translate }}</h3>
+                <p class="text-[10px] text-slate-500 dark:text-gray-500">Configure spreadsheet output</p>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Toggle Options -->
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-5">
+            <label class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg cursor-pointer transition-all border"
+                   [class]="customizationOptions.excelOptions.autoFilter ? 'bg-blue-50 border-blue-500/30 text-blue-750 dark:bg-blue-600/10 dark:border-blue-500/30 dark:text-blue-200' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-350 dark:bg-gray-800/40 dark:border-gray-700/40 dark:text-gray-400 dark:hover:border-gray-600'">
+              <input type="checkbox" [(ngModel)]="customizationOptions.excelOptions.autoFilter"
+                     class="w-3.5 h-3.5 text-blue-600 rounded focus:ring-blue-500 bg-white border-slate-300 dark:bg-gray-700 dark:border-gray-600">
+              <div>
+                <div class="text-xs font-medium">Auto Filter</div>
+                <div class="text-[10px] opacity-60">Column filtering</div>
+              </div>
+            </label>
+            <label class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg cursor-pointer transition-all border"
+                   [class]="customizationOptions.excelOptions.freezePanes ? 'bg-blue-50 border-blue-500/30 text-blue-750 dark:bg-blue-600/10 dark:border-blue-500/30 dark:text-blue-200' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-350 dark:bg-gray-800/40 dark:border-gray-700/40 dark:text-gray-400 dark:hover:border-gray-600'">
+              <input type="checkbox" [(ngModel)]="customizationOptions.excelOptions.freezePanes"
+                     class="w-3.5 h-3.5 text-blue-600 rounded focus:ring-blue-500 bg-white border-slate-300 dark:bg-gray-700 dark:border-gray-600">
+              <div>
+                <div class="text-xs font-medium">{{ 'REPORTS.FREEZE_HEADER' | translate }}</div>
+                <div class="text-[10px] opacity-60">Lock header row</div>
+              </div>
+            </label>
+            <label class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg cursor-pointer transition-all border"
+                   [class]="customizationOptions.excelOptions.includeCharts ? 'bg-blue-50 border-blue-500/30 text-blue-750 dark:bg-blue-600/10 dark:border-blue-500/30 dark:text-blue-200' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-350 dark:bg-gray-800/40 dark:border-gray-700/40 dark:text-gray-400 dark:hover:border-gray-600'">
+              <input type="checkbox" [(ngModel)]="customizationOptions.excelOptions.includeCharts"
+                     class="w-3.5 h-3.5 text-blue-600 rounded focus:ring-blue-500 bg-white border-slate-300 dark:bg-gray-700 dark:border-gray-600">
+              <div>
+                <div class="text-xs font-medium">{{ 'REPORTS.ADD_CHARTS' | translate }}</div>
+                <div class="text-[10px] opacity-60">Embed charts</div>
+              </div>
+            </label>
+            <label *ngIf="getSourceKeys().length > 1" class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg cursor-pointer transition-all border"
+                   [class]="customizationOptions.excelOptions.includeCombinedAnalysis ? 'bg-purple-50 border-purple-500/30 text-purple-750 dark:bg-purple-600/10 dark:border-purple-500/30 dark:text-purple-200' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-350 dark:bg-gray-800/40 dark:border-gray-700/40 dark:text-gray-400 dark:hover:border-gray-600'">
+              <input type="checkbox" [(ngModel)]="customizationOptions.excelOptions.includeCombinedAnalysis"
+                     class="w-3.5 h-3.5 text-purple-600 rounded focus:ring-purple-500 bg-white border-slate-300 dark:bg-gray-700 dark:border-gray-600">
+              <div>
+                <div class="text-xs font-medium">{{ 'REPORTS.INCLUDE_COMBINED_ANALYSIS' | translate }}</div>
+                <div class="text-[10px] opacity-60">SYS + APP</div>
+              </div>
+            </label>
+          </div>
+
+          <!-- Theme Selection -->
+          <div class="mb-5">
+            <div class="flex items-center justify-between mb-2.5">
+              <label class="text-xs text-slate-700 dark:text-gray-300 font-medium">{{ 'REPORTS.THEME_PALETTES' | translate }}</label>
+              <button (click)="resetToDefaultColors()"
+                      class="text-[10px] text-slate-500 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center gap-1">
+                <i class="fas fa-undo text-[8px]"></i>
+                {{ 'REPORTS.RESET_DEFAULTS' | translate }}
+              </button>
+            </div>
+            <div class="grid grid-cols-4 md:grid-cols-6 gap-2">
+              <button *ngFor="let theme of allThemes"
+                      (click)="applyColorTheme(theme)"
+                      class="relative group rounded-xl p-2.5 border-2 transition-all duration-200 hover:scale-[1.04] hover:shadow-lg"
+                      [class]="isThemeSelected(theme) ? 'border-blue-500 bg-blue-50/50 dark:bg-gray-700/80 shadow-blue-500/10 shadow-md' : 'border-slate-200 bg-slate-50/50 dark:border-gray-700/40 dark:bg-gray-800/30 hover:border-slate-400 dark:hover:border-gray-500/50'"
+                      [title]="theme.name">
+                <div class="space-y-0.5 mb-1.5 rounded-md overflow-hidden">
+                  <div class="h-3 rounded-t-sm" [style.background-color]="theme.colors.headerBg"></div>
+                  <div class="h-2" [style.background-color]="theme.colors.alternateRow"></div>
+                  <div class="h-2 bg-white"></div>
+                  <div class="h-2 rounded-b-sm" [style.background-color]="theme.colors.alternateRow"></div>
+                </div>
+                <div class="text-[9px] text-slate-600 dark:text-gray-400 text-center truncate font-medium">{{ theme.name }}</div>
+                <div *ngIf="isThemeSelected(theme)" class="absolute -top-1.5 -right-1.5 w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center shadow-lg shadow-blue-500/30">
+                  <i class="fas fa-check text-white text-[8px]"></i>
+                </div>
+              </button>
+            </div>
+          </div>
+
+          <!-- Color & Font Settings -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <!-- Colors -->
+            <div class="bg-slate-50 dark:bg-slate-900/40 rounded-lg p-3.5 border border-slate-200 dark:border-slate-800/50">
+              <h4 class="text-xs font-medium text-slate-700 dark:text-gray-300 mb-3 flex items-center gap-1.5">
+                <i class="fas fa-palette text-blue-500 dark:text-blue-400 text-[10px]"></i> Colors
+              </h4>
+              <div class="grid grid-cols-5 gap-2">
+                <div class="text-center">
+                  <input type="color" [(ngModel)]="customizationOptions.excelOptions.colors.headerBg"
+                         class="w-8 h-8 border-2 border-slate-300 dark:border-gray-600/50 rounded-lg cursor-pointer bg-transparent mx-auto block">
+                  <span class="text-[9px] text-slate-500 dark:text-gray-500 mt-1 block">Header</span>
+                </div>
+                <div class="text-center">
+                  <input type="color" [(ngModel)]="customizationOptions.excelOptions.colors.headerText"
+                         class="w-8 h-8 border-2 border-slate-300 dark:border-gray-600/50 rounded-lg cursor-pointer bg-transparent mx-auto block">
+                  <span class="text-[9px] text-slate-500 dark:text-gray-500 mt-1 block">Text</span>
+                </div>
+                <div class="text-center">
+                  <input type="color" [(ngModel)]="customizationOptions.excelOptions.colors.alternateRow"
+                         class="w-8 h-8 border-2 border-slate-300 dark:border-gray-600/50 rounded-lg cursor-pointer bg-transparent mx-auto block">
+                  <span class="text-[9px] text-slate-500 dark:text-gray-500 mt-1 block">Alt Row</span>
+                </div>
+                <div class="text-center">
+                  <input type="color" [(ngModel)]="customizationOptions.excelOptions.colors.borderColor"
+                         class="w-8 h-8 border-2 border-slate-300 dark:border-gray-600/50 rounded-lg cursor-pointer bg-transparent mx-auto block">
+                  <span class="text-[9px] text-slate-500 dark:text-gray-500 mt-1 block">Border</span>
+                </div>
+                <div class="text-center">
+                  <input type="color" [(ngModel)]="customizationOptions.excelOptions.colors.accentColor"
+                         class="w-8 h-8 border-2 border-slate-300 dark:border-gray-600/50 rounded-lg cursor-pointer bg-transparent mx-auto block">
+                  <span class="text-[9px] text-slate-500 dark:text-gray-500 mt-1 block">Accent</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Typography -->
+            <div class="bg-slate-50 dark:bg-slate-900/40 rounded-lg p-3.5 border border-slate-200 dark:border-slate-800/50">
+              <h4 class="text-xs font-medium text-slate-700 dark:text-gray-300 mb-3 flex items-center gap-1.5">
+                <i class="fas fa-font text-blue-500 dark:text-blue-400 text-[10px]"></i> Typography
+              </h4>
+              <div class="grid grid-cols-3 gap-2">
+                <div>
+                  <label class="block text-[10px] text-slate-500 dark:text-gray-500 mb-1">Font</label>
+                  <select [(ngModel)]="customizationOptions.excelOptions.fontStyles!.fontFamily"
+                          class="w-full px-2 py-1.5 text-xs bg-white dark:bg-gray-700/50 border border-slate-200 dark:border-gray-600/50 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500">
+                    <option value="Calibri">Calibri</option>
+                    <option value="Arial">Arial</option>
+                    <option value="Times New Roman">Times New Roman</option>
+                    <option value="Segoe UI">Segoe UI</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-[10px] text-slate-500 dark:text-gray-500 mb-1">Header</label>
+                  <select [(ngModel)]="customizationOptions.excelOptions.fontStyles!.headerSize"
+                          class="w-full px-2 py-1.5 text-xs bg-white dark:bg-gray-700/50 border border-slate-200 dark:border-gray-600/50 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500">
+                    <option value="10">10pt</option><option value="11">11pt</option><option value="12">12pt</option>
+                    <option value="14">14pt</option><option value="16">16pt</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-[10px] text-slate-500 dark:text-gray-500 mb-1">Data</label>
+                  <select [(ngModel)]="customizationOptions.excelOptions.fontStyles!.dataSize"
+                          class="w-full px-2 py-1.5 text-xs bg-white dark:bg-gray-700/50 border border-slate-200 dark:border-gray-600/50 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500">
+                    <option value="9">9pt</option><option value="10">10pt</option><option value="11">11pt</option>
+                    <option value="12">12pt</option>
+                  </select>
+                </div>
+              </div>
+              <div class="flex gap-1 mt-2.5">
+                <button *ngFor="let preset of ['minimal', 'corporate', 'vibrant', 'elegant']"
+                        (click)="applyStylePreset(preset)"
+                        class="flex-1 px-2 py-1.5 text-[10px] bg-slate-200 text-slate-700 rounded-md hover:bg-slate-300 dark:bg-gray-700/40 dark:text-gray-400 dark:hover:bg-gray-600/50 dark:hover:text-white transition-colors capitalize font-medium">
+                  {{ preset }}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Live Preview -->
+          <div class="rounded-xl overflow-hidden border border-slate-200 dark:border-gray-700/40 shadow-lg">
+            <div class="flex items-center justify-between px-3 py-2 bg-slate-100 dark:bg-gray-800/60">
+              <span class="text-[10px] text-slate-500 dark:text-gray-400 font-medium flex items-center gap-1.5">
+                <i class="fas fa-eye text-blue-500 dark:text-blue-400 text-[9px]"></i> {{ 'REPORTS.LIVE_PREVIEW' | translate }}
+              </span>
+            </div>
+            <table class="w-full text-xs bg-white">
+              <thead>
+                <tr [style.background-color]="customizationOptions.excelOptions.colors.headerBg"
+                    [style.color]="customizationOptions.excelOptions.colors.headerText">
+                  <th class="px-3 py-2 text-left font-semibold" [style.font-family]="customizationOptions.excelOptions.fontStyles?.fontFamily"
+                      [style.font-size.pt]="customizationOptions.excelOptions.fontStyles?.headerSize">POINT_NAME</th>
+                  <th class="px-3 py-2 text-left font-semibold" [style.font-family]="customizationOptions.excelOptions.fontStyles?.fontFamily"
+                      [style.font-size.pt]="customizationOptions.excelOptions.fontStyles?.headerSize">TIME_STAMP</th>
+                  <th class="px-3 py-2 text-left font-semibold" [style.font-family]="customizationOptions.excelOptions.fontStyles?.fontFamily"
+                      [style.font-size.pt]="customizationOptions.excelOptions.fontStyles?.headerSize">VALUE</th>
+                  <th class="px-3 py-2 text-left font-semibold" [style.font-family]="customizationOptions.excelOptions.fontStyles?.fontFamily"
+                      [style.font-size.pt]="customizationOptions.excelOptions.fontStyles?.headerSize">QUALITY</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="bg-white" [style.border-bottom-color]="customizationOptions.excelOptions.colors.borderColor" style="border-bottom: 1px solid">
+                  <td class="px-3 py-1.5 text-gray-800" [style.font-family]="customizationOptions.excelOptions.fontStyles?.fontFamily">Station_A.Voltage</td>
+                  <td class="px-3 py-1.5 text-gray-800" [style.font-family]="customizationOptions.excelOptions.fontStyles?.fontFamily">2025-01-15 10:00</td>
+                  <td class="px-3 py-1.5 text-gray-800 font-mono" [style.font-family]="customizationOptions.excelOptions.fontStyles?.fontFamily">220.50</td>
+                  <td class="px-3 py-1.5" [style.font-family]="customizationOptions.excelOptions.fontStyles?.fontFamily">
+                    <span class="text-green-700 bg-green-50 px-1.5 py-0.5 rounded text-[10px] font-medium">Good</span>
+                  </td>
+                </tr>
+                <tr [style.background-color]="customizationOptions.excelOptions.colors.alternateRow" [style.border-bottom-color]="customizationOptions.excelOptions.colors.borderColor" style="border-bottom: 1px solid">
+                  <td class="px-3 py-1.5 text-gray-800" [style.font-family]="customizationOptions.excelOptions.fontStyles?.fontFamily">Station_A.Voltage</td>
+                  <td class="px-3 py-1.5 text-gray-800" [style.font-family]="customizationOptions.excelOptions.fontStyles?.fontFamily">2025-01-15 10:15</td>
+                  <td class="px-3 py-1.5 text-gray-800 font-mono" [style.font-family]="customizationOptions.excelOptions.fontStyles?.fontFamily">221.20</td>
+                  <td class="px-3 py-1.5" [style.font-family]="customizationOptions.excelOptions.fontStyles?.fontFamily">
+                    <span class="text-green-700 bg-green-50 px-1.5 py-0.5 rounded text-[10px] font-medium">Good</span>
+                  </td>
+                </tr>
+                <tr class="bg-white" [style.border-bottom-color]="customizationOptions.excelOptions.colors.borderColor" style="border-bottom: 1px solid">
+                  <td class="px-3 py-1.5 text-gray-800" [style.font-family]="customizationOptions.excelOptions.fontStyles?.fontFamily">Station_B.Current</td>
+                  <td class="px-3 py-1.5 text-gray-800" [style.font-family]="customizationOptions.excelOptions.fontStyles?.fontFamily">2025-01-15 10:30</td>
+                  <td class="px-3 py-1.5 text-gray-800 font-mono" [style.font-family]="customizationOptions.excelOptions.fontStyles?.fontFamily">15.80</td>
+                  <td class="px-3 py-1.5" [style.font-family]="customizationOptions.excelOptions.fontStyles?.fontFamily">
+                    <span class="text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded text-[10px] font-medium">Suspect</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 3: Preview -->
+      <div *ngIf="currentStep === 3" class="space-y-4">
+        <div *ngIf="previewLoading" class="flex items-center justify-center min-h-[300px]">
+          <div class="text-center space-y-3">
+            <div class="animate-spin rounded-full h-10 w-10 border-2 border-blue-400 border-t-transparent mx-auto"></div>
+            <p class="text-sm text-slate-500 dark:text-gray-400">{{ 'REPORTS.PREVIEW_LOADING' | translate }}</p>
+          </div>
+        </div>
+
+        <div *ngIf="!previewLoading && previewData" class="space-y-4">
+          <div class="bg-slate-50 dark:bg-slate-900/50 rounded-lg p-4 border border-slate-200 dark:border-slate-800/60">
+            <div class="grid grid-cols-3 gap-4 text-sm">
+              <div>
+                <div class="text-xs text-slate-500 dark:text-gray-400">{{ 'REPORTS.REPORT_NAME_LABEL' | translate }}</div>
+                <div class="text-slate-800 dark:text-white font-medium">{{ previewData.report_info.report_name }}</div>
+              </div>
+              <div>
+                <div class="text-xs text-slate-500 dark:text-gray-400">{{ 'REPORTS.TOTAL_PATHS_LABEL' | translate }}</div>
+                <div class="text-slate-800 dark:text-white font-medium">{{ previewData.report_info.total_paths }}</div>
+              </div>
+              <div>
+                <div class="text-xs text-slate-500 dark:text-gray-400">{{ 'REPORTS.FORMAT_LABEL' | translate }}</div>
+                <div class="text-slate-800 dark:text-white font-medium">{{ customizationOptions.fileFormat | uppercase }}</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sheets-based Spreadsheet Preview -->
+          <div *ngIf="previewData.sheets && previewData.sheets.length > 0" class="space-y-4">
+            <!-- Sheet Tabs -->
+            <div class="flex items-center gap-1 border-b border-slate-200 dark:border-gray-700/50 pb-2 overflow-x-auto">
+              <button *ngFor="let sheet of previewData.sheets; let idx = index"
+                      (click)="activePreviewSheetIdx = idx"
+                      class="px-4 py-2 text-xs font-semibold rounded-lg transition-all flex items-center gap-2"
+                      [class]="activePreviewSheetIdx === idx ? 'bg-blue-600 text-white font-bold' : 'bg-slate-100 dark:bg-gray-800/60 text-slate-600 dark:text-gray-400 hover:bg-slate-200 dark:hover:bg-gray-800 dark:hover:text-gray-300 border border-slate-200 dark:border-gray-700/30'">
+                <i class="fas fa-file-excel text-[10px]" [class]="activePreviewSheetIdx === idx ? 'text-white' : 'text-green-500'"></i>
+                <span>{{ sheet.name }}</span>
+              </button>
+            </div>
+
+            <!-- Spreadsheet Grid -->
+            <div class="overflow-auto max-h-[500px] border border-slate-200 dark:border-gray-800 rounded-lg shadow-lg bg-slate-50/50 dark:bg-gray-950/20">
+              <table class="min-w-full text-xs border-collapse">
+                <tbody>
+                  <tr *ngFor="let row of previewData.sheets[activePreviewSheetIdx].rows; let rIdx = index">
+                    <!-- Row Header (1-indexed index) -->
+                    <td class="w-10 bg-slate-100 dark:bg-gray-800 border-r border-b border-slate-200 dark:border-gray-700/50 text-[10px] text-slate-500 dark:text-gray-500 text-center font-medium sticky left-0 py-1">
+                      {{ rIdx + 1 }}
+                    </td>
+                    <!-- Cells -->
+                    <td *ngFor="let cell of row"
+                        class="px-3 py-1.5 border-r border-b border-slate-200 dark:border-gray-800/30 whitespace-nowrap text-slate-800 dark:text-gray-300"
+                        [style.background-color]="cell.bg_color ? '#' + cell.bg_color : ''"
+                        [style.color]="cell.text_color ? '#' + cell.text_color : ''"
+                        [style.font-weight]="cell.bold ? 'bold' : 'normal'"
+                        [style.font-style]="cell.italic ? 'italic' : 'normal'"
+                        [style.text-align]="cell.align || 'left'">
+                      {{ cell.value }}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <!-- Row limit disclaimer label -->
+            <div class="px-4 py-2 text-[10px] text-slate-500 dark:text-gray-500 bg-slate-100 dark:bg-gray-800/30 rounded-lg flex items-center gap-1.5">
+              <i class="fas fa-info-circle text-blue-500 dark:text-blue-400"></i>
+              <span>{{ 'REPORTS.PREVIEW_ROW_LIMIT_WARNING' | translate }}</span>
+            </div>
+          </div>
+
+          <!-- Fallback: Standard Path-based Card Preview -->
+          <div *ngIf="!previewData.sheets || previewData.sheets.length === 0" class="space-y-4">
+            <div *ngFor="let pathData of previewData.paths" class="bg-slate-50 dark:bg-gray-800/50 rounded-lg border border-slate-200 dark:border-gray-700/50 overflow-hidden">
+              <div class="flex items-center justify-between px-4 py-2.5 bg-slate-100 dark:bg-gray-700/30">
+                <div class="flex items-center gap-2">
+                  <span *ngIf="pathData.source" 
+                        class="text-[10px] font-bold px-1.5 py-0.5 rounded"
+                        [ngClass]="{
+                          'bg-blue-600/30 text-blue-300': pathData.source === 'sys',
+                          'bg-amber-600/30 text-amber-300': pathData.source === 'app',
+                          'bg-green-600/30 text-green-300': pathData.source === 'live'
+                        }">{{ pathData.source | uppercase }}</span>
+                  <span class="text-sm text-slate-800 dark:text-gray-200 truncate max-w-md">{{ pathData.path }}</span>
+                </div>
+                <span class="text-xs text-slate-500 dark:text-gray-400">{{ pathData.total_records | number }} {{ 'REPORTS.RECORDS_SUFFIX' | translate }}</span>
+              </div>
+              
+              <div class="overflow-x-auto">
+                <table class="min-w-full text-xs">
+                  <thead>
+                    <tr [style.background-color]="customizationOptions.excelOptions.colors.headerBg"
+                        [style.color]="customizationOptions.excelOptions.colors.headerText">
+                      <th *ngFor="let column of pathData.columns" class="px-3 py-2 text-left font-medium">{{ column }}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let row of pathData.preview_data; let i = index"
+                        class="border-t border-slate-200 dark:border-gray-700/30"
+                        [class]="i % 2 === 1 ? 'bg-slate-50 dark:bg-gray-800/20' : 'bg-white dark:bg-transparent'">
+                      <td *ngFor="let column of pathData.columns" class="px-3 py-1.5 text-slate-800 dark:text-gray-300">{{ row[column] }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="px-4 py-1.5 text-[10px] text-slate-500 dark:text-gray-500 bg-slate-100 dark:bg-gray-800/30">{{ 'REPORTS.FIRST_5_RECORDS' | translate }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 4: Generate -->
+      <div *ngIf="currentStep === 4 && generating" class="flex items-center justify-center min-h-[400px]">
+        <div class="max-w-md w-full space-y-6">
+          <div class="text-center">
+            <div class="w-16 h-16 bg-green-600/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <i class="fas fa-cog fa-spin text-green-400 text-2xl"></i>
+            </div>
+            <h3 class="text-lg font-semibold text-slate-800 dark:text-white">{{ 'REPORTS.GENERATING_REPORT' | translate }}</h3>
+            <p class="text-sm text-slate-500 dark:text-gray-400 mt-1">{{ currentProgressStep }}</p>
+          </div>
+          
+          <div class="space-y-2">
+            <div class="flex justify-between text-xs text-slate-500 dark:text-gray-400">
+              <span>{{ currentProgressStep }}</span>
+              <span>{{ progressPercentage }}%</span>
+            </div>
+            <div class="w-full bg-slate-200 dark:bg-gray-700 rounded-full h-2">
+              <div class="bg-gradient-to-r from-green-500 to-blue-500 h-2 rounded-full transition-all duration-300"
+                   [style.width.%]="progressPercentage"></div>
+            </div>
+          </div>
+          
+          <div *ngIf="estimatedTimeRemaining > 0" class="text-center text-xs text-slate-500 dark:text-gray-550">
+            ~{{ estimatedTimeRemaining }}s {{ 'REPORTS.REMAINING' | translate }}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Footer -->
+    <div class="bg-slate-50 dark:bg-slate-900 px-6 py-3 flex justify-between items-center border-t border-slate-200 dark:border-slate-800/80 flex-shrink-0">
+      <div>
+        <button *ngIf="currentStep > 1 && !generating"
+                (click)="goToPreviousStep()"
+                class="px-4 py-2 text-sm text-slate-500 hover:text-slate-800 dark:text-gray-400 dark:hover:text-white transition-colors flex items-center gap-1.5">
+          <i class="fas fa-chevron-left text-xs"></i>
+          <span>{{ 'REPORTS.BACK' | translate }}</span>
+        </button>
+      </div>
+      
+      <div class="flex items-center gap-2">
+        <button (click)="closeCustomizer()"
+                class="px-4 py-2 text-sm text-slate-500 hover:text-slate-800 dark:text-gray-400 dark:hover:text-white transition-colors">
+          {{ 'REPORTS.CANCEL' | translate }}
+        </button>
+
+        <ng-container *ngIf="currentStep === 1 && !analyzing && reportAnalysis">
+          <button (click)="goToCustomization()"
+                  class="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center gap-1.5">
+            <i class="fas fa-sliders-h text-xs"></i>
+            <span>Quick Customize</span>
+          </button>
+          <button (click)="openTemplateBuilder()"
+                  class="px-4 py-2 text-sm bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors font-medium flex items-center gap-1.5">
+            <i class="fas fa-table text-xs"></i>
+            <span>Template Builder</span>
+          </button>
+        </ng-container>
+        
+        <ng-container *ngIf="currentStep === 2">
+          <button (click)="openTemplateBuilder()"
+                  class="px-4 py-2 text-sm bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors font-medium flex items-center gap-1.5">
+            <i class="fas fa-table text-xs"></i>
+            <span>Template Builder</span>
+            <i class="fas fa-check-circle text-xs text-teal-300" *ngIf="excelTemplate"></i>
+          </button>
+
+          <button (click)="showPreview()"
+                  [disabled]="customizationOptions.selectedColumns.length === 0"
+                  class="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-40 transition-colors font-medium">
+            {{ 'REPORTS.SHOW_PREVIEW' | translate }} <i class="fas fa-arrow-right ml-1"></i>
+          </button>
+        </ng-container>
+        
+        <button *ngIf="currentStep === 3"
+                (click)="generateCustomizedReport()"
+                [disabled]="generating"
+                class="px-5 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-40 transition-colors font-medium flex items-center gap-1.5">
+          <i class="fas fa-file-download text-xs" *ngIf="!generating"></i>
+          <div *ngIf="generating" class="animate-spin rounded-full h-3 w-3 border border-white border-t-transparent"></div>
+          <span>{{ generating ? ('REPORTS.GENERATING' | translate) : ('REPORTS.GENERATE_REPORT' | translate) }}</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Excel Template Builder -->
+<app-excel-template-builder
+  *ngIf="showTemplateBuilder"
+  [isVisible]="showTemplateBuilder"
+  [reportAnalysis]="reportAnalysis"
+  [selectedColumns]="customizationOptions.selectedColumns"
+  [existingTemplate]="excelTemplate"
+  [existingFileConfig]="fileTemplateConfig"
+  (templateSaved)="onTemplateSaved($event)"
+  (fileConfigSaved)="onFileConfigSaved($event)"
+  (closeBuilder)="closeTemplateBuilder()">
+</app-excel-template-builder>

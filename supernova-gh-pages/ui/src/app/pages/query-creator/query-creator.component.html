@@ -1,0 +1,625 @@
+<div class="query-creator-container">
+  <!-- Unified Left Sidebar -->
+  <aside class="sidebar-panel" [class.collapsed]="isSidebarCollapsed">
+    <div class="panel-header" *ngIf="!isSidebarCollapsed">
+      <!-- Tabs for the sidebar -->
+      <div class="sidebar-tabs" style="display: flex; gap: 0.25rem;">
+        <button class="tab-btn" [class.active]="activeSidebarTab === 'database'" (click)="setSidebarTab('database')" style="padding: 0.5rem 0.25rem; font-size: 0.75rem;">
+          <i class="fas fa-database mr-1 text-indigo-400"></i> DB
+        </button>
+        <button class="tab-btn" [class.active]="activeSidebarTab === 'saved'" (click)="setSidebarTab('saved')" style="padding: 0.5rem 0.25rem; font-size: 0.75rem;">
+          <i class="fas fa-bookmark mr-1 text-emerald-400"></i> Queries
+        </button>
+        <button class="tab-btn" [class.active]="activeSidebarTab === 'functions'" (click)="setSidebarTab('functions')" style="padding: 0.5rem 0.25rem; font-size: 0.75rem;">
+          <i class="fas fa-cube mr-1 text-pink-400"></i> Funcs
+        </button>
+      </div>
+      <button class="collapse-btn" (click)="toggleSidebar()" title="Collapse Sidebar">
+        <i class="fas fa-chevron-left"></i>
+      </button>
+    </div>
+
+    <!-- Collapsed state header -->
+    <div class="panel-header-collapsed" *ngIf="isSidebarCollapsed">
+      <button class="collapse-btn" (click)="toggleSidebar()" title="Expand Sidebar">
+        <i class="fas fa-chevron-right"></i>
+      </button>
+      <button class="icon-tab-btn mt-3" [class.active]="activeSidebarTab === 'database'" (click)="setSidebarTab('database'); toggleSidebar()" title="Database">
+        <i class="fas fa-database text-indigo-400"></i>
+      </button>
+      <button class="icon-tab-btn mt-2" [class.active]="activeSidebarTab === 'saved'" (click)="setSidebarTab('saved'); toggleSidebar()" title="Queries">
+        <i class="fas fa-bookmark text-emerald-400"></i>
+      </button>
+      <button class="icon-tab-btn mt-2" [class.active]="activeSidebarTab === 'functions'" (click)="setSidebarTab('functions'); toggleSidebar()" title="Functions & Packages">
+        <i class="fas fa-cube text-pink-400"></i>
+      </button>
+    </div>
+
+    <!-- Content Area (visible only when not collapsed) -->
+    <div class="sidebar-content" *ngIf="!isSidebarCollapsed">
+      
+      <!-- DATABASE TAB -->
+      <ng-container *ngIf="activeSidebarTab === 'database'">
+        <!-- Toggle Mode -->
+        <div class="db-search-type flex gap-1 mb-2 p-1" style="background: var(--bg-secondary); border-radius: 6px; border: 1px solid var(--border-color);">
+          <button class="flex-1 py-1 text-xs rounded transition-all font-semibold" 
+                  [style.background]="dbSearchMode === 'tables' ? 'var(--accent-primary)' : 'transparent'"
+                  [style.color]="dbSearchMode === 'tables' ? '#fff' : 'var(--text-muted)'"
+                  (click)="dbSearchMode = 'tables'">
+            <i class="fas fa-table mr-1"></i> Tables
+          </button>
+          <button class="flex-1 py-1 text-xs rounded transition-all font-semibold" 
+                  [style.background]="dbSearchMode === 'columns' ? 'var(--accent-primary)' : 'transparent'"
+                  [style.color]="dbSearchMode === 'columns' ? '#fff' : 'var(--text-muted)'"
+                  (click)="dbSearchMode = 'columns'">
+            <i class="fas fa-columns mr-1"></i> Columns
+          </button>
+        </div>
+
+        <!-- SEARCH TABLES MODE -->
+        <ng-container *ngIf="dbSearchMode === 'tables'">
+          <div class="search-wrapper" style="display: flex; gap: 0.5rem; align-items: center; width: 100%;">
+            <div style="position: relative; flex: 1;">
+              <i class="fas fa-search search-icon" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); margin: 0;"></i>
+              <input type="text" class="search-input" [(ngModel)]="searchTermTable" placeholder="Search tables..." style="width: 100%; padding-left: 30px;" />
+            </div>
+            <button *ngIf="selectedDataSourceId" (click)="loadTables(true)" class="btn-icon" title="Refresh Tables List (Force Connection)" style="padding: 0.35rem 0.6rem; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-muted); cursor: pointer; transition: all 0.2s;" onmouseover="this.style.color='#fff'; this.style.borderColor='var(--accent-primary)'" onmouseout="this.style.color='var(--text-muted)'; this.style.borderColor='var(--border-color)'">
+              <i class="fas fa-sync-alt"></i>
+            </button>
+          </div>
+
+          <div class="tables-list">
+            <div *ngIf="loadingTables" class="loading-state-small">
+              <div class="spinner-small"></div>
+              <span>Loading...</span>
+            </div>
+
+            <ng-container *ngIf="!loadingTables">
+              <div *ngFor="let table of filteredTables" class="table-item-container">
+                <div class="table-item" 
+                     [class.active]="table.id === selectedTable"
+                     (click)="toggleTable(table, $event)">
+                  <i class="fas" [ngClass]="table.expanded ? 'fa-chevron-down' : 'fa-chevron-right'" class="tree-icon text-slate-500 mr-2" style="font-size: 0.7rem;"></i>
+                  <i class="fas fa-table text-indigo-400 mr-2" style="font-size: 0.85rem"></i>
+                  <span class="table-name" [title]="table.name">{{ table.name }}</span>
+                  
+                  <!-- Insert to editor button -->
+                  <button class="insert-btn ml-auto" (click)="insertTableIntoEditor(table.name); $event.stopPropagation()" title="Insert table name to editor">
+                    <i class="fas fa-arrow-right"></i>
+                  </button>
+                </div>
+
+                <!-- Columns list (Drill down) -->
+                <div class="columns-list" *ngIf="table.expanded">
+                  <div *ngIf="!table.columns" class="loading-columns">
+                    <div class="spinner-small mr-2" style="width: 12px; height: 12px;"></div> Loading...
+                  </div>
+                  <div class="column-item" *ngFor="let col of table.columns" (click)="insertTableIntoEditor(col.name); $event.stopPropagation()" style="display: flex; align-items: center; width: 100%;">
+                    <i class="fas fa-columns text-slate-500 mr-2" style="font-size: 0.75rem;"></i>
+                    <span class="col-name" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;">{{ col.name }}</span>
+                    <span class="col-type text-xs text-slate-500 mr-1" style="font-size: 0.7rem;">{{ col.dataType || col.type_name }}</span>
+                    <!-- Relation finder -->
+                    <button class="relation-btn" (click)="findMatches(table.name, col.name); $event.stopPropagation()" title="Find related tables" 
+                            style="background: none; border: none; color: rgb(var(--accent-primary-rgb)); padding: 2px 4px; cursor: pointer; font-size: 0.75rem;">
+                      <i class="fas fa-link"></i>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div *ngIf="filteredTables.length === 0" class="empty-state">
+                <i class="fas fa-database mb-2 text-xl opacity-40"></i>
+                <span>No tables found</span>
+              </div>
+            </ng-container>
+          </div>
+        </ng-container>
+
+        <!-- SEARCH COLUMNS MODE -->
+        <ng-container *ngIf="dbSearchMode === 'columns'">
+          <div class="search-wrapper">
+            <i class="fas fa-search search-icon"></i>
+            <input type="text" class="search-input" [(ngModel)]="searchTermColumn" (ngModelChange)="onColumnSearchChange()" placeholder="Enter column name..." />
+          </div>
+
+          <div class="tables-list">
+            <div *ngIf="loadingColumnSearch" class="loading-state-small">
+              <div class="spinner-small"></div>
+              <span>Searching columns...</span>
+            </div>
+
+            <ng-container *ngIf="!loadingColumnSearch">
+              <div *ngFor="let match of columnSearchResults" class="column-match-item" 
+                   style="border-bottom: 1px solid rgba(58,52,64,0.3); padding: 0.65rem 0.5rem; display: flex; flex-direction: column; gap: 0.25rem;">
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                  <span style="font-family: monospace; color: rgb(252, 165, 165); font-size: 0.85rem; font-weight: 600;">
+                    <i class="fas fa-columns text-slate-500 mr-1" style="font-size: 0.75rem;"></i> {{ match.column_name }}
+                  </span>
+                  <span class="px-2 py-0.5 rounded text-[9px] font-bold uppercase bg-slate-800 text-slate-400">
+                    {{ match.dataType }}
+                  </span>
+                </div>
+                
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 0.25rem;">
+                  <span class="text-xs text-indigo-300 font-semibold" style="cursor: pointer; display: flex; align-items: center; gap: 4px;"
+                        (click)="toggleTable({id: match.table_name, name: match.table_name}, $event)">
+                    <i class="fas fa-table text-indigo-400" style="font-size: 0.8rem;"></i> {{ match.table_name }}
+                  </span>
+                  
+                  <div style="display: flex; gap: 4px;">
+                    <!-- Find relationship -->
+                    <button (click)="findMatches(match.table_name, match.column_name)" title="Find related tables" 
+                            style="background: rgba(var(--accent-primary-rgb), 0.1); border: 1px solid rgba(var(--accent-primary-rgb), 0.2); color: rgb(var(--accent-primary-rgb)); border-radius: 4px; padding: 2px 6px; font-size: 0.7rem; cursor: pointer;">
+                      <i class="fas fa-link mr-1"></i> Verify
+                    </button>
+                    <!-- Insert column -->
+                    <button (click)="insertTableIntoEditor(match.column_name)" title="Insert column name" 
+                            style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #fff; border-radius: 4px; padding: 2px 6px; font-size: 0.7rem; cursor: pointer;">
+                      <i class="fas fa-arrow-right"></i>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div *ngIf="columnSearchResults.length === 0 && searchTermColumn" class="empty-state">
+                <i class="fas fa-columns mb-2 text-xl opacity-40"></i>
+                <span>No columns found</span>
+              </div>
+              <div *ngIf="!searchTermColumn" class="empty-state">
+                <i class="fas fa-search mb-2 text-xl opacity-40"></i>
+                <span>Type a column name to start searching</span>
+              </div>
+            </ng-container>
+          </div>
+        </ng-container>
+      </ng-container>
+
+      <!-- SAVED QUERIES TAB -->
+      <ng-container *ngIf="activeSidebarTab === 'saved'">
+        <div class="panel-actions-row">
+          <button class="new-query-btn w-full flex items-center justify-center gap-2 mb-2" (click)="startNewQuery()">
+            <i class="fas fa-plus"></i> New Query
+          </button>
+        </div>
+        <div class="search-wrapper">
+          <i class="fas fa-search search-icon"></i>
+          <input type="text" class="search-input" [(ngModel)]="searchTerm" placeholder="Search queries..." />
+        </div>
+
+        <div class="queries-list">
+          <div *ngFor="let q of filteredQueries" 
+               class="query-item" 
+               [class.active]="q.id === activeQueryId"
+               (click)="loadQuery(q)">
+            <div class="query-item-meta">
+              <i class="fas fa-file-code text-emerald-400 mr-2" style="font-size: 0.9em;"></i>
+              <span class="query-name" [title]="q.name">{{ q.name }}</span>
+            </div>
+            <button class="delete-btn" (click)="deleteQuery(q, $event)" title="Delete Query">
+              <i class="fas fa-trash"></i>
+            </button>
+          </div>
+          
+          <div *ngIf="filteredQueries.length === 0" class="empty-state">
+            <i class="fas fa-folder-open mb-2 text-2xl opacity-40"></i>
+            <span>No queries found</span>
+          </div>
+        </div>
+      </ng-container>
+
+      <!-- FUNCTIONS & PACKAGES TAB -->
+      <ng-container *ngIf="activeSidebarTab === 'functions'">
+        <div class="search-wrapper">
+          <i class="fas fa-search search-icon"></i>
+          <input type="text" class="search-input" [(ngModel)]="searchTermFunction" placeholder="Search functions or packages..." />
+        </div>
+
+        <div class="queries-list" style="margin-top: 0.5rem;">
+          <div *ngIf="loadingFunctions" class="loading-state-small">
+            <div class="spinner-small"></div>
+            <span>Loading functions...</span>
+          </div>
+
+          <ng-container *ngIf="!loadingFunctions">
+            <div *ngFor="let func of filteredFunctions" class="table-item-container" style="border-bottom: 1px solid rgba(58,52,64,0.15);">
+              
+              <!-- Function Row -->
+              <div class="query-item" style="cursor: pointer; padding: 0.65rem 0.5rem; display: flex; align-items: center; width: 100%; justify-content: space-between;"
+                   (click)="toggleFuncExpand(func, $event)">
+                
+                <div style="display: flex; align-items: center; flex: 1; min-width: 0;">
+                  <!-- Chevron to toggle details -->
+                  <i class="fas" [ngClass]="func.expanded ? 'fa-chevron-down' : 'fa-chevron-right'" 
+                     style="font-size: 0.65rem; color: rgb(148, 163, 184); margin-right: 0.5rem; width: 10px;"></i>
+                  
+                  <i class="fas fa-cube text-pink-400 mr-2" style="font-size: 0.8rem"></i>
+                  
+                  <span class="query-name" [title]="func.signature" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.8rem; font-weight: 500; flex: 1;">
+                    <span *ngIf="func.packageName" style="color: rgb(244, 114, 182); font-weight: 600;">{{ func.packageName }}.</span>{{ func.packageName ? func.name.substring(func.packageName.length + 1) : func.name }}
+                  </span>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
+                  <span class="px-1.5 py-0.5 rounded text-[8px] font-bold bg-pink-950/40 text-pink-300" style="font-size: 0.65rem; line-height: 1;">
+                    {{ func.type }}
+                  </span>
+                  
+                  <!-- Insert Button -->
+                  <button class="insert-btn" (click)="insertFunctionIntoEditor(func); $event.stopPropagation()" title="Insert function signature"
+                          style="opacity: 1; visibility: visible; display: flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 4px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); color: rgb(244, 114, 182); cursor: pointer;">
+                    <i class="fas fa-arrow-right" style="font-size: 0.7rem;"></i>
+                  </button>
+                </div>
+
+              </div>
+
+              <!-- Collapsible Details Block -->
+              <div *ngIf="func.expanded" 
+                   style="padding: 0.65rem 0.75rem; background: rgba(10, 8, 14, 0.4); border-left: 2px solid rgb(244, 114, 182); font-size: 0.75rem; color: rgb(203, 213, 225); margin: 0 0.5rem 0.5rem 0.75rem; border-radius: 4px; display: flex; flex-direction: column; gap: 0.4rem; border: 1px solid rgba(244, 114, 182, 0.1); border-left-width: 3px;">
+                <div style="font-family: 'JetBrains Mono', 'Fira Code', monospace; color: rgb(165, 243, 252); font-size: 0.7rem; background: rgba(0, 0, 0, 0.3); padding: 4px 6px; border-radius: 4px; word-break: break-all; line-height: 1.4;">
+                  {{ func.signature }}
+                </div>
+                <div style="white-space: pre-wrap; line-height: 1.45; color: rgb(156, 163, 175); font-family: system-ui, sans-serif;">
+                  {{ func.description }}
+                </div>
+              </div>
+
+            </div>
+
+            <div *ngIf="filteredFunctions.length === 0" class="empty-state" style="padding: 3rem 1rem;">
+              <i class="fas fa-cube mb-2 text-2xl opacity-40"></i>
+              <span>No functions found</span>
+            </div>
+          </ng-container>
+        </div>
+      </ng-container>
+
+    </div>
+  </aside>
+
+  <!-- Main Area: Editor and Results -->
+  <main class="editor-panel">
+    <!-- Header/Kontroller -->
+    <header class="editor-header">
+      <div class="header-inputs">
+        <div class="input-group">
+          <label>Query Name</label>
+          <input type="text" [(ngModel)]="queryName" placeholder="e.g. Monthly Sales Report" />
+        </div>
+        <div class="input-group">
+          <label>Data Source</label>
+          <select [(ngModel)]="selectedDataSourceId" (ngModelChange)="onDataSourceChange()">
+            <option *ngFor="let ds of dataSources" [value]="ds.id">{{ ds.name }} ({{ ds.dbType }})</option>
+          </select>
+        </div>
+      </div>
+      
+      <div class="header-actions">
+        <button class="btn btn-secondary" (click)="runQuery()" [disabled]="executing">
+          <i class="fas fa-play mr-2 text-emerald-400" *ngIf="!executing"></i>
+          <i class="fas fa-spinner fa-spin mr-2" *ngIf="executing"></i>
+          Run Query
+        </button>
+        <button class="btn btn-primary" (click)="openSaveModal()">
+          <i class="fas fa-save mr-2"></i>
+          Save
+        </button>
+        <div style="width: 1px; height: 24px; background: var(--border-color); display: inline-block; vertical-align: middle; margin: 0 0.5rem;"></div>
+        <a [routerLink]="['/table-explorer']" 
+           class="btn btn-secondary" 
+           style="border: 1px solid rgba(239, 68, 68, 0.2); color: rgb(252, 165, 165); cursor: pointer; display: inline-flex; align-items: center; background: rgba(239, 68, 68, 0.05);"
+           onmouseover="this.style.background='rgba(239, 68, 68, 0.15)'; this.style.borderColor='rgba(239, 68, 68, 0.4)'; this.style.color='#fff';"
+           onmouseout="this.style.background='rgba(239, 68, 68, 0.05)'; this.style.borderColor='rgba(239, 68, 68, 0.2)'; this.style.color='rgb(252, 165, 165)';"
+           title="Close & Back to Table Explorer">
+          <i class="fas fa-xmark mr-2" style="color: rgb(248, 113, 113);"></i>
+          Close
+        </a>
+      </div>
+    </header>
+
+    <!-- Açıklama Girişi -->
+    <div class="desc-input-wrapper">
+      <input type="text" [(ngModel)]="queryDescription" class="desc-input" placeholder="Add a description (optional)..." />
+    </div>
+
+    <!-- Editor Container -->
+    <div class="sql-editor-container" style="display: flex; flex-direction: column;">
+      <div style="flex: 1; display: flex; position: relative; padding: 1rem 0;">
+        <div class="line-numbers">
+          <span *ngFor="let line of [1,2,3,4,5,6,7,8,9,10,11,12]">{{line}}</span>
+        </div>
+
+        <textarea [(ngModel)]="querySql"
+                  class="sql-textarea"
+                  placeholder="SELECT * FROM table_name WHERE condition... (Do not add semicolon)"></textarea>
+      </div>
+    </div>
+
+    <!-- Sonuç Paneli -->
+    <section class="results-panel">
+      <!-- Result Tabs -->
+      <div class="results-tabs-bar">
+        <button class="result-tab" [class.active]="activeBottomTab === 'results'" (click)="setBottomTab('results')">
+          <i class="fas fa-terminal mr-2 text-emerald-400"></i> Query Results
+        </button>
+        <button class="result-tab" [class.active]="activeBottomTab === 'preview'" (click)="setBottomTab('preview')" *ngIf="activePreviewTable">
+          <i class="fas fa-table mr-2 text-indigo-400"></i> {{ activePreviewTable }} Preview
+        </button>
+      </div>
+
+      <!-- TAB: QUERY RESULTS -->
+      <div class="tab-content-area" *ngIf="activeBottomTab === 'results'">
+        <div class="results-meta-bar" *ngIf="previewResult">
+          <span class="meta-badge"><i class="fas fa-clock mr-1"></i> {{ previewResult.executionMs }} ms</span>
+          <span class="meta-badge"><i class="fas fa-list-ol mr-1"></i> {{ previewResult.totalRows }} rows</span>
+        </div>
+
+        <div class="error-container" *ngIf="errorMessage">
+          <i class="fas fa-exclamation-triangle mr-3 text-red-400 text-lg"></i>
+          <div class="error-text">
+            <strong>Execution Error:</strong>
+            <pre>{{ errorMessage }}</pre>
+          </div>
+        </div>
+
+        <div class="table-container" *ngIf="previewResult && !errorMessage">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th class="w-10">#</th>
+                <th *ngFor="let col of previewResult.columns">
+                  <div class="th-content">
+                    <span class="col-name">{{ col.name }}</span>
+                    <span class="col-type" *ngIf="col.dataType">{{ col.dataType }}</span>
+                  </div>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let row of previewResult.rows; let i = index">
+                <td class="row-num">{{ i + 1 }}</td>
+                <td *ngFor="let col of previewResult.columns" 
+                    [class.null-value]="row[col.name] === null || row[col.name] === undefined"
+                    [class.number-value]="col.dataType === 'int' || col.dataType === 'float' || col.dataType === 'NUMBER'">
+                  {{ row[col.name] !== null && row[col.name] !== undefined ? row[col.name] : 'NULL' }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="no-results-state" *ngIf="!previewResult && !errorMessage && !executing">
+          <i class="fas fa-terminal mb-3 text-3xl opacity-30"></i>
+          <span>Run the query to preview results.</span>
+        </div>
+        
+        <div class="loading-state" *ngIf="executing">
+          <div class="spinner"></div>
+          <span>Executing query...</span>
+        </div>
+      </div>
+
+      <!-- TAB: TABLE PREVIEW -->
+      <div class="tab-content-area" *ngIf="activeBottomTab === 'preview'">
+        <div class="error-container" *ngIf="tablePreviewError">
+          <i class="fas fa-exclamation-triangle mr-3 text-red-400 text-lg"></i>
+          <div class="error-text">
+            <strong>Preview Error:</strong>
+            <pre>{{ tablePreviewError }}</pre>
+          </div>
+        </div>
+
+        <div class="table-container" *ngIf="activePreviewResult && !tablePreviewError">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th class="w-10">#</th>
+                <th *ngFor="let col of activePreviewResult.columns">
+                  <div class="th-content">
+                    <span class="col-name">{{ col.name }}</span>
+                    <span class="col-type" *ngIf="col.dataType || col.type_name">{{ col.dataType || col.type_name }}</span>
+                  </div>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let row of activePreviewResult.rows; let i = index">
+                <td class="row-num">{{ i + 1 }}</td>
+                <td *ngFor="let col of activePreviewResult.columns" 
+                    [class.null-value]="row[col.name] === null || row[col.name] === undefined"
+                    [class.number-value]="col.dataType === 'int' || col.dataType === 'float' || col.dataType === 'NUMBER'">
+                  {{ row[col.name] !== null && row[col.name] !== undefined ? row[col.name] : 'NULL' }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="loading-state" *ngIf="tablePreviewLoading">
+          <div class="spinner"></div>
+          <span>Loading table preview...</span>
+        </div>
+      </div>
+
+    </section>
+  </main>
+</div>
+
+<!-- Toast Bildirimi -->
+<div class="toast-notification" [class.show]="toastMessage" [class.error]="toastType === 'error'">
+  <i class="fas" [ngClass]="toastType === 'error' ? 'fa-exclamation-circle' : 'fa-check-circle'"></i>
+  <span>{{ toastMessage }}</span>
+</div>
+
+<!-- Save Query Modal -->
+<div class="modal-overlay" *ngIf="showSaveModal">
+  <div class="modal-dialog">
+    <div class="modal-header">
+      <h3 style="margin: 0; font-size: 1.1rem; font-weight: 500;">Save Query</h3>
+      <button class="close-btn" (click)="closeSaveModal()"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body" style="padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem;">
+      <div class="input-group">
+        <label>Query Name *</label>
+        <input type="text" [(ngModel)]="queryName" placeholder="e.g. Monthly Sales Report" style="width: 100%; padding: 0.5rem; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-color); border-radius: 4px;" />
+      </div>
+
+      <div class="input-group">
+        <label>Allowed Roles (comma separated)</label>
+        <input type="text" [(ngModel)]="allowedRoles" placeholder="e.g. admin, manager" style="width: 100%; padding: 0.5rem; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-color); border-radius: 4px;" />
+      </div>
+
+      <div class="input-group">
+        <label>Allowed Users (comma separated emails/usernames)</label>
+        <input type="text" [(ngModel)]="allowedUsers" placeholder="e.g. john@doe.com, alice" style="width: 100%; padding: 0.5rem; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-color); border-radius: 4px;" />
+      </div>
+    </div>
+    <div class="modal-footer" style="padding: 1rem 1.5rem; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 0.5rem; background: var(--bg-secondary);">
+      <button class="btn btn-secondary" (click)="closeSaveModal()">Cancel</button>
+      <button class="btn btn-primary" (click)="saveQuery()"><i class="fas fa-save mr-2"></i> Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Query Parameters Modal -->
+<div class="modal-overlay" *ngIf="showParamModal">
+  <div class="modal-dialog" style="max-width: 550px;">
+    <div class="modal-header">
+      <h3 style="margin: 0; font-size: 1.1rem; font-weight: 500; display: flex; align-items: center; gap: 8px;">
+        <i class="fas fa-sliders text-indigo-400"></i> Query Parameters
+      </h3>
+      <button class="close-btn" (click)="showParamModal = false"><i class="fas fa-times"></i></button>
+    </div>
+    
+    <div class="modal-body" style="padding: 1.5rem; display: flex; flex-direction: column; gap: 1.25rem; max-height: 400px; overflow-y: auto;">
+      <p class="text-xs text-[rgb(163,154,137)]" style="margin: 0;">Parameters detected in the query. Please enter their values before running.</p>
+      
+      <div *ngFor="let p of detectedParams" class="param-row" style="background: rgba(31,27,38,0.4); padding: 1rem; border: 1px solid rgba(58,52,64,0.5); border-radius: 8px; display: flex; flex-direction: column; gap: 0.75rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-family: monospace; color: rgb(252, 165, 165); font-weight: 600;">:{{ p.name }}</span>
+          
+          <select [(ngModel)]="p.type" (change)="p.value = ''; p.pathId = ''; p.pathNodeSelected = null;" 
+                  style="padding: 0.25rem 0.5rem; background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-color); border-radius: 4px; font-size: 0.8rem;">
+            <option value="string">Text (string)</option>
+            <option value="number">Number</option>
+            <option value="date">Date</option>
+            <option value="path">Path (Hierarchy)</option>
+          </select>
+        </div>
+
+        <!-- Normal Inputs (String, Number, Date) -->
+        <div *ngIf="p.type !== 'path'">
+          <input *ngIf="p.type === 'string'" type="text" [(ngModel)]="p.value" placeholder="Enter text..." 
+                 style="width: 100%; padding: 0.5rem; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-color); border-radius: 4px; font-size: 0.9rem;" />
+          
+          <input *ngIf="p.type === 'number'" type="number" [(ngModel)]="p.value" placeholder="Enter number..." 
+                 style="width: 100%; padding: 0.5rem; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-color); border-radius: 4px; font-size: 0.9rem;" />
+          
+          <input *ngIf="p.type === 'date'" type="date" [(ngModel)]="p.value" 
+                 style="width: 100%; padding: 0.5rem; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-color); border-radius: 4px; font-size: 0.9rem;" />
+        </div>
+
+        <!-- Path Hierarchy Picker -->
+        <div *ngIf="p.type === 'path'" style="display: flex; flex-direction: column; gap: 0.5rem;">
+          <select [(ngModel)]="p.pathId" (change)="onPathParamChange(p)" 
+                  style="width: 100%; padding: 0.5rem; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-color); border-radius: 4px; font-size: 0.9rem;">
+            <option value="">— Select Path Definition —</option>
+            <option *ngFor="let path of pathDefs" [value]="path.id">{{ path.name }} ({{ path.structure }})</option>
+          </select>
+
+          <!-- Node Selection Dropdown -->
+          <div *ngIf="p.pathId && p.pathNodes?.length">
+            <label style="font-size: 0.75rem; color: rgb(163, 154, 137); margin-bottom: 0.25rem; display: block;">Select Target Node</label>
+            <select [(ngModel)]="p.pathNodeSelected" 
+                    style="width: 100%; padding: 0.5rem; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-color); border-radius: 4px; font-size: 0.9rem;">
+              <option [ngValue]="null">— Select Node (point_name) —</option>
+              <option *ngFor="let node of p.pathNodes" [ngValue]="node">
+                {{ node.label }} (ID: {{ node.id }})
+              </option>
+            </select>
+          </div>
+          
+          <div *ngIf="p.pathId && !p.pathNodes?.length" class="text-xs text-amber-400">
+            <i class="fas fa-spinner fa-spin mr-1"></i> Loading tree structure...
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer" style="padding: 1rem 1.5rem; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 0.5rem; background: var(--bg-secondary);">
+      <button class="btn btn-secondary" (click)="showParamModal = false">Cancel</button>
+      <button class="btn btn-primary" (click)="executeWithParams()"><i class="fas fa-play mr-2 text-emerald-400"></i> Run Query</button>
+    </div>
+  </div>
+</div>
+
+<!-- Relationship Check Modal -->
+<div class="modal-overlay" *ngIf="showRelationshipModal && activeRelationshipCheck">
+  <div class="modal-dialog" style="max-width: 600px;">
+    <div class="modal-header">
+      <h3 style="margin: 0; font-size: 1.1rem; font-weight: 500; display: flex; align-items: center; gap: 8px;">
+        <i class="fas fa-link text-indigo-400"></i> Verify Table Relationship
+      </h3>
+      <button class="close-btn" (click)="showRelationshipModal = false"><i class="fas fa-times"></i></button>
+    </div>
+
+    <div class="modal-body" style="padding: 1.5rem; display: flex; flex-direction: column; gap: 1.25rem;">
+      <div style="background: rgba(31,27,38,0.4); border: 1px solid rgba(58,52,64,0.5); padding: 1rem; border-radius: 8px; font-size: 0.9rem;">
+        <span class="text-[rgb(163,154,137)]">Source Column:</span>
+        <span style="font-family: monospace; color: rgb(252, 165, 165); font-weight: 600; margin-left: 0.5rem;">
+          {{ activeRelationshipCheck.t1 }}.{{ activeRelationshipCheck.c1 }}
+        </span>
+      </div>
+
+      <div style="font-size: 0.85rem; font-weight: 500; margin-top: 0.5rem;">
+        Test which table contains matching data for this column:
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 0.75rem; max-height: 250px; overflow-y: auto; padding-right: 0.25rem;">
+        <div *ngFor="let m of activeRelationshipCheck.matches" 
+             style="display: flex; align-items: center; justify-content: space-between; background: rgba(20,17,27,0.3); border: 1px solid rgba(58,52,64,0.3); padding: 0.75rem; border-radius: 6px;">
+          
+          <div style="display: flex; flex-direction: column; gap: 0.15rem;">
+            <span class="text-white font-semibold" style="font-size: 0.85rem;">
+              <i class="fas fa-table text-indigo-400 mr-1"></i> {{ m.table_name }}
+            </span>
+            <span class="text-xs text-[rgb(163,154,137)]" style="font-family: monospace;">
+              Col: {{ m.column_name }}
+            </span>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 1rem;">
+            <!-- Overlap Result Badge -->
+            <div *ngIf="m.overlap !== null" 
+                 [ngClass]="{
+                   'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20': m.status === 'highly_related',
+                   'bg-amber-500/10 text-amber-400 border border-amber-500/20': m.status === 'possibly_related',
+                   'bg-slate-500/10 text-slate-400 border border-slate-500/20': m.status === 'unrelated'
+                 }"
+                 style="padding: 0.25rem 0.65rem; border-radius: 4px; font-size: 0.75rem; font-weight: bold; display: flex; align-items: center; gap: 4px;">
+              <i class="fas" [ngClass]="m.status === 'highly_related' ? 'fa-circle-check' : (m.status === 'possibly_related' ? 'fa-circle-question' : 'fa-circle-xmark')"></i>
+              {{ m.overlap }}% Overlap ({{ m.status === 'highly_related' ? 'Related' : (m.status === 'possibly_related' ? 'Possible' : 'No relation') }})
+            </div>
+
+            <!-- Verify trigger button -->
+            <button class="btn btn-secondary !py-1 !px-3" (click)="verifyConnection(m)" [disabled]="m.loading" style="font-size: 0.75rem;">
+              <i class="fas fa-spinner fa-spin mr-1" *ngIf="m.loading"></i>
+              <i class="fas fa-vial mr-1" *ngIf="!m.loading"></i>
+              Test Connection
+            </button>
+          </div>
+
+        </div>
+
+        <div *ngIf="activeRelationshipCheck.matches.length === 0" class="text-xs text-[rgb(163,154,137)] text-center py-4">
+          No matching fields found in other tables for this column.
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer" style="padding: 1rem 1.5rem; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; background: var(--bg-secondary);">
+      <button class="btn btn-primary" (click)="showRelationshipModal = false">Close</button>
+    </div>
+  </div>
+</div>
+

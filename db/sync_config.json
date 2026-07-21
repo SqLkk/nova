@@ -1,0 +1,6 @@
+{
+  "enabled": true,
+  "interval_hours": 6,
+  "base_hour": 13,
+  "last_sync_hour": "2026-07-10 13"
+}

@@ -1,0 +1,385 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+// Font Awesome kütüphanesini import et
+@import '@fortawesome/fontawesome-free/css/all.min.css';
+
+// ============================================================================
+// NOV4 GOLD — Design Tokens
+// Değişkenler "R G B" channel-triplet formatındadır; SCSS tarafında
+// rgb(var(--x)) , Tailwind tarafında rgb(var(--x) / <alpha-value>) ile tüketilir.
+// ============================================================================
+
+// ---- Karanlık tema (default) ----
+:root,
+body.dark-theme {
+  // Nötr / yüzey (sıcak onyx)
+  --bg-primary: 20 17 27; // #14111B — app arka planı (warm onyx)
+  --bg-secondary: 31 27 38; // #1F1B26 — kart / yüzey
+  --bg-tertiary: 47 41 52; // #2F2934 — hover / yükseltilmiş
+  --bg-elevated: 58 52 64; // #3A3440 — popout / modal başlık
+  --bg-inverse: 251 250 246; // koyu üzerinde açık okuma
+
+  // Metin
+  --text-primary: 244 241 234; // #F4F1EA
+  --text-secondary: 201 196 186; // #C9C4BA
+  --text-muted: 163 154 137; // #A39A89
+  --text-inverse: 20 17 27;
+
+  // Kenarlık / ayraç
+  --border-color: 58 52 64; // #3A3440
+  --border-strong: 82 74 90; // #524A5A
+
+  // Marka aksanları
+  --accent-primary: 245 179 1; // #F5B301 — imza altın
+  --accent-secondary: 255 122 26; // #FF7A1A — solar flare
+  --accent-tertiary: 124 141 181; // #7C8DB5 — ay ışığı çelik
+  --accent-soft: 252 211 77; // #FCD34D — açık altın (vurgu)
+  --on-accent: 26 23 20; // altın üzerinde her zaman koyu metin (#1A1714)
+
+  // Semantik durum renkleri
+  --success: 52 211 153; // #34D399
+  --warning: 245 158 11; // #F59E0B
+  --danger: 239 68 68; // #EF4444
+  --info: 124 141 181; // lunar
+
+  // Hafif tonlar (rozet / chip arka planları)
+  --success-bg: 52 211 153;
+  --warning-bg: 245 158 11;
+  --danger-bg: 239 68 68;
+  --info-bg: 124 141 181;
+
+  // Gölgeler
+  --shadow-color: 0 0 0;
+  --shadow-strength: 0.45;
+
+  // Kategorik grafik paleti (temadan bağımsız)
+  --chart-1: 245 179 1;
+  --chart-2: 255 122 26;
+  --chart-3: 124 141 181;
+  --chart-4: 52 211 153;
+  --chart-5: 244 114 182;
+  --chart-6: 167 139 250;
+  --chart-7: 45 212 191;
+  --chart-8: 252 211 77;
+  --chart-9: 96 165 250;
+  --chart-10: 251 113 133;
+}
+
+// ---- Aydınlık tema ----
+body.light-theme {
+  // Nötr / yüzey (sıcak kağıt)
+  --bg-primary: 251 250 246; // #FBFAF6 — app arka planı (warm paper)
+  --bg-secondary: 255 255 255; // #FFFFFF — kart / yüzey
+  --bg-tertiary: 244 241 234; // #F4F1EA — hover / yükseltilmiş
+  --bg-elevated: 238 234 224; // #EEEAE0
+  --bg-inverse: 20 17 27;
+
+  // Metin
+  --text-primary: 26 23 20; // #1A1714
+  --text-secondary: 74 69 64; // #4A4540
+  --text-muted: 117 110 96; // #756E60
+  --text-inverse: 251 250 246;
+
+  // Kenarlık / ayraç
+  --border-color: 231 226 215; // #E7E2D7
+  --border-strong: 206 199 184; // #CEC7B8
+
+  // Marka aksanları (kontrast için biraz daha koyu)
+  --accent-primary: 176 122 0; // #B07A00 — okunabilir altın
+  --accent-secondary: 214 88 0; // #D65800 — flare
+  --accent-tertiary: 90 107 146; // #5A6B92 — lunar
+  --accent-soft: 217 152 0; // #D99800
+  --on-accent: 26 23 20; // altın üzerinde her zaman koyu metin (#1A1714)
+
+  // Semantik durum renkleri (kontrast için koyu)
+  --success: 22 163 74; // #16A34A
+  --warning: 180 83 9; // #B45309
+  --danger: 220 38 38; // #DC2626
+  --info: 90 107 146;
+
+  --success-bg: 22 163 74;
+  --warning-bg: 180 83 9;
+  --danger-bg: 220 38 38;
+  --info-bg: 90 107 146;
+
+  // Gölgeler
+  --shadow-color: 26 23 20;
+  --shadow-strength: 0.10;
+}
+
+// ============================================================================
+// Global gövde stili
+// ============================================================================
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: rgb(var(--bg-primary));
+  color: rgb(var(--text-primary));
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+// Tipografi
+// Gövde/veri için Inter (styles.scss body + tailwind sans), başlıklar/logo
+// için Space Grotesk (index.html'de yüklenir, network-map canvas'ı ile aynı).
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Space Grotesk', 'Inter', sans-serif;
+  font-weight: 600;
+  line-height: 1.25;
+  color: rgb(var(--text-primary));
+  letter-spacing: -0.01em;
+}
+
+p {
+  color: rgb(var(--text-secondary));
+}
+
+a {
+  color: rgb(var(--accent-primary));
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+a:hover {
+  color: rgb(var(--accent-secondary));
+}
+
+// ============================================================================
+// Yüzeyler
+// ============================================================================
+.surface {
+  background: rgb(var(--bg-secondary));
+  border: 1px solid rgb(var(--border-color));
+  border-radius: 12px;
+  box-shadow: 0 14px 38px rgb(var(--shadow-color) / 0.18);
+  transition: all 0.2s ease;
+}
+
+.surface:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 18px 46px rgb(var(--shadow-color) / 0.22);
+}
+
+.card {
+  background: rgb(var(--bg-secondary));
+  border: 1px solid rgb(var(--border-color));
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 4px 6px -1px rgb(var(--shadow-color) / var(--shadow-strength));
+}
+
+.panel {
+  background: rgb(var(--bg-secondary));
+  border: 1px solid rgb(var(--border-color));
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+// ============================================================================
+// Butonlar
+// ============================================================================
+.btn-primary {
+  background: linear-gradient(135deg, rgb(var(--accent-primary)), rgb(var(--accent-secondary)));
+  // Altın üzerinde koyu metin — yüksek kontrast, premium görünüm
+  color: rgb(var(--on-accent));
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px rgb(var(--accent-primary) / 0.35);
+    filter: brightness(1.05);
+  }
+}
+
+.btn-secondary {
+  background: rgb(var(--bg-tertiary));
+  color: rgb(var(--text-primary));
+  border: 1px solid rgb(var(--border-color));
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: rgb(var(--bg-elevated));
+    border-color: rgb(var(--accent-primary));
+    color: rgb(var(--accent-primary));
+  }
+}
+
+// ============================================================================
+// Girdi alanları
+// ============================================================================
+.input-field {
+  background: rgb(var(--bg-tertiary));
+  border: 1px solid rgb(var(--border-color));
+  color: rgb(var(--text-primary));
+  padding: 10px 12px;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+
+  &:focus {
+    outline: none;
+    border-color: rgb(var(--accent-primary));
+    box-shadow: 0 0 0 3px rgb(var(--accent-primary) / 0.15);
+  }
+
+  &::placeholder {
+    color: rgb(var(--text-muted));
+  }
+}
+
+// ============================================================================
+// Animasyonlar
+// ============================================================================
+@layer utilities {
+  .animate-fade-in-down {
+    animation: fadeInDown 0.7s ease-out both;
+  }
+
+  @keyframes fadeInDown {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .animate-pulse-subtle {
+    animation: pulseSubtle 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  .animate-pulse-slow {
+    animation: pulseSlow 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  .animate-ping-slow {
+    animation: pingSlow 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+  }
+
+  @keyframes pulseSubtle {
+    0%, 100% { opacity: 0.2; }
+    50% { opacity: 0.4; }
+  }
+
+  @keyframes pulseSlow {
+    0%, 100% { opacity: 0.25; }
+    50% { opacity: 0.55; }
+  }
+
+  @keyframes pingSlow {
+    0% { transform: scale(1); opacity: 0.8; }
+    75%, 100% { transform: scale(2); opacity: 0; }
+  }
+}
+
+// ============================================================================
+// Durum rozetleri (semantic token'lara bağlı)
+// ============================================================================
+.status-ready {
+  background-color: rgb(var(--success-bg) / 0.12) !important;
+  color: rgb(var(--success)) !important;
+}
+
+.status-generating {
+  background-color: rgb(var(--accent-primary) / 0.14) !important;
+  color: rgb(var(--accent-primary)) !important;
+}
+
+.status-error {
+  background-color: rgb(var(--danger-bg) / 0.12) !important;
+  color: rgb(var(--danger)) !important;
+}
+
+.status-scheduled {
+  background-color: rgb(var(--warning-bg) / 0.12) !important;
+  color: rgb(var(--warning)) !important;
+}
+
+// ============================================================================
+// Grafik konteynerleri
+// ============================================================================
+.chart-container {
+  position: relative;
+  transition: all 0.5s ease;
+  background: rgb(var(--bg-secondary));
+  border-radius: 8px;
+  padding: 16px;
+  border: 1px solid rgb(var(--border-color));
+}
+
+.data-flow-indicator {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  display: flex;
+  align-items: center;
+  font-size: 10px;
+  color: rgb(var(--text-muted));
+}
+
+.data-flow-indicator::before {
+  content: "";
+  display: block;
+  width: 6px;
+  height: 6px;
+  background-color: rgb(var(--accent-primary));
+  border-radius: 50%;
+  margin-right: 4px;
+  animation: pingSlow 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+// ============================================================================
+// Scrollbar (merkezi — token tabanlı)
+// ============================================================================
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgb(var(--bg-secondary));
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgb(var(--bg-elevated));
+  border-radius: 4px;
+
+  &:hover {
+    background: rgb(var(--text-muted));
+  }
+}
+
+::-webkit-scrollbar-corner {
+  background: rgb(var(--bg-secondary));
+}
+
+// Firefox scrollbar
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--bg-elevated)) rgb(var(--bg-secondary));
+}
+
+// ============================================================================
+// Modal aktifken arka plan kaydırma kilidi
+// ============================================================================
+body.overflow-hidden {
+  overflow: hidden !important;
+
+  main {
+    overflow: hidden !important;
+  }
+}

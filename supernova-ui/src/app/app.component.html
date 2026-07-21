@@ -1,0 +1,11 @@
+<div class="app-layout">
+  <!-- Sol sidebar — yalnızca login değilse -->
+  <app-navigation *ngIf="showNavigation"></app-navigation>
+
+  <!-- Ana içerik: sidebar flex kardeşi, tam genişlik -->
+  <main class="content-area" [class.no-nav]="!showNavigation">
+    <router-outlet></router-outlet>
+  </main>
+
+  <app-confirm-dialog></app-confirm-dialog>
+</div>

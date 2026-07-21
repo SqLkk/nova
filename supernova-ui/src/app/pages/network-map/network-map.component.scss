@@ -1,0 +1,378 @@
+// ============================================================================
+// Space Map — sade "temiz uzay" arayüzü.
+// Renkler styles.scss CSS değişkenlerinden: rgb(var(--bg-*)), rgb(var(--text-*)),
+// rgb(var(--accent-tertiary)) (lunar çelik), rgb(var(--border-color)).
+// ============================================================================
+
+:host {
+  display: block;
+  height: 100%;
+  min-height: 0;
+}
+
+.space-map {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: #05070f; // canvas dışı kenarlar (temiz uzay zemin)
+  color: rgb(var(--text-primary));
+  font-family: "Space Grotesk", "Segoe UI", sans-serif;
+  overflow: hidden;
+}
+
+// ============================ TOPBAR ============================
+.sm-topbar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0.6rem 1rem;
+  background: linear-gradient(180deg, rgb(var(--bg-secondary) / 0.96), rgb(var(--bg-primary) / 0.96));
+  border-bottom: 1px solid rgb(var(--border-color));
+  backdrop-filter: blur(8px);
+  z-index: 5;
+}
+
+.sm-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-right: auto;
+
+  .sm-brand-icon {
+    width: 38px; height: 38px;
+    display: grid; place-items: center;
+    border-radius: 10px;
+    background: radial-gradient(circle at 30% 30%, rgb(var(--accent-tertiary) / 0.45), rgb(var(--bg-tertiary) / 0.6));
+    border: 1px solid rgb(var(--accent-tertiary) / 0.4);
+    color: #cdd8ee;
+    font-size: 1rem;
+    box-shadow: 0 0 18px rgb(var(--accent-tertiary) / 0.25);
+  }
+  .sm-brand-text {
+    line-height: 1.15;
+    h1 { margin: 0; font-size: 1.02rem; font-weight: 700; letter-spacing: 0.02em; }
+    p { margin: 0; font-size: 0.72rem; color: rgb(var(--text-muted)); max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  }
+}
+
+// ---- Arama ----
+.sm-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 220px;
+
+  > i.fa-search {
+    position: absolute;
+    left: 0.7rem;
+    color: rgb(var(--text-muted));
+    font-size: 0.78rem;
+    pointer-events: none;
+  }
+  input {
+    width: 100%;
+    padding: 0.45rem 0.8rem 0.45rem 1.9rem;
+    background: rgb(var(--bg-primary) / 0.6);
+    border: 1px solid rgb(var(--border-color));
+    border-radius: 8px;
+    color: rgb(var(--text-primary));
+    font-size: 0.82rem;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    &::placeholder { color: rgb(var(--text-muted)); }
+    &:focus { border-color: rgb(var(--accent-tertiary) / 0.7); box-shadow: 0 0 0 3px rgb(var(--accent-tertiary) / 0.15); }
+  }
+}
+.sm-search-results {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0; right: 0;
+  margin: 0; padding: 0.3rem;
+  list-style: none;
+  background: rgb(var(--bg-elevated));
+  border: 1px solid rgb(var(--border-color));
+  border-radius: 8px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+  max-height: 280px;
+  overflow-y: auto;
+  z-index: 20;
+
+  li {
+    display: flex; align-items: center; gap: 0.5rem;
+    padding: 0.4rem 0.5rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    &:hover { background: rgb(var(--bg-tertiary) / 0.7); }
+    .lvl {
+      font-size: 0.62rem; font-weight: 700;
+      padding: 1px 5px; border-radius: 4px;
+      background: rgb(var(--accent-tertiary) / 0.2);
+      color: #cdd8ee;
+    }
+    .lbl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  }
+}
+.sm-search-hint {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  font-size: 0.72rem;
+  color: rgb(var(--text-muted));
+}
+
+// ---- Alan seçiciler (DB / Path) ----
+.sm-field {
+  position: relative;
+  display: flex; align-items: center;
+
+  > i {
+    position: absolute;
+    left: 0.6rem;
+    color: rgb(var(--text-muted));
+    font-size: 0.72rem;
+    pointer-events: none;
+  }
+  select {
+    appearance: none;
+    padding: 0.45rem 1.8rem 0.45rem 1.7rem;
+    background: rgb(var(--bg-primary) / 0.6)
+                url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path fill='%23a39a89' d='M0 0l5 6 5-6z'/></svg>") no-repeat right 0.6rem center;
+    border: 1px solid rgb(var(--border-color));
+    border-radius: 8px;
+    color: rgb(var(--text-primary));
+    font-size: 0.8rem;
+    outline: none;
+    cursor: pointer;
+    min-width: 150px;
+    &:hover { border-color: rgb(var(--accent-tertiary) / 0.5); }
+    option { background: rgb(var(--bg-elevated)); color: rgb(var(--text-primary)); }
+  }
+}
+
+// ---- Butonlar ----
+.sm-icon-btn {
+  display: grid; place-items: center;
+  width: 36px; height: 36px;
+  border-radius: 8px;
+  background: rgb(var(--bg-tertiary) / 0.5);
+  border: 1px solid rgb(var(--border-color));
+  color: rgb(var(--text-secondary));
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  &:hover:not(:disabled) { background: rgb(var(--accent-tertiary) / 0.18); color: #fff; border-color: rgb(var(--accent-tertiary) / 0.5); }
+  &:disabled { opacity: 0.4; cursor: not-allowed; }
+  &.ghost { width: 40px; height: 40px; }
+  i.spinning { animation: sm-spin 0.9s linear infinite; }
+}
+
+.sm-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.45rem;
+  padding: 0.5rem 0.9rem;
+  border-radius: 8px;
+  background: rgb(var(--bg-tertiary) / 0.7);
+  border: 1px solid rgb(var(--border-color));
+  color: rgb(var(--text-primary));
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.05s;
+  &:hover { background: rgb(var(--accent-tertiary) / 0.2); border-color: rgb(var(--accent-tertiary) / 0.5); }
+  &:active { transform: translateY(1px); }
+  &.primary { background: linear-gradient(135deg, rgb(var(--accent-tertiary) / 0.5), rgb(var(--accent-tertiary) / 0.25)); border-color: rgb(var(--accent-tertiary) / 0.6); }
+}
+
+// ============================ CANVAS ============================
+.sm-canvas-wrap {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+.sm-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+  &:active { cursor: grabbing; }
+}
+
+// ---- Canvas üstü çipler ----
+.sm-focus-chip, .sm-stats-chip {
+  position: absolute;
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.4rem 0.7rem;
+  background: rgb(var(--bg-secondary) / 0.82);
+  border: 1px solid rgb(var(--border-color));
+  border-radius: 8px;
+  backdrop-filter: blur(8px);
+  font-size: 0.78rem;
+  color: rgb(var(--text-secondary));
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  z-index: 3;
+}
+.sm-focus-chip {
+  top: 0.8rem; left: 0.8rem;
+  max-width: 60%;
+  span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; color: rgb(var(--text-primary)); }
+  i.fa-crosshairs { color: rgb(var(--accent-tertiary)); }
+  .sm-up {
+    margin-left: 0.3rem;
+    width: 24px; height: 24px;
+    display: grid; place-items: center;
+    border-radius: 6px;
+    border: 1px solid rgb(var(--border-color));
+    background: transparent;
+    color: rgb(var(--text-secondary));
+    cursor: pointer;
+    &:hover { background: rgb(var(--accent-tertiary) / 0.2); color: #fff; }
+  }
+}
+.sm-stats-chip {
+  top: 0.8rem; right: 0.8rem;
+  .dot { color: rgb(var(--text-muted)); }
+  i { color: rgb(var(--text-muted)); margin-right: 0.25rem; }
+}
+
+// ---- Zoom kontrolleri ----
+.sm-zoom {
+  position: absolute;
+  bottom: 0.9rem; right: 0.9rem;
+  display: flex; align-items: center; gap: 0.3rem;
+  padding: 0.3rem;
+  background: rgb(var(--bg-secondary) / 0.85);
+  border: 1px solid rgb(var(--border-color));
+  border-radius: 10px;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+  z-index: 3;
+
+  button {
+    width: 32px; height: 32px;
+    display: grid; place-items: center;
+    border-radius: 7px;
+    border: none;
+    background: transparent;
+    color: rgb(var(--text-secondary));
+    cursor: pointer;
+    &:hover { background: rgb(var(--accent-tertiary) / 0.2); color: #fff; }
+  }
+  .sm-zoom-val { min-width: 44px; text-align: center; font-size: 0.74rem; font-weight: 600; color: rgb(var(--text-secondary)); }
+  .fit { margin-left: 0.2rem; border-left: 1px solid rgb(var(--border-color)); border-radius: 0 7px 7px 0; padding-left: 0; width: 34px; }
+}
+
+// ---- Overlay'ler ----
+.sm-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 0.8rem;
+  background: radial-gradient(circle at 50% 40%, rgba(8, 12, 26, 0.6), rgba(5, 7, 15, 0.9));
+  color: rgb(var(--text-secondary));
+  text-align: center;
+  z-index: 4;
+
+  i { font-size: 2.2rem; color: rgb(var(--accent-tertiary)); }
+  p { margin: 0; font-size: 0.9rem; max-width: 360px; }
+  .spinner i { animation: sm-spin 1.6s linear infinite; font-size: 2rem; }
+
+  &.sm-error i { color: rgb(var(--danger)); }
+}
+
+// ============================ DETAY PANELİ ============================
+.sm-detail {
+  position: absolute;
+  top: 0.8rem;
+  right: 0.8rem;
+  bottom: 4rem;
+  width: 290px;
+  display: flex; flex-direction: column; gap: 0.7rem;
+  padding: 1rem;
+  background: rgb(var(--bg-secondary) / 0.92);
+  border: 1px solid rgb(var(--border-color));
+  border-radius: 12px;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  z-index: 6;
+  animation: sm-slide-in 0.22s ease;
+
+  .sm-detail-head {
+    display: flex; align-items: center; justify-content: space-between;
+    .sm-level {
+      font-size: 0.66rem; font-weight: 700; letter-spacing: 0.05em;
+      padding: 3px 8px; border-radius: 5px;
+      background: rgb(var(--accent-tertiary) / 0.2);
+      color: #cdd8ee;
+      text-transform: uppercase;
+    }
+    .sm-close {
+      width: 26px; height: 26px;
+      display: grid; place-items: center;
+      border-radius: 6px; border: none;
+      background: transparent; color: rgb(var(--text-muted)); cursor: pointer;
+      &:hover { background: rgb(var(--bg-tertiary)); color: #fff; }
+    }
+  }
+  .sm-detail-title { margin: 0; font-size: 1.1rem; font-weight: 700; line-height: 1.25; word-break: break-word; }
+
+  .sm-breadcrumb {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem;
+    font-size: 0.74rem; color: rgb(var(--text-muted));
+    span.active { color: rgb(var(--text-primary)); font-weight: 600; }
+    .sep { font-size: 0.55rem; opacity: 0.6; }
+  }
+
+  .sm-detail-meta {
+    display: flex; gap: 0.6rem;
+    margin-top: 0.2rem;
+    div {
+      flex: 1;
+      display: flex; flex-direction: column; gap: 2px;
+      padding: 0.55rem;
+      background: rgb(var(--bg-primary) / 0.5);
+      border: 1px solid rgb(var(--border-color));
+      border-radius: 8px;
+      span { font-size: 0.66rem; color: rgb(var(--text-muted)); text-transform: uppercase; letter-spacing: 0.03em; }
+      strong { font-size: 1.1rem; color: rgb(var(--text-primary)); }
+    }
+  }
+
+  .sm-detail-actions {
+    display: flex; flex-wrap: wrap; gap: 0.45rem;
+    margin-top: auto;
+    .sm-btn { flex: 1 1 auto; }
+    .sm-icon-btn { flex: 0 0 auto; }
+  }
+}
+
+// ============================ TOAST ============================
+.sm-toast {
+  position: absolute;
+  bottom: 1.2rem; left: 50%; transform: translateX(-50%);
+  padding: 0.55rem 1rem;
+  background: rgb(var(--success) / 0.92);
+  color: #04130c;
+  border-radius: 8px;
+  font-size: 0.82rem; font-weight: 600;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  z-index: 10;
+  animation: sm-slide-in 0.2s ease;
+  &.err { background: rgb(var(--danger) / 0.92); color: #fff; }
+}
+
+// ============================ Animasyonlar ============================
+@keyframes sm-spin { to { transform: rotate(360deg); } }
+@keyframes sm-slide-in {
+  from { opacity: 0; transform: translateX(12px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+// Küçük ekranlarda topbar sarma
+@media (max-width: 880px) {
+  .sm-brand { margin-right: 0; width: 100%; }
+  .sm-search { min-width: 160px; flex: 1 1 200px; }
+  .sm-detail { width: calc(100% - 1.6rem); bottom: 5rem; }
+}

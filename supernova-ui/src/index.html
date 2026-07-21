@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Nov4</title>
+  <base href="/">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#14111B">
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+
+  <!-- Tipografi: Inter (UI/veri) + Space Grotesk (başlık/display) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap"
+  />
+</head>
+<body>
+  <!--
+    Tema flash'ını (FOUC) önlemek için pre-paint script.
+    ThemeService ile AYNI kuralı uygular: localStorage('ui-theme') > sistem
+    tercihi > dark. body.light-theme/dark-theme + html.dark sınıflarını
+    Angular bootstrap'inden ÖNCE ekler; böylece saklanan açık tema önce koyu
+    olarak çakıp sonra düzelmez.
+
+    Font Awesome CDN'den değil, styles.scss içindeki self-host import'tan
+    yüklenir (fabrika içi ağlarda harici CDN'e bağımlılık olmasın).
+  -->
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem('ui-theme');
+        var theme = (stored === 'light' || stored === 'dark')
+          ? stored
+          : (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+        var isLight = theme === 'light';
+        document.body.classList.add(isLight ? 'light-theme' : 'dark-theme');
+        if (!isLight) document.documentElement.classList.add('dark');
+      } catch (e) { /* gizli mod / SSR — :root koyu varsayılanı geçerli */ }
+    })();
+  </script>
+
+  <app-root></app-root>
+</body>
+</html>
