@@ -1258,6 +1258,7 @@
     "ROLE_ENGINEER": "Mühendis",
     "ROLE_USER": "Kullanıcı",
     "ROLE_VIEWER": "İzleyici",
+    "ROLE_OPERATOR": "Operatör",
     "API_SERVER_DOWN": "API server çalışmıyor",
     "CONNECTION_ERROR": "Bağlantı hatası",
     "ERROR_NO_DATE_RANGE": "Hata: Geçmiş veri için tarih aralığı belirtilmemiş",

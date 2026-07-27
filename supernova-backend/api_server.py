@@ -14,7 +14,7 @@ from flask import Flask, jsonify, request, send_file, g
 _DM_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(_DM_DIR, '..'))
 
-from db.database import get_db
+from db.database import get_db, ROLE_LEVELS, ALL_PERMISSION_KEYS, PERMISSION_CATALOG, _hash_password
 from query_executor import (
     execute_query, test_connection, get_tables, get_table_schema, get_table_preview,
     search_columns_in_db, check_relationship, get_functions,
@@ -74,6 +74,7 @@ def _auth_guard():
     g.uid = payload.get('uid')
     g.username = payload.get('u')
     g.role = payload.get('role')
+    g.level = payload.get('level', 0)  # kolaylık için token'dan; güvenlik için DB'den tekrar çözülür
     return None
 
 
@@ -179,6 +180,128 @@ def _can_modify_query(row: dict) -> bool:
     return bool(row.get('owner_id')) and row['owner_id'] == getattr(g, 'uid', None)
 
 
+# ---------------------------------------------------------------------------
+# RBAC yardımcıları: çağıran kullanıcının rolü/seviyesi/izinleri (istek başına,
+# DB'den çözülür ve g üzerinde önbelleğe alınır). Hiyerarşi + izin kontrolleri.
+# ---------------------------------------------------------------------------
+
+def _current_user_row() -> dict | None:
+    """Çağıran kullanıcının users↔roles join'li satırı (g'de önbelleğe alınır)."""
+    if hasattr(g, '_me_row'):
+        return g._me_row
+    db = get_db()
+    with db._conn() as conn:
+        row = conn.execute(
+            '''SELECT u.id, u.username, u.display_name, u.email, u.role, u.role_id, u.is_active,
+                      r.key AS role_key, r.name AS role_name, r.level, r.is_system
+               FROM users u LEFT JOIN roles r ON r.id = u.role_id WHERE u.id = ?''',
+            (_user_id(),)).fetchone()
+    g._me_row = dict(row) if row else None
+    return g._me_row
+
+
+def _user_level() -> int:
+    me = _current_user_row()
+    try:
+        return int((me or {}).get('level') or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _compute_effective_permissions(uid: str) -> set:
+    """Verilen kullanıcının efektif izinleri: role_permissions ∪ user grant-overrides
+    − user deny-overrides. superuser → tüm izinler (wildcard). DB'den taze çözülür."""
+    db = get_db()
+    with db._conn() as conn:
+        u = conn.execute(
+            'SELECT u.role_id, r.key AS role_key, r.level FROM users u '
+            'LEFT JOIN roles r ON r.id = u.role_id WHERE u.id = ?', (uid,)).fetchone()
+        if not u:
+            return set()
+        if u['role_key'] == 'superuser' or (u['level'] or 0) >= ROLE_LEVELS['superuser']:
+            return set(ALL_PERMISSION_KEYS)
+        role_perms = {r['permission_key'] for r in conn.execute(
+            'SELECT permission_key FROM role_permissions WHERE role_id = ?', (u['role_id'],))}
+        overrides = conn.execute(
+            'SELECT permission_key, granted FROM user_permissions WHERE user_id = ?', (uid,)).fetchall()
+    granted = {o['permission_key'] for o in overrides if o['granted']}
+    denied = {o['permission_key'] for o in overrides if not o['granted']}
+    return (role_perms | granted) - denied
+
+
+def _effective_permissions() -> set:
+    """Çağıran kullanıcının efektif izinleri (g'de önbelleğe alınır)."""
+    if not hasattr(g, '_eff_perms'):
+        g._eff_perms = _compute_effective_permissions(_user_id())
+    return g._eff_perms
+
+
+def _has_perm(key: str) -> bool:
+    return key in _effective_permissions()
+
+
+def _require_perm(key: str):
+    """İzin yoksa 403 yanıtı döndürür, varsa None. Kullanım:
+       denied = _require_perm('user:view'); if denied: return denied"""
+    if not _has_perm(key):
+        return _err('Forbidden: insufficient permissions.', 403)
+    return None
+
+
+def _can_manage_level(target_level) -> bool:
+    """Hiyerarşi: hedef seviye çağıranın seviyesinden DÜŞÜK mü?"""
+    try:
+        return int(target_level or 0) < _user_level()
+    except (TypeError, ValueError):
+        return False
+
+
+def _can_manage_user(target_uid: str) -> bool:
+    """Çağıran bu kullanıcıyı yönetebilir mi? user:edit izni + hedef seviye daha düşük.
+    Kendi üzerinde yönetim (rol/aktif/silme) engellenir (kilitlenmeyi önler)."""
+    if not _has_perm('user:edit'):
+        return False
+    if target_uid == _user_id():
+        return False
+    db = get_db()
+    with db._conn() as conn:
+        t = conn.execute(
+            'SELECT r.level FROM users u LEFT JOIN roles r ON r.id = u.role_id WHERE u.id = ?',
+            (target_uid,)).fetchone()
+    if not t or t['level'] is None:
+        return False
+    return t['level'] < _user_level()
+
+
+def _effective_pages(uid: str) -> list:
+    """Kullanıcının görebileceği sayfa key'leri (page:* izinlerinden türetilir)."""
+    perms = _compute_effective_permissions(uid)
+    return sorted(p.split(':', 1)[1] for p in perms if p.startswith('page:'))
+
+
+def _role_to_dict(row: dict, member_count: int = 0) -> dict:
+    return {
+        'id': row['id'],
+        'key': row['key'],
+        'name': row['name'],
+        'description': row.get('description', ''),
+        'level': row['level'],
+        'isSystem': bool(row['is_system']),
+        'isActive': bool(row['is_active']),
+        'color': row.get('color', ''),
+        'memberCount': member_count,
+        'createdAt': row.get('created_at', ''),
+        'updatedAt': row.get('updated_at', ''),
+    }
+
+
+def _load_role_row(rid: str) -> dict | None:
+    db = get_db()
+    with db._conn() as conn:
+        row = conn.execute('SELECT * FROM roles WHERE id = ?', (rid,)).fetchone()
+    return dict(row) if row else None
+
+
 def _err(message: str, status: int = 400, **extra):
     payload = {"success": False, "error": message}
     payload.update(extra)
@@ -197,12 +320,16 @@ _DEFAULT_PREFS = {
 
 
 def _user_public_dict(row) -> dict:
+    r = dict(row)
     return {
-        'id': row['id'],
-        'username': row['username'],
-        'displayName': row['display_name'] or row['username'],
-        'email': row['email'],
-        'role': row['role'],
+        'id': r['id'],
+        'username': r['username'],
+        'displayName': r.get('display_name') or r['username'],
+        'email': r.get('email', ''),
+        'role': r.get('role', 'viewer'),
+        'level': r.get('level', 0) or 0,
+        'roleId': r.get('role_id', ''),
+        'roleName': r.get('role_name', ''),
         'preferences': dict(_DEFAULT_PREFS),
     }
 
@@ -218,8 +345,10 @@ def login():
     db = get_db()
     with db._conn() as conn:
         row = conn.execute(
-            'SELECT id, username, display_name, email, role, password_hash, password_salt, is_active '
-            'FROM users WHERE username = ?', (username,)
+            'SELECT u.id, u.username, u.display_name, u.email, u.role, u.role_id, '
+            'u.password_hash, u.password_salt, u.is_active, '
+            'r.level, r.key AS role_key, r.name AS role_name '
+            'FROM users u LEFT JOIN roles r ON r.id = u.role_id WHERE u.username = ?', (username,)
         ).fetchone()
 
     # Kullanıcı adı / şifre hatalarını aynı mesajla döndür (user enumeration koruması).
@@ -228,7 +357,7 @@ def login():
     if not auth_lib.verify_password(password, row['password_salt'], row['password_hash']):
         return _err('Invalid username or password.', 401)
 
-    token = auth_lib.create_token(row['id'], row['username'], row['role'])
+    token = auth_lib.create_token(row['id'], row['username'], row['role'], row['level'] or 0)
     return jsonify({
         'success': True,
         'user': _user_public_dict(row),
@@ -238,13 +367,15 @@ def login():
 
 @app.route('/api/users/<uid>/profile', methods=['GET'])
 def get_user_profile(uid):
-    # Kendi profili ya da admin.
-    if g.uid != uid and not _is_admin():
+    # Kendi profili ya da yönetebildiği kullanıcı.
+    if g.uid != uid and not _can_manage_user(uid) and not _is_admin():
         return _err('Unauthorized.', 403)
     db = get_db()
     with db._conn() as conn:
         row = conn.execute(
-            'SELECT id, username, display_name, email, role FROM users WHERE id = ?', (uid,)
+            'SELECT u.id, u.username, u.display_name, u.email, u.role, u.role_id, '
+            'r.level, r.name AS role_name '
+            'FROM users u LEFT JOIN roles r ON r.id = u.role_id WHERE u.id = ?', (uid,)
         ).fetchone()
     if not row:
         return _err('User not found.', 404)
@@ -253,9 +384,25 @@ def get_user_profile(uid):
 
 @app.route('/api/users/<uid>/permissions', methods=['GET'])
 def get_user_permissions(uid):
-    if g.uid != uid and not _is_admin():
+    # Kendi izinleri ya da yönetebildiği kullanıcının izinleri.
+    if g.uid != uid and not _can_manage_user(uid) and not _is_admin():
         return _err('Unauthorized.', 403)
-    return jsonify({'user_id': uid, 'allowed_pages': _allowed_pages_for_role(g.role)})
+    db = get_db()
+    with db._conn() as conn:
+        u = conn.execute(
+            'SELECT u.role, r.key AS role_key, r.level FROM users u '
+            'LEFT JOIN roles r ON r.id = u.role_id WHERE u.id = ?', (uid,)).fetchone()
+    if not u:
+        return _err('User not found.', 404)
+    perms = sorted(_compute_effective_permissions(uid))
+    pages = sorted(p.split(':', 1)[1] for p in perms if p.startswith('page:'))
+    return jsonify({
+        'user_id': uid,
+        'role': u['role_key'] or u['role'],
+        'level': u['level'] or 0,
+        'permissions': perms,
+        'allowed_pages': pages,
+    })
 
 
 # ---------------------------------------------------------------------------
@@ -275,8 +422,19 @@ def health_check():
 def get_users():
     db = get_db()
     with db._conn() as conn:
-        users = [dict(row) for row in conn.execute(
-            'SELECT id, username, display_name, email, role, is_active FROM users')]
+        if _has_perm('user:view'):
+            users = [dict(row) for row in conn.execute(
+                '''SELECT u.id, u.username, u.display_name, u.email, u.role, u.is_active,
+                          r.key AS role_key, r.level
+                   FROM users u LEFT JOIN roles r ON r.id = u.role_id
+                   ORDER BY r.level DESC, u.username''')]
+        else:
+            # user:view izni yoksa sadece kendi kaydını döndür (paylaşım seçicileri için).
+            users = [dict(row) for row in conn.execute(
+                '''SELECT u.id, u.username, u.display_name, u.email, u.role, u.is_active,
+                          r.key AS role_key, r.level
+                   FROM users u LEFT JOIN roles r ON r.id = u.role_id WHERE u.id = ?''',
+                (_user_id(),))]
     return jsonify({"success": True, "data": users})
 
 
@@ -914,9 +1072,19 @@ def list_templates():
     db = get_db()
     with db._conn() as conn:
         rows = [dict(r) for r in conn.execute(
-            'SELECT id, name, description, owner_id, version, is_active, created_at, updated_at '
+            'SELECT id, name, description, owner_id, allowed_roles, allowed_users, '
+            'version, is_active, created_at, updated_at '
             'FROM report_templates ORDER BY datetime(updated_at) DESC')]
-    return jsonify({"success": True, "data": rows})
+    visible = []
+    for r in rows:
+        # _can_access_query generic'tir: owner_id/allowed_roles/allowed_users okur.
+        if not _can_access_query(r):
+            continue
+        r['owner'] = r.pop('owner_id', '')
+        r['allowedRoles'] = json.loads(r.pop('allowed_roles', '[]') or '[]')
+        r['allowedUsers'] = json.loads(r.pop('allowed_users', '[]') or '[]')
+        visible.append(r)
+    return jsonify({"success": True, "data": visible})
 
 
 @app.route('/api/templates/<tid>', methods=['GET'])
@@ -926,8 +1094,13 @@ def get_template(tid):
         row = conn.execute('SELECT * FROM report_templates WHERE id=?', (tid,)).fetchone()
     if not row:
         return _err("Template not found.", 404)
+    if not _can_access_query(dict(row)):
+        return _err("Erişim yetkiniz yok.", 403)
     data = dict(row)
     data['model'] = json.loads(data.get('model') or '{}')
+    data['owner'] = data.pop('owner_id', '')
+    data['allowedRoles'] = json.loads(data.pop('allowed_roles', '[]') or '[]')
+    data['allowedUsers'] = json.loads(data.pop('allowed_users', '[]') or '[]')
     return jsonify({"success": True, "data": data})
 
 
@@ -939,13 +1112,16 @@ def create_template():
     model = body.get('model') or {}
     if isinstance(model, str):
         model = json.loads(model)
+    allowed_roles = body.get('allowedRoles') or body.get('allowed_roles') or []
+    allowed_users = body.get('allowedUsers') or body.get('allowed_users') or []
     db = get_db()
     with db._conn() as conn:
         try:
             conn.execute(
-                '''INSERT INTO report_templates (id, name, description, model, owner_id, version, is_active)
-                   VALUES (?, ?, ?, ?, ?, 1, 1)''',
-                (tid, name, body.get('description', ''), json.dumps(model, ensure_ascii=False), _user_id()))
+                '''INSERT INTO report_templates (id, name, description, model, owner_id, allowed_roles, allowed_users, version, is_active)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, 1, 1)''',
+                (tid, name, body.get('description', ''), json.dumps(model, ensure_ascii=False),
+                 _user_id(), json.dumps(allowed_roles), json.dumps(allowed_users)))
         except Exception as exc:
             return _err(f"Could not create template: {exc}", 409)
     return jsonify({"success": True, "data": {"id": tid, "name": name}}), 201
@@ -956,9 +1132,11 @@ def update_template(tid):
     body = request.get_json(silent=True) or {}
     db = get_db()
     with db._conn() as conn:
-        row = conn.execute('SELECT id FROM report_templates WHERE id=?', (tid,)).fetchone()
+        row = conn.execute('SELECT id, owner_id FROM report_templates WHERE id=?', (tid,)).fetchone()
         if not row:
             return _err("Template not found.", 404)
+        if not _can_modify_query(dict(row)):
+            return _err("Bu template'ı düzenleme yetkiniz yok.", 403)
         model = body.get('model')
         if model is None:
             conn.execute(
@@ -973,10 +1151,34 @@ def update_template(tid):
     return jsonify({"success": True, "data": {"id": tid}})
 
 
+@app.route('/api/templates/<tid>/sharing', methods=['PUT'])
+def update_template_sharing(tid):
+    """Template ACL: allowed_roles / allowed_users (sahip / admin / share:templates)."""
+    body = request.get_json(silent=True) or {}
+    db = get_db()
+    with db._conn() as conn:
+        row = conn.execute('SELECT id, owner_id FROM report_templates WHERE id=?', (tid,)).fetchone()
+        if not row:
+            return _err("Template not found.", 404)
+        if not (_can_modify_query(dict(row)) or _has_perm('share:templates')):
+            return _err("Paylaşım düzenleme yetkiniz yok.", 403)
+        allowed_roles = body.get('allowedRoles') or body.get('allowed_roles') or []
+        allowed_users = body.get('allowedUsers') or body.get('allowed_users') or []
+        conn.execute(
+            '''UPDATE report_templates SET allowed_roles=?, allowed_users=?, updated_at=datetime('now') WHERE id=?''',
+            (json.dumps(allowed_roles), json.dumps(allowed_users), tid))
+    return jsonify({"success": True})
+
+
 @app.route('/api/templates/<tid>', methods=['DELETE'])
 def delete_template(tid):
     db = get_db()
     with db._conn() as conn:
+        row = conn.execute('SELECT id, owner_id FROM report_templates WHERE id=?', (tid,)).fetchone()
+        if not row:
+            return _err("Template not found.", 404)
+        if not _can_modify_query(dict(row)):
+            return _err("Bu template'ı silme yetkiniz yok.", 403)
         cur = conn.execute('DELETE FROM report_templates WHERE id=?', (tid,))
     return jsonify({"success": True, "deleted": cur.rowcount > 0})
 
@@ -1019,6 +1221,8 @@ def render_template(tid):
         row = conn.execute('SELECT * FROM report_templates WHERE id=?', (tid,)).fetchone()
     if not row:
         return _err("Template not found.", 404)
+    if not _can_access_query(dict(row)):
+        return _err("Erişim yetkiniz yok.", 403)
 
     model = json.loads(dict(row).get('model') or '{}')
     body = request.get_json(silent=True) or {}
@@ -1308,6 +1512,384 @@ def search_path(pid):
                     'breadcrumb': _breadcrumb(built['nodes'], node.get('path', [])),
                 })
     return jsonify({"success": True, "data": {"hits": hits, "stats": built['stats']}})
+
+
+# ---------------------------------------------------------------------------
+# RBAC yönetim uçları: izin kataloğu, roller, kullanıcı yönetimi, paylaşım.
+# Hiyerarşi: çağıran sadece kendi seviyesinden DÜŞÜK kullanıcı/rolleri yönetir.
+# ---------------------------------------------------------------------------
+
+_SHARING_TABLES = {
+    'templates': ('report_templates', 'share:templates'),
+    'paths': ('path_defs', 'share:paths'),
+    'queries': ('queries', 'share:queries'),
+    'scripts': ('python_scripts', 'share:scripts'),
+}
+
+
+@app.route('/api/permissions', methods=['GET'])
+def get_permission_catalog():
+    return jsonify({'success': True, 'data': PERMISSION_CATALOG})
+
+
+# ---- Roller -----------------------------------------------------------------
+
+@app.route('/api/roles', methods=['GET'])
+def list_roles():
+    denied = _require_perm('role:view')
+    if denied:
+        return denied
+    me_level = _user_level()
+    db = get_db()
+    with db._conn() as conn:
+        rows = [dict(r) for r in conn.execute('SELECT * FROM roles ORDER BY level DESC, name')]
+        counts = {r['role_id']: r['c'] for r in conn.execute(
+            "SELECT role_id, COUNT(*) c FROM users WHERE role_id IS NOT NULL AND role_id != '' GROUP BY role_id")}
+        perms = {}
+        for r in conn.execute('SELECT role_id, permission_key FROM role_permissions'):
+            perms.setdefault(r['role_id'], []).append(r['permission_key'])
+    result = []
+    for row in rows:
+        d = _role_to_dict(row, counts.get(row['id'], 0))
+        d['permissions'] = sorted(perms.get(row['id'], []))
+        d['canManage'] = (row['level'] or 0) < me_level
+        result.append(d)
+    return jsonify({'success': True, 'data': result})
+
+
+@app.route('/api/roles', methods=['POST'])
+def create_role():
+    denied = _require_perm('role:create')
+    if denied:
+        return denied
+    body = request.get_json(silent=True) or {}
+    name = (body.get('name') or '').strip()
+    if not name:
+        return _err('Rol adı zorunludur.', 400)
+    key = (body.get('key') or '').strip().lower().replace(' ', '_') or ('role_' + uuid.uuid4().hex[:8])
+    try:
+        level = int(body.get('level', 20))
+    except (TypeError, ValueError):
+        return _err('Geçersiz seviye.', 400)
+    if not _can_manage_level(level):
+        return _err('Sadece kendi seviyenizden düşük bir rol oluşturabilirsiniz.', 403)
+    color = (body.get('color') or '#7C8DB5').strip()
+    perms = [p for p in (body.get('permissions') or []) if p in ALL_PERMISSION_KEYS]
+    rid = _new_id('r_')
+    db = get_db()
+    with db._conn() as conn:
+        try:
+            conn.execute(
+                '''INSERT INTO roles (id, key, name, description, level, is_system, is_active, color)
+                   VALUES (?, ?, ?, ?, ?, 0, 1, ?)''',
+                (rid, key, name, body.get('description', ''), level, color))
+        except Exception as exc:
+            return _err(f'Rol oluşturulamadı (anahtar benzersiz olmalı): {exc}', 409)
+        for p in perms:
+            conn.execute('INSERT OR IGNORE INTO role_permissions (role_id, permission_key) VALUES (?, ?)', (rid, p))
+    return jsonify({'success': True, 'data': {'id': rid, 'key': key, 'name': name}}), 201
+
+
+@app.route('/api/roles/<rid>', methods=['PUT'])
+def update_role(rid):
+    denied = _require_perm('role:edit')
+    if denied:
+        return denied
+    row = _load_role_row(rid)
+    if not row:
+        return _err('Rol bulunamadı.', 404)
+    if not _can_manage_level(row['level']):
+        return _err('Bu rolü düzenleme yetkiniz yok (seviye çok yüksek).', 403)
+    body = request.get_json(silent=True) or {}
+    name = body.get('name', row['name'])
+    description = body.get('description', row['description'])
+    color = body.get('color', row['color'])
+    level = row['level']
+    # Sistem rollerinin key/level'ı kilitli; özel rollerin seviyesi değişebilir.
+    if not row['is_system'] and body.get('level') is not None:
+        try:
+            new_level = int(body['level'])
+        except (TypeError, ValueError):
+            return _err('Geçersiz seviye.', 400)
+        if not _can_manage_level(new_level):
+            return _err('Rol seviyesi kendi seviyenizden düşük olmalı.', 403)
+        level = new_level
+    perms = body.get('permissions')  # None = dokunma; list = tam seti değiştir
+    db = get_db()
+    with db._conn() as conn:
+        conn.execute(
+            '''UPDATE roles SET name=?, description=?, color=?, level=?, updated_at=datetime('now') WHERE id=?''',
+            (name, description, color, level, rid))
+        if perms is not None:
+            conn.execute('DELETE FROM role_permissions WHERE role_id=?', (rid,))
+            for p in perms:
+                if p in ALL_PERMISSION_KEYS:
+                    conn.execute('INSERT OR IGNORE INTO role_permissions (role_id, permission_key) VALUES (?, ?)', (rid, p))
+    return jsonify({'success': True, 'data': {'id': rid}})
+
+
+@app.route('/api/roles/<rid>', methods=['DELETE'])
+def delete_role(rid):
+    denied = _require_perm('role:delete')
+    if denied:
+        return denied
+    row = _load_role_row(rid)
+    if not row:
+        return _err('Rol bulunamadı.', 404)
+    if row['is_system']:
+        return _err('Sistem rolleri silinemez.', 400)
+    if not _can_manage_level(row['level']):
+        return _err('Bu rolü silme yetkiniz yok.', 403)
+    db = get_db()
+    with db._conn() as conn:
+        cnt = conn.execute('SELECT COUNT(*) c FROM users WHERE role_id=?', (rid,)).fetchone()['c']
+        if cnt > 0:
+            return _err(f'Bu role atanmış {cnt} kullanıcı var; önce kullanıcıları başka role taşıyın.', 409)
+        conn.execute('DELETE FROM roles WHERE id=?', (rid,))
+    return jsonify({'success': True, 'deleted': True})
+
+
+# ---- Kullanıcı yönetimi -----------------------------------------------------
+
+@app.route('/api/admin/users', methods=['GET'])
+def admin_list_users():
+    denied = _require_perm('user:view')
+    if denied:
+        return denied
+    me_level = _user_level()
+    me_id = _user_id()
+    db = get_db()
+    with db._conn() as conn:
+        users = [dict(r) for r in conn.execute(
+            '''SELECT u.id, u.username, u.display_name, u.email, u.role, u.role_id, u.is_active,
+                      u.created_at, u.updated_at, r.key AS role_key, r.name AS role_name,
+                      r.level, r.color AS role_color
+               FROM users u LEFT JOIN roles r ON r.id = u.role_id
+               ORDER BY r.level DESC, u.username''')]
+    for u in users:
+        u['displayName'] = u.pop('display_name', '')
+        u['roleId'] = u.pop('role_id', '')
+        u['roleKey'] = u.pop('role_key', '')
+        u['roleName'] = u.pop('role_name', '')
+        u['isActive'] = bool(u.pop('is_active', 1))
+        u['createdAt'] = u.pop('created_at', '')
+        u['updatedAt'] = u.pop('updated_at', '')
+        u['canManage'] = (u.get('level') or 0) < me_level and u['id'] != me_id
+    return jsonify({'success': True, 'data': users})
+
+
+@app.route('/api/admin/users/<uid>', methods=['GET'])
+def admin_get_user(uid):
+    denied = _require_perm('user:view')
+    if denied:
+        return denied
+    if g.uid != uid and not _can_manage_user(uid) and not _is_admin():
+        return _err('Unauthorized.', 403)
+    db = get_db()
+    with db._conn() as conn:
+        u = conn.execute(
+            '''SELECT u.id, u.username, u.display_name, u.email, u.role, u.role_id, u.is_active,
+                      u.created_at, u.updated_at, r.key AS role_key, r.name AS role_name,
+                      r.level, r.color AS role_color
+               FROM users u LEFT JOIN roles r ON r.id = u.role_id WHERE u.id = ?''', (uid,)).fetchone()
+        if not u:
+            return _err('User not found.', 404)
+        u = dict(u)
+        perms = sorted(_compute_effective_permissions(uid))
+        overrides = [dict(r) for r in conn.execute(
+            'SELECT permission_key, granted FROM user_permissions WHERE user_id=?', (uid,))]
+        counts = {
+            'templates': conn.execute('SELECT COUNT(*) c FROM report_templates WHERE owner_id=?', (uid,)).fetchone()['c'],
+            'paths': conn.execute('SELECT COUNT(*) c FROM path_defs WHERE owner_id=?', (uid,)).fetchone()['c'],
+            'queries': conn.execute('SELECT COUNT(*) c FROM queries WHERE owner_id=?', (uid,)).fetchone()['c'],
+            'scripts': conn.execute('SELECT COUNT(*) c FROM python_scripts WHERE owner_id=?', (uid,)).fetchone()['c'],
+        }
+    u['permissions'] = perms
+    u['allowedPages'] = sorted(p.split(':', 1)[1] for p in perms if p.startswith('page:'))
+    u['overrides'] = overrides
+    u['ownedCounts'] = counts
+    u['canManage'] = (u.get('level') or 0) < _user_level() and u['id'] != _user_id()
+    return jsonify({'success': True, 'data': u})
+
+
+@app.route('/api/admin/users', methods=['POST'])
+def admin_create_user():
+    denied = _require_perm('user:create')
+    if denied:
+        return denied
+    body = request.get_json(silent=True) or {}
+    username = (body.get('username') or '').strip()
+    password = body.get('password') or ''
+    if not username or not password:
+        return _err('Kullanıcı adı ve şifre zorunludur.', 400)
+    role_id = (body.get('role_id') or body.get('roleId') or '').strip()
+    role_row = _load_role_row(role_id) if role_id else None
+    if not role_row:
+        return _err('Geçerli bir rol seçin.', 400)
+    if not _can_manage_level(role_row['level']):
+        return _err('Bu rolü atayamazsınız (seviye çok yüksek).', 403)
+    display_name = (body.get('display_name') or body.get('displayName') or '').strip()
+    email = (body.get('email') or '').strip()
+    is_active = 1 if body.get('is_active', body.get('isActive', True)) else 0
+    pw_hash, pw_salt = _hash_password(password)
+    uid = _new_id('u_')
+    db = get_db()
+    with db._conn() as conn:
+        try:
+            conn.execute(
+                '''INSERT INTO users (id, username, display_name, email, password_hash, password_salt, role, role_id, is_active)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                (uid, username, display_name, email, pw_hash, pw_salt, role_row['key'], role_id, is_active))
+        except Exception as exc:
+            return _err(f'Kullanıcı oluşturulamadı (kullanıcı adı benzersiz olmalı): {exc}', 409)
+    return jsonify({'success': True, 'data': {'id': uid, 'username': username}}), 201
+
+
+@app.route('/api/admin/users/<uid>', methods=['PUT'])
+def admin_update_user(uid):
+    denied = _require_perm('user:edit')
+    if denied:
+        return denied
+    if not _can_manage_user(uid):
+        return _err('Bu kullanıcıyı düzenleme yetkiniz yok.', 403)
+    body = request.get_json(silent=True) or {}
+    sets, params = [], []
+    dn = body.get('display_name', body.get('displayName'))
+    if dn is not None:
+        sets.append('display_name=?'); params.append(dn)
+    if 'email' in body:
+        sets.append('email=?'); params.append(body['email'] or '')
+    ia = body.get('is_active', body.get('isActive'))
+    if ia is not None:
+        sets.append('is_active=?'); params.append(1 if ia else 0)
+    role_id = body.get('role_id', body.get('roleId'))
+    if role_id is not None:
+        role_row = _load_role_row(role_id) if role_id else None
+        if not role_row:
+            return _err('Geçersiz rol.', 400)
+        if not _can_manage_level(role_row['level']):
+            return _err('Bu rolü atayamazsınız (seviye çok yüksek).', 403)
+        sets.append('role_id=?'); params.append(role_id)
+        sets.append('role=?'); params.append(role_row['key'])
+    if not sets:
+        return _err('Güncellenecek alan yok.', 400)
+    sets.append("updated_at=datetime('now')")
+    params.append(uid)
+    db = get_db()
+    with db._conn() as conn:
+        cur = conn.execute(f"UPDATE users SET {', '.join(sets)} WHERE id=?", params)
+        if cur.rowcount == 0:
+            return _err('User not found.', 404)
+    return jsonify({'success': True})
+
+
+@app.route('/api/admin/users/<uid>', methods=['DELETE'])
+def admin_delete_user(uid):
+    denied = _require_perm('user:delete')
+    if denied:
+        return denied
+    if not _can_manage_user(uid):
+        return _err('Bu kullanıcıyı silme yetkiniz yok.', 403)
+    db = get_db()
+    with db._conn() as conn:
+        cur = conn.execute('DELETE FROM users WHERE id=?', (uid,))
+    return jsonify({'success': True, 'deleted': cur.rowcount > 0})
+
+
+@app.route('/api/admin/users/<uid>/password', methods=['PUT'])
+def admin_reset_password(uid):
+    denied = _require_perm('user:reset-password')
+    if denied:
+        return denied
+    if not _can_manage_user(uid):
+        return _err('Yetkiniz yok.', 403)
+    body = request.get_json(silent=True) or {}
+    password = body.get('password') or ''
+    if len(password) < 4:
+        return _err('Şifre en az 4 karakter olmalı.', 400)
+    pw_hash, pw_salt = _hash_password(password)
+    db = get_db()
+    with db._conn() as conn:
+        cur = conn.execute(
+            "UPDATE users SET password_hash=?, password_salt=?, updated_at=datetime('now') WHERE id=?",
+            (pw_hash, pw_salt, uid))
+        if cur.rowcount == 0:
+            return _err('User not found.', 404)
+    return jsonify({'success': True})
+
+
+@app.route('/api/admin/users/<uid>/permissions', methods=['PUT'])
+def admin_set_user_permissions(uid):
+    """Kullanıcı başına izin override'ları (grant/deny). Rol izinlerinin üzerine uygulanır."""
+    denied = _require_perm('user:edit')
+    if denied:
+        return denied
+    if not _can_manage_user(uid):
+        return _err('Yetkiniz yok.', 403)
+    body = request.get_json(silent=True) or {}
+    overrides = body.get('overrides') or []
+    db = get_db()
+    with db._conn() as conn:
+        conn.execute('DELETE FROM user_permissions WHERE user_id=?', (uid,))
+        for o in overrides:
+            key = o.get('permission_key') or o.get('key')
+            granted = 1 if o.get('granted', True) else 0
+            if key in ALL_PERMISSION_KEYS:
+                conn.execute(
+                    'INSERT OR IGNORE INTO user_permissions (user_id, permission_key, granted) VALUES (?, ?, ?)',
+                    (uid, key, granted))
+    return jsonify({'success': True})
+
+
+# ---- Nesne yetkilendirme (paylaşım) ----------------------------------------
+
+@app.route('/api/admin/sharing/<otype>', methods=['GET'])
+def admin_list_sharing(otype):
+    spec = _SHARING_TABLES.get(otype)
+    if not spec:
+        return _err('Bilinmeyen nesne tipi.', 400)
+    table, perm = spec
+    denied = _require_perm(perm)
+    if denied:
+        return denied
+    db = get_db()
+    with db._conn() as conn:
+        rows = [dict(r) for r in conn.execute(
+            f'''SELECT t.id, t.name, t.owner_id, u.display_name AS owner_name,
+                       t.allowed_roles, t.allowed_users
+                FROM {table} t LEFT JOIN users u ON u.id = t.owner_id
+                ORDER BY t.name''')]
+    out = []
+    for r in rows:
+        out.append({
+            'id': r['id'], 'name': r['name'],
+            'owner': r['owner_id'], 'ownerName': r['owner_name'] or '',
+            'allowedRoles': json.loads(r.get('allowed_roles') or '[]'),
+            'allowedUsers': json.loads(r.get('allowed_users') or '[]'),
+        })
+    return jsonify({'success': True, 'data': out})
+
+
+@app.route('/api/admin/sharing/<otype>/<oid>', methods=['PUT'])
+def admin_update_sharing(otype, oid):
+    spec = _SHARING_TABLES.get(otype)
+    if not spec:
+        return _err('Bilinmeyen nesne tipi.', 400)
+    table, perm = spec
+    denied = _require_perm(perm)
+    if denied:
+        return denied
+    body = request.get_json(silent=True) or {}
+    allowed_roles = body.get('allowedRoles') or []
+    allowed_users = body.get('allowedUsers') or []
+    db = get_db()
+    with db._conn() as conn:
+        cur = conn.execute(
+            f"UPDATE {table} SET allowed_roles=?, allowed_users=?, updated_at=datetime('now') WHERE id=?",
+            (json.dumps(allowed_roles), json.dumps(allowed_users), oid))
+        if cur.rowcount == 0:
+            return _err('Nesne bulunamadı.', 404)
+    return jsonify({'success': True})
 
 
 if __name__ == '__main__':

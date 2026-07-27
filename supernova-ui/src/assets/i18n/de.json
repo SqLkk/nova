@@ -1233,6 +1233,7 @@
     "ROLE_ENGINEER": "Ingenieur",
     "ROLE_USER": "Benutzer",
     "ROLE_VIEWER": "Betrachter",
+    "ROLE_OPERATOR": "Operator",
     "API_SERVER_DOWN": "API-Server läuft nicht",
     "CONNECTION_ERROR": "Verbindungsfehler",
     "ERROR_NO_DATE_RANGE": "Fehler: Datumsbereich für historische Daten nicht angegeben",

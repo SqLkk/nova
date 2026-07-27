@@ -1,0 +1,35 @@
+# System & OS
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+
+# IDE & Tooling
+.vscode/
+.idea/
+.claude/
+
+# Node dependencies & logs
+node_modules/
+**/node_modules/
+npm-debug.log*
+yarn-debug.log*
+
+# Angular / Frontend build output
+dist/
+**/dist/
+.angular/
+**/.angular/
+tmp/
+out-tsc/
+
+# Python virtual environment & cache
+__pycache__/
+**/__pycache__/
+*.py[cod]
+venv/
+**/venv/
+.env
+
+# Logs
+*.log

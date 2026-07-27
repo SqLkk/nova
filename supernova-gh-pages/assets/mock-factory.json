@@ -1,0 +1,188 @@
+[
+  {
+    "id": "loc_1",
+    "label": "Plant Alpha - Assembly",
+    "depth": 0,
+    "parent": null
+  },
+  {
+    "id": "loc_2",
+    "label": "Plant Beta - Packaging",
+    "depth": 0,
+    "parent": null
+  },
+  {
+    "id": "loc_3",
+    "label": "Plant Gamma - Paint Shop",
+    "depth": 0,
+    "parent": null
+  },
+  {
+    "id": "line_1",
+    "label": "Chassis Assembly Line",
+    "depth": 1,
+    "parent": "loc_1"
+  },
+  {
+    "id": "line_2",
+    "label": "Engine Assembly Line",
+    "depth": 1,
+    "parent": "loc_1"
+  },
+  {
+    "id": "line_3",
+    "label": "Electronics Assembly",
+    "depth": 1,
+    "parent": "loc_1"
+  },
+  {
+    "id": "line_4",
+    "label": "Primary Packaging",
+    "depth": 1,
+    "parent": "loc_2"
+  },
+  {
+    "id": "line_5",
+    "label": "Secondary Packaging",
+    "depth": 1,
+    "parent": "loc_2"
+  },
+  {
+    "id": "line_6",
+    "label": "Base Coat Line",
+    "depth": 1,
+    "parent": "loc_3"
+  },
+  {
+    "id": "line_7",
+    "label": "Clear Coat Line",
+    "depth": 1,
+    "parent": "loc_3"
+  },
+  {
+    "id": "mach_1",
+    "label": "KUKA Robot Arm C1",
+    "depth": 2,
+    "parent": "line_1"
+  },
+  {
+    "id": "mach_2",
+    "label": "KUKA Robot Arm C2",
+    "depth": 2,
+    "parent": "line_1"
+  },
+  {
+    "id": "mach_3",
+    "label": "Conveyor Belt C-Main",
+    "depth": 2,
+    "parent": "line_1"
+  },
+  {
+    "id": "mach_4",
+    "label": "Siemens S7 PLC C1",
+    "depth": 2,
+    "parent": "line_1"
+  },
+  {
+    "id": "mach_5",
+    "label": "CNC Lathe E1",
+    "depth": 2,
+    "parent": "line_2"
+  },
+  {
+    "id": "mach_6",
+    "label": "CNC Lathe E2",
+    "depth": 2,
+    "parent": "line_2"
+  },
+  {
+    "id": "mach_7",
+    "label": "Torque Station E1",
+    "depth": 2,
+    "parent": "line_2"
+  },
+  {
+    "id": "mach_8",
+    "label": "Engine Testing Rig",
+    "depth": 2,
+    "parent": "line_2"
+  },
+  {
+    "id": "mach_9",
+    "label": "Siemens S7 PLC E1",
+    "depth": 2,
+    "parent": "line_2"
+  },
+  {
+    "id": "mach_10",
+    "label": "Pick and Place M1",
+    "depth": 2,
+    "parent": "line_3"
+  },
+  {
+    "id": "mach_11",
+    "label": "Reflow Oven",
+    "depth": 2,
+    "parent": "line_3"
+  },
+  {
+    "id": "mach_12",
+    "label": "Optical Inspection",
+    "depth": 2,
+    "parent": "line_3"
+  },
+  {
+    "id": "mach_13",
+    "label": "Box Erector P1",
+    "depth": 2,
+    "parent": "line_4"
+  },
+  {
+    "id": "mach_14",
+    "label": "Sealing Machine P1",
+    "depth": 2,
+    "parent": "line_4"
+  },
+  {
+    "id": "mach_15",
+    "label": "Palletizer Robot R1",
+    "depth": 2,
+    "parent": "line_5"
+  },
+  {
+    "id": "mach_16",
+    "label": "Stretch Wrapper",
+    "depth": 2,
+    "parent": "line_5"
+  },
+  {
+    "id": "mach_17",
+    "label": "Paint Robot Spray 1",
+    "depth": 2,
+    "parent": "line_6"
+  },
+  {
+    "id": "mach_18",
+    "label": "Paint Robot Spray 2",
+    "depth": 2,
+    "parent": "line_6"
+  },
+  {
+    "id": "mach_19",
+    "label": "Drying Oven 1",
+    "depth": 2,
+    "parent": "line_6"
+  },
+  {
+    "id": "mach_20",
+    "label": "Clear Coat Sprayer",
+    "depth": 2,
+    "parent": "line_7"
+  },
+  {
+    "id": "mach_21",
+    "label": "Drying Oven 2",
+    "depth": 2,
+    "parent": "line_7"
+  }
+]

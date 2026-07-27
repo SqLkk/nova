@@ -754,7 +754,7 @@ export class ReportsComponent implements OnInit, OnDestroy {
   loadUsersList(): void {
     this.adminService.getUsers().subscribe({
       next: (res) => {
-        this.usersList = res?.users || [];
+        this.usersList = res || [];
         this.cdr.detectChanges();
       },
       error: (err) => {

@@ -48,12 +48,13 @@ def verify_password(password: str, salt: str, expected_hash: str) -> bool:
     return hmac.compare_digest(actual, expected_hash or "")
 
 
-def create_token(user_id: str, username: str, role: str, ttl: int = _TOKEN_TTL) -> str:
+def create_token(user_id: str, username: str, role: str, level: int = 0, ttl: int = _TOKEN_TTL) -> str:
     now = int(time.time())
     payload = {
         "uid": user_id,
         "u": username,
         "role": role,
+        "level": level,
         "iat": now,
         "exp": now + ttl,
     }

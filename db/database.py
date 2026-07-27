@@ -12,7 +12,96 @@ logger = logging.getLogger(__name__)
 
 _DB_DIR = os.path.dirname(os.path.abspath(__file__))
 _DB_PATH = os.path.join(_DB_DIR, 'supernova_reports.db')
-_SCHEMA_VERSION = 1
+_SCHEMA_VERSION = 2
+
+# ---------------------------------------------------------------------------
+# RBAC: rol seviyeleri + izin kataloğu + varsayılan rol izinleri
+# Bu sabitler hem seed hem de api_server tarafındaki yetki kontrolleri için
+# tek kaynak olarak kullanılır. Frontend (permission-catalog.ts) bunları mirror'lar.
+# ---------------------------------------------------------------------------
+ROLE_LEVELS = {
+    'superuser': 100,
+    'admin': 80,
+    'engineer': 60,
+    'operator': 40,
+    'viewer': 20,
+}
+
+# İzin kataloğu: grup → [(key, label)]. Etiketler ayrıca i18n'de de tanımlıdır;
+# buradaki değer backend/fallback için kullanılır.
+PERMISSION_CATALOG = [
+    {'group': 'pages', 'permissions': [
+        ('page:dashboard', 'Dashboard'),
+        ('page:reports', 'Raporlar'),
+        ('page:network-map', 'Network Map'),
+        ('page:alarms', 'Alarmlar'),
+        ('page:table-explorer', 'Table Explorer'),
+        ('page:template-builder', 'Template Builder'),
+        ('page:query-creator', 'Query Creator'),
+        ('page:python-workspace', 'Python Workspace'),
+        ('page:admin', 'Admin Panel'),
+        ('page:settings', 'Ayarlar'),
+        ('page:profile', 'Profil'),
+    ]},
+    {'group': 'users', 'permissions': [
+        ('user:view', 'Kullanıcıları görüntüle'),
+        ('user:create', 'Kullanıcı oluştur'),
+        ('user:edit', 'Kullanıcı düzenle'),
+        ('user:delete', 'Kullanıcı sil'),
+        ('user:reset-password', 'Şifre sıfırla'),
+        ('user:activate', 'Aktif/pasif yap'),
+    ]},
+    {'group': 'roles', 'permissions': [
+        ('role:view', 'Rolleri görüntüle'),
+        ('role:create', 'Rol oluştur'),
+        ('role:edit', 'Rol düzenle'),
+        ('role:delete', 'Rol sil'),
+    ]},
+    {'group': 'sharing', 'permissions': [
+        ('share:templates', 'Template paylaşımı'),
+        ('share:paths', 'Network-map / path paylaşımı'),
+        ('share:queries', 'Sorgu paylaşımı'),
+        ('share:scripts', 'Python script paylaşımı'),
+    ]},
+    {'group': 'datasources', 'permissions': [
+        ('datasource:view', 'Veri kaynaklarını görüntüle'),
+        ('datasource:manage', 'Veri kaynaklarını yönet'),
+    ]},
+]
+
+ALL_PERMISSION_KEYS = [k for _g in PERMISSION_CATALOG for k, _l in _g['permissions']]
+
+# Varsayılan rol izinleri (seed edilir). superuser ayrıca koda özel olarak
+# tüm izinleri (wildcard) almıştır — kataloğa yeni izin eklendiğinde otomatik.
+DEFAULT_ROLE_PERMISSIONS = {
+    'superuser': list(ALL_PERMISSION_KEYS),
+    'admin': list(ALL_PERMISSION_KEYS),
+    'engineer': [
+        'page:dashboard', 'page:reports', 'page:network-map', 'page:alarms',
+        'page:table-explorer', 'page:template-builder', 'page:query-creator',
+        'page:python-workspace', 'page:settings', 'page:profile',
+        'share:templates', 'share:paths', 'share:queries', 'share:scripts',
+        'datasource:view',
+    ],
+    'operator': [
+        'page:dashboard', 'page:reports', 'page:alarms', 'page:table-explorer',
+        'page:settings', 'page:profile', 'datasource:view',
+    ],
+    'viewer': [
+        'page:dashboard', 'page:reports', 'page:alarms', 'page:profile',
+    ],
+}
+
+
+def _reset_demo_passwords() -> bool:
+    """Demo parolalarının her restart'ta sıfırlanıp sıfırlanmayacağı.
+    config.RESET_DEMO_PASSWORDS yoksa ortam değişkenine, o da yoksa True'ya düşer."""
+    try:
+        from config import config  # type: ignore
+        return bool(getattr(config, 'RESET_DEMO_PASSWORDS', True))
+    except Exception:
+        return os.environ.get('NOVA_RESET_DEMO_PASSWORDS', '1') != '0'
+
 
 _CREATE_TABLES = """
 CREATE TABLE IF NOT EXISTS users (
@@ -22,10 +111,37 @@ CREATE TABLE IF NOT EXISTS users (
     email         TEXT NOT NULL DEFAULT '',
     password_hash TEXT NOT NULL DEFAULT '',
     password_salt TEXT NOT NULL DEFAULT '',
-    role          TEXT NOT NULL DEFAULT 'viewer',
+    role          TEXT NOT NULL DEFAULT 'viewer',   -- legacy string (token payload); role_id asıl kaynak
+    role_id       TEXT DEFAULT '',                  -- FK → roles(id)
     is_active     INTEGER NOT NULL DEFAULT 1,
     created_at    TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS roles (
+    id          TEXT PRIMARY KEY,
+    key         TEXT NOT NULL UNIQUE,
+    name        TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    level       INTEGER NOT NULL DEFAULT 0,          -- hiyerarşi sırası (yüksek = daha yetkili)
+    is_system   INTEGER NOT NULL DEFAULT 0,          -- 1 = yerleşik rol (key/level kilitli, silinemez)
+    is_active   INTEGER NOT NULL DEFAULT 1,
+    color       TEXT NOT NULL DEFAULT '',
+    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS role_permissions (
+    role_id        TEXT NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
+    permission_key TEXT NOT NULL,
+    PRIMARY KEY (role_id, permission_key)
+);
+
+CREATE TABLE IF NOT EXISTS user_permissions (
+    user_id        TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    permission_key TEXT NOT NULL,
+    granted        INTEGER NOT NULL DEFAULT 1,        -- 1 = izin ver (override), 0 = reddet
+    PRIMARY KEY (user_id, permission_key)
 );
 
 CREATE TABLE IF NOT EXISTS dashboards (
@@ -97,6 +213,8 @@ CREATE TABLE IF NOT EXISTS report_templates (
     description     TEXT NOT NULL DEFAULT '',
     model           TEXT NOT NULL DEFAULT '{}',  -- TemplateDocument JSON
     owner_id        TEXT DEFAULT '',
+    allowed_roles   TEXT DEFAULT '[]',           -- ACL: hangi roller görebilir
+    allowed_users   TEXT DEFAULT '[]',           -- ACL: hangi kullanıcılar görebilir
     version         INTEGER NOT NULL DEFAULT 1,
     is_active       INTEGER NOT NULL DEFAULT 1,
     created_at      TEXT NOT NULL DEFAULT (datetime('now')),
@@ -177,16 +295,25 @@ class Database:
     def _init_db(self):
         with self._lock, self._conn() as conn:
             conn.executescript(_CREATE_TABLES)
-            try:
-                conn.execute("ALTER TABLE data_sources ADD COLUMN cached_tables TEXT DEFAULT ''")
-            except sqlite3.OperationalError:
-                pass
+            # --- Şema genişletmeleri (idempotent; mevcut DB'ler için) ---
+            for stmt in (
+                "ALTER TABLE data_sources ADD COLUMN cached_tables TEXT DEFAULT ''",
+                "ALTER TABLE users ADD COLUMN role_id TEXT DEFAULT ''",
+                "ALTER TABLE report_templates ADD COLUMN allowed_roles TEXT DEFAULT '[]'",
+                "ALTER TABLE report_templates ADD COLUMN allowed_users TEXT DEFAULT '[]'",
+            ):
+                try:
+                    conn.execute(stmt)
+                except sqlite3.OperationalError:
+                    pass
             count = conn.execute('SELECT COUNT(*) as c FROM users').fetchone()['c']
             if count == 0:
                 self._seed_demo_data(conn)
             # Demo varlıklar her zaman idempotent olarak güvence altına (mevcut
             # DB'lerde de şema genişlemesinden sonra oluşsun).
             self._ensure_demo_assets(conn)
+            # RBAC: rolleri + izinleri seed et, mevcut kullanıcıların role_id'sini backfill et.
+            self._seed_rbac(conn)
 
     def _seed_demo_data(self, conn):
         now = datetime.now().isoformat()
@@ -200,28 +327,38 @@ class Database:
     def _ensure_demo_assets(self, conn):
         """Template Builder için demo veri kaynağı + sorgu + şablon (idempotent)."""
         now = datetime.now().isoformat()
+        reset_pwd = _reset_demo_passwords()
 
         # Demo kullanıcılar — login ekranında gösterilen kimlik bilgileriyle.
-        # ON CONFLICT → restart'ta demo parolaları hep taze tutar (gerçek
-        # kullanıcılar dokunulmaz). Gerçek üretimde bu blok kaldırılmalı.
+        # reset_pwd=True (varsayılan) → restart'ta demo parolaları/rolleri taze
+        # tutar (eski davranış). False → sadece yoksa oluşturur; yöneticinin
+        # admin panelinden ayarladığı parolalar korunur.
         demo_users = [
             ('u_developer', 'developer', 'Geliştirici (Superuser)', 'developer@supernovacorp.com', 'superuser', 'Sp7_Super#4302'),
             ('u_admin',     'admin',     'System Admin',            'admin@supernovacorp.com',     'admin',     'Sp7_Admin#9841'),
             ('u_utku',      'utku',      'Geliştirici',             'utku@supernovacorp.com',      'superuser', 'Sp7_Super#4302'),
-            ('u_operator',  'operator',  'System Operator',         'operator@supernovacorp.com',  'user',      'Sp7_Operator#1520'),
+            ('u_operator',  'operator',  'System Operator',         'operator@supernovacorp.com',  'operator',  'Sp7_Operator#1520'),
             ('u_viewer',    'viewer',    'Viewer',                  'viewer@supernovacorp.com',    'viewer',    'Sp7_Viewer#7611'),
         ]
         for uid, uname, dname, email, role, pwd in demo_users:
             ph, salt = _hash_password(pwd)
-            conn.execute(
-                '''INSERT INTO users (id, username, display_name, email, password_hash, password_salt, role, is_active, created_at, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
-                   ON CONFLICT(username) DO UPDATE SET
-                     password_hash=excluded.password_hash,
-                     password_salt=excluded.password_salt,
-                     role=excluded.role, is_active=1''',
-                (uid, uname, dname, email, ph, salt, role, now, now)
-            )
+            if reset_pwd:
+                conn.execute(
+                    '''INSERT INTO users (id, username, display_name, email, password_hash, password_salt, role, is_active, created_at, updated_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+                       ON CONFLICT(username) DO UPDATE SET
+                         password_hash=excluded.password_hash,
+                         password_salt=excluded.password_salt,
+                         role=excluded.role, is_active=1''',
+                    (uid, uname, dname, email, ph, salt, role, now, now)
+                )
+            else:
+                conn.execute(
+                    '''INSERT OR IGNORE INTO users
+                       (id, username, display_name, email, password_hash, password_salt, role, is_active, created_at, updated_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)''',
+                    (uid, uname, dname, email, ph, salt, role, now, now)
+                )
         # Yerel SQLite kaynağı → uygulama DB'si (repo köküne göre göreceli yol).
         conn.execute(
             '''INSERT OR IGNORE INTO data_sources
@@ -261,6 +398,52 @@ class Database:
              json.dumps({'group_col': 'Role', 'label_col': 'Display Name'}, ensure_ascii=False),
              now, now)
         )
+
+    def _seed_rbac(self, conn):
+        """Rolleri + varsayılan izinleri seed eder, mevcut kullanıcıların role_id'sini
+        backfill eder. İdempotent — her açılışta güvenle çalışır; admin düzenlemelerini
+        (izin ekleme/çıkarma, özel rol) korur."""
+        now = datetime.now().isoformat()
+        role_defs = [
+            # id, key, name, description, level, is_system, color
+            ('r_super',    'superuser', 'Superuser', 'Tam yetkili sistem yöneticisi.', 100, 1, '#F5B301'),
+            ('r_admin',    'admin',     'Admin',     'Yönetici.', 80, 1, '#FF7A1A'),
+            ('r_engineer', 'engineer',  'Engineer',  'Mühendis — sorgu/path/python.', 60, 1, '#7C8DB5'),
+            ('r_operator', 'operator',  'Operator',  'Operatör — operasyonel kullanım.', 40, 1, '#34D399'),
+            ('r_viewer',   'viewer',    'Viewer',    'Salt okuma (silinemez taban rol).', 20, 1, '#A39A89'),
+        ]
+        for rid, key, name, desc, level, is_system, color in role_defs:
+            conn.execute(
+                '''INSERT OR IGNORE INTO roles
+                   (id, key, name, description, level, is_system, is_active, color, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)''',
+                (rid, key, name, desc, level, is_system, color, now, now))
+        # Varsayılan izinleri seed et (INSERT OR IGNORE — admin düzenlemesi korunur).
+        for role_key, perms in DEFAULT_ROLE_PERMISSIONS.items():
+            rid_row = conn.execute('SELECT id FROM roles WHERE key=?', (role_key,)).fetchone()
+            if not rid_row:
+                continue
+            for p in perms:
+                conn.execute(
+                    'INSERT OR IGNORE INTO role_permissions (role_id, permission_key) VALUES (?, ?)',
+                    (rid_row['id'], p))
+        # Mevcut kullanıcıların role_id'sini legacy role string'inden backfill et.
+        conn.execute('''
+            UPDATE users SET role_id = CASE
+                WHEN role='superuser' THEN (SELECT id FROM roles WHERE key='superuser')
+                WHEN role='admin'     THEN (SELECT id FROM roles WHERE key='admin')
+                WHEN role='engineer'  THEN (SELECT id FROM roles WHERE key='engineer')
+                WHEN role IN ('user','operator') THEN (SELECT id FROM roles WHERE key='operator')
+                WHEN role='viewer'    THEN (SELECT id FROM roles WHERE key='viewer')
+                ELSE (SELECT id FROM roles WHERE key='viewer')
+            END
+            WHERE role_id IS NULL OR role_id = ''
+        ''')
+        # role string'ini role_id'den kanonik key'e normalize et (tutarlılık).
+        conn.execute('''
+            UPDATE users SET role = (SELECT key FROM roles WHERE id = users.role_id)
+            WHERE role_id IS NOT NULL AND role_id != ''
+        ''')
 
     @staticmethod
     def _demo_template_model():

@@ -20,6 +20,12 @@ class Config:
     # eski davranış (kalıcı saklama) geri döner.
     PERSIST_QUERY_COLUMNS_META = False
 
+    # Demo kullanıcı parolalarının her backend restart'ında sıfırlanıp
+    # sıfırlanmayacağı. True (varsayılan, eski davranış) → demo kimlik bilgileri
+    # hep taze kalır (geliştirme/login ekranı için). False → admin panelinden
+    # ayarlanan parolalar korunur (üretim/gerçek kullanım).
+    RESET_DEMO_PASSWORDS = True
+
     @staticmethod
     def get_db_config(name):
         return {"primary": {}, "standby": {}}

@@ -75,8 +75,8 @@ export class PathDefinerComponent implements OnInit, OnChanges {
   ) {}
 
   ngOnInit(): void {
-    const role = this.auth.getCurrentUser()?.role;
-    this.canDefine = role === 'admin' || role === 'superuser' || role === 'engineer';
+    // Hiyerarşi tabanlı: engineer (60) ve üzeri path tanımlayabilir.
+    this.canDefine = this.auth.hasRole('engineer');
     this.loadPaths();
     this.loadQueries();
   }

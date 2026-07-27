@@ -130,7 +130,7 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
   // ===========================================================================
 
   ngOnInit(): void {
-    this.canManage = this.auth.hasRole('engineer') || this.auth.hasRole('admin') || this.auth.hasRole('superuser');
+    this.canManage = this.auth.hasRole('engineer');
     this.dss.load();
 
     this.subs.push(
