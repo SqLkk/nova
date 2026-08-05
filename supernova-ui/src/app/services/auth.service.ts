@@ -33,6 +33,7 @@ export interface LoginResponse {
   success: boolean;
   user?: User;
   token?: string;
+  refreshToken?: string;
   message?: string;
 }
 
@@ -54,6 +55,7 @@ export class AuthService {
 
   private apiUrl = environment.apiUrl || 'http://localhost:5000/api';
   private tokenKey = 'auth_token';
+  private refreshTokenKey = 'refresh_token';
   private userKey = 'current_user';
 
   constructor(
@@ -126,6 +128,9 @@ export class AuthService {
         if (response.success && response.user && response.token) {
           // Token ve kullanıcı bilgilerini sakla
           localStorage.setItem(this.tokenKey, response.token);
+          if (response.refreshToken) {
+            localStorage.setItem(this.refreshTokenKey, response.refreshToken);
+          }
           localStorage.setItem(this.userKey, JSON.stringify(response.user));
 
           // BehaviorSubject'i güncelle
@@ -156,8 +161,16 @@ export class AuthService {
    * Logout işlemi
    */
   logout(): void {
+    // Best-effort: sunucudaki refresh token'ı iptal et (yanıt beklenmez).
+    const refreshToken = this.getRefreshToken();
+    if (refreshToken) {
+      this.http.post(`${this.apiUrl}/auth/logout`, { refreshToken }).subscribe({
+        error: () => { /* oturum zaten kapanıyor */ }
+      });
+    }
     // LocalStorage'ı temizle
     localStorage.removeItem(this.tokenKey);
+    localStorage.removeItem(this.refreshTokenKey);
     localStorage.removeItem(this.userKey);
 
     // BehaviorSubject'i sıfırla
@@ -318,6 +331,13 @@ export class AuthService {
    */
   getToken(): string | null {
     return localStorage.getItem(this.tokenKey);
+  }
+
+  /**
+   * Refresh token'ı getir (erişim token'ı dolduğunda yenileme için).
+   */
+  getRefreshToken(): string | null {
+    return localStorage.getItem(this.refreshTokenKey);
   }
 
   /**
