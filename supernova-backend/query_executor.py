@@ -18,6 +18,7 @@ import re
 import time
 import logging
 import sqlite3
+import sqlparse
 from typing import Any, Dict, List, Tuple
 
 logger = logging.getLogger(__name__)
@@ -29,13 +30,15 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_LIMIT = 1000
 MAX_LIMIT = 50000
 
-# Salt-okunur guard: bu anahtar kelimelerden biri geçen sorgular reddedilir.
-# (Yorum/sabit içinde yanıltma olabilir; bu yüzden birincil savunma bağlantı
-# izinleri olmalıdır — burası ikincil önlem.)
+# Salt-okunur guard. BİRİNCİL savunma sqlparse ile deyim sınıflandırmasıdır
+# (yorum/dize soyulur, çoklu deyim reddedilir, yalnızca SELECT/WITH'e izin verilir).
+# _WRITER_RE ikincil (defense-in-depth) önlemdir.
 _WRITER_RE = re.compile(
     r"\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|TRUNCATE|MERGE|GRANT|REVOKE|REPLACE|ATTACH|DETACH|PRAGMA)\b",
     re.IGNORECASE,
 )
+# İzin verilen okuma deyim başlangıçları (sqlparse ilk anahtar kelimesi).
+_READONLY_STMT_STARTS = {"SELECT", "WITH"}
 
 
 class QueryExecutionError(Exception):
@@ -49,10 +52,43 @@ def _resolve_sqlite_path(database_name: str) -> str:
 
 
 def _guard_readonly(sql: str) -> None:
-    if _WRITER_RE.search(sql):
-        raise QueryExecutionError(
-            "Only read queries are allowed (INSERT/UPDATE/DELETE/... are forbidden)."
-        )
+    """Salt-okunur zorunluğu.
+
+    Yorumlar soyulur (anahtar kelime gizleme: ``/* INSERT */``), çoklu (stacked)
+    deyimler reddedilir ve yalnızca SELECT/WITH başlayan tek deyime izin verilir.
+    ``_WRITER_RE`` ikincil bir savunma olarak soyulmuş metinde tekrar denetlenir.
+    Bağlantı izinleri her zaman birincil yetki kaynağıdır; burası defense-in-depth.
+    """
+    if not sql or not sql.strip():
+        raise QueryExecutionError("Boş sorgu.")
+
+    stripped = sqlparse.format(sql, strip_comments=True)
+    statements = [s for s in sqlparse.split(stripped) if s.strip()]
+    if not statements:
+        raise QueryExecutionError("Boş sorgu.")
+    if len(statements) > 1:
+        # Stacked query (";"): ikinci deyim yazıcı olabilir.
+        raise QueryExecutionError("Yalnızca tek bir okuma deyimine izin verilir.")
+
+    # İlk anlamlı anahtar kelimeyi bul (CTE: WITH, normal: SELECT).
+    stmt = sqlparse.parse(statements[0])[0]
+    first_kw = None
+    for tok in stmt.flatten():
+        if tok.ttype is not None and tok.ttype in sqlparse.tokens.Keyword:
+            first_kw = tok.value.upper()
+            break
+    if first_kw not in _READONLY_STMT_STARTS:
+        raise QueryExecutionError("Yalnızca okuma sorgularına (SELECT / WITH) izin verilir.")
+
+    # İkincil savunma (defense-in-depth): deyim içinde hiçbir anahtar-kelime
+    # token'ı yazıcı fiil içermemeli. Ham metin yerine token'larda denetlenir →
+    # dize/alias içindeki 'update' gibi kelimeler false-positive vermez.
+    for tok in stmt.flatten():
+        if tok.ttype is not None and tok.ttype in sqlparse.tokens.Keyword \
+                and _WRITER_RE.search(tok.value):
+            raise QueryExecutionError(
+                "Yalnızca okuma sorgularına izin verilir (yazıcı anahtar kelime tespit edildi)."
+            )
 
 
 def _open_sqlite(ds: Dict[str, Any]) -> sqlite3.Connection:
