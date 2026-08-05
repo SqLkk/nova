@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { switchMap } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
 import { TemplateDocument } from '../models/template-document.model';
 import { ApiEnvelope } from './query.service';
@@ -10,7 +11,14 @@ export interface TemplateSummary {
   id: string;
   name: string;
   description?: string;
+  /** Backend `GET /api/templates` yanıtı `owner` (sahip uid) döner. */
+  owner?: string;
+  /** Eski alan adı — geri uyumluluk için tutuldu. */
   owner_id?: string;
+  /** ACL: şablonu görebilen roller. */
+  allowedRoles?: string[];
+  /** ACL: şablonu görebilen kullanıcılar (username veya uid). */
+  allowedUsers?: string[];
   version?: number;
   is_active?: boolean;
   created_at?: string;
@@ -51,6 +59,26 @@ export class TemplateBuilderService {
 
   remove(id: string): Observable<ApiEnvelope<boolean>> {
     return this.http.delete<ApiEnvelope<boolean>>(`${this.base}/${id}`);
+  }
+
+  /**
+   * Görünürlük / ACL güncelle → `PUT /api/templates/<id>/sharing`.
+   * İzin: sahip VEYA admin/superuser VEYA `share:templates`.
+   * (admin sharing endpoint'inden farkı: sahip de kendi şablonunu paylaşabilir.)
+   */
+  updateSharing(id: string, allowedRoles: string[], allowedUsers: string[]): Observable<ApiEnvelope<boolean>> {
+    return this.http.put<ApiEnvelope<boolean>>(`${this.base}/${id}/sharing`, { allowedRoles, allowedUsers });
+  }
+
+  /** Şablonu kopyala: modeli çek, id'siz yeni kayıt olarak kaydet. */
+  duplicate(id: string, newName: string): Observable<ApiEnvelope<{ id: string; name: string }>> {
+    return this.get(id).pipe(
+      switchMap((res) => {
+        const model: TemplateDocument = res.data.model;
+        if (model) { model.id = ''; }
+        return this.create(newName, model, res.data.description || '');
+      })
+    );
   }
 
   /** Şablonu çalıştır → .xlsx blob (component indirmeyi tetikler). */

@@ -1,5 +1,5 @@
 import { Component, OnInit, HostListener } from '@angular/core';
-import { Router } from '@angular/router';
+import { Router, ActivatedRoute } from '@angular/router';
 import { DomSanitizer, SafeStyle } from '@angular/platform-browser';
 import { QueryService } from '../../services/query.service';
 import { TemplateBuilderService, TemplateSummary } from '../../services/template-builder.service';
@@ -80,6 +80,7 @@ export class TemplateBuilderComponent implements OnInit {
 
   constructor(
     private router: Router,
+    private route: ActivatedRoute,
     private queryService: QueryService,
     private templateService: TemplateBuilderService,
     private sanitizer: DomSanitizer,
@@ -91,13 +92,24 @@ export class TemplateBuilderComponent implements OnInit {
     this.loadTemplates();
     this.loadPythonScripts();
     this.ensureCell(this.selected.row, this.selected.col);
+
+    // Reports hub'undan "Edit" ile doğrudan açılış: /template-builder/:id
+    const routeId = this.route.snapshot.paramMap.get('id');
+    if (routeId) {
+      this.openById(routeId);
+    }
   }
 
   // ---- Yükleyiciler ----
 
   loadQueries(): void {
     this.queryService.list().subscribe({
-      next: (res) => (this.queries = res.data || []),
+      next: (res) => {
+        this.queries = res.data || [];
+        // Editör modda, modeldeki ilk bağlı sorgu henüz aktif edilmediyse şimdi dene
+        // (route :id ile açılışta query listesi sonra yüklenmiş olabilir).
+        if (this.mode === 'editor' && !this.activeSource) this.activateFirstBoundQuery();
+      },
       error: () => (this.queries = []),
     });
     this.queryService.listDatasources().subscribe({
@@ -146,16 +158,69 @@ export class TemplateBuilderComponent implements OnInit {
   open(t: TemplateSummary): void {
     this.templateService.get(t.id).subscribe({
       next: (res) => {
-        this.doc = res.data.model;
-        if (!this.doc.sheets?.length) this.doc.sheets = [createEmptySheet('Sheet1')];
-        this.sheetIndex = 0;
-        this.activeSource = null;
-        this.ensureCell(1, 1);
-        this.mode = 'editor';
-        this.notify(`"${t.name}" loaded.`);
+        this.applyLoadedDoc(res.data.model, res.data.name || t.name);
       },
       error: () => this.notify('Could not load template.'),
     });
+  }
+
+  /**
+   * Reports hub'undan "Edit" (/template-builder/:id) ile doğrudan açılış.
+   * Mevcut open() ile aynı efekti üretir; açılışta "queries hazır" için
+   * modeldeki ilk bağlı SQL sorgusunu da aktif eder.
+   */
+  openById(id: string): void {
+    this.templateService.get(id).subscribe({
+      next: (res) => {
+        this.applyLoadedDoc(res.data.model, res.data.name || 'Template');
+        if (this.queries.length) this.activateFirstBoundQuery();
+      },
+      error: () => this.notify('Could not load template.'),
+    });
+  }
+
+  /** Yüklenen modeli editöre uygular (open/openById ortak yolu). */
+  private applyLoadedDoc(model: TemplateDocument, name: string): void {
+    this.doc = model;
+    if (!this.doc.sheets?.length) this.doc.sheets = [createEmptySheet('Sheet1')];
+    this.sheetIndex = 0;
+    this.activeSource = null;
+    this.ensureCell(1, 1);
+    this.mode = 'editor';
+    this.notify(`"${name}" loaded.`);
+  }
+
+  /**
+   * "Queries hazır": modelde başvurulan ilk bağlı SQL sorgusunu aktif kaynağa
+   * bağlar → sağdaki Fields paneli hemen dolar, kullanıcı anında üretebilir.
+   * py: başvuruları (Python dataset) atlanır.
+   */
+  activateFirstBoundQuery(): void {
+    if (this.activeSource) return;
+    const qid = this.firstBoundSqlQueryId();
+    if (!qid) return;
+    const q = this.queries.find((x) => x.id === qid);
+    if (q) this.selectQuery(q);
+  }
+
+  /** Model genelinde başvurulan ilk SQL sorgu id'si (py: hariç). */
+  private firstBoundSqlQueryId(): string | null {
+    for (const sheet of this.doc.sheets) {
+      for (const cell of Object.values(sheet.cells || {})) {
+        const b = cell.binding;
+        if (b && (b.kind === 'query_field' || b.kind === 'summary')
+          && b.queryId && !b.queryId.startsWith('py:')) {
+          return b.queryId;
+        }
+      }
+      for (const band of sheet.bands || []) {
+        if (band.queryId && !band.queryId.startsWith('py:')) return band.queryId;
+      }
+      for (const chart of sheet.charts || []) {
+        if (chart.queryId && !chart.queryId.startsWith('py:')) return chart.queryId;
+      }
+    }
+    return null;
   }
 
   duplicateTemplate(t: TemplateSummary, ev: Event): void {
