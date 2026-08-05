@@ -4,17 +4,21 @@ import json
 import uuid
 import logging
 import re
+import shutil
 import subprocess
 import tempfile
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from io import BytesIO
 
 from flask import Flask, jsonify, request, send_file, g
+from werkzeug.middleware.proxy_fix import ProxyFix
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 _DM_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(_DM_DIR, '..'))
 
-from db.database import get_db, ROLE_LEVELS, ALL_PERMISSION_KEYS, PERMISSION_CATALOG, _hash_password
+from db.database import get_db, ROLE_LEVELS, ALL_PERMISSION_KEYS, PERMISSION_CATALOG
 from query_executor import (
     execute_query, test_connection, get_tables, get_table_schema, get_table_preview,
     search_columns_in_db, check_relationship, get_functions,
@@ -23,33 +27,68 @@ from query_executor import (
 from excel_template_engine import ExcelTemplateEngine
 from path_engine import build_structure
 import auth as auth_lib
+import passwords
+import secrets_util
 from cache import metadata_cache
 from config import config
 
 app = Flask(__name__)
+# Flask/oturum imzası config'ten (NOVA_FLASK_SECRET). Hardcoded DEĞİL.
+app.secret_key = config.FLASK_SECRET_KEY
+# İstek gövdesi boyut sınırı (DoS koruması): 10 MiB.
+app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024
+# Üretimde debugger/traceback sızıntısı kapalı (yalnızca DEBUG=True iken propagate).
+app.config['PROPAGATE_EXCEPTIONS'] = config.DEBUG
+# Reverse proxy (nginx) arkasında gerçek IP/şema/host güveni.
+app.wsgi_app = ProxyFix(
+    app.wsgi_app,
+    x_for=config.TRUSTED_PROXY_HOPS, x_proto=1, x_host=1, x_prefix=1)
+# Rate limiting / kaba kuvvet tabanı (NIS2 Art.21(1)(c); ISO/IEC 27002:2022 A.8.5).
+# Gerçek istemci IP'si ProxyFix tarafından request.remote_addr'a yazılır.
+# memory:// (dev) worker başına ayrı sayar; üretimde paylaşımlı redis:// zorunlu.
+limiter = Limiter(
+    key_func=get_remote_address,
+    app=app,
+    default_limits=[f"{config.RATELIMIT_GLOBAL_PER_MIN} per minute"],
+    storage_uri=config.RATELIMIT_STORAGE_URI,
+    headers_enabled=True,
+)
 _engine = ExcelTemplateEngine()
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Token gerektirmeyen (herkese açık) yollar.
-PUBLIC_PATHS = {'/health', '/api/auth/login'}
+# Token gerektirmeyen (herkese açık) yollar. (refresh/logout kendi içinde
+# refresh token'ı doğrular; erişim token'ı gerekmez.)
+PUBLIC_PATHS = {'/health', '/api/auth/login', '/api/auth/refresh', '/api/auth/logout'}
 
-# CORS: sadece bilinen frontend kökenlerine izin ver (önceden '*' idi).
-_ALLOWED_ORIGINS = {
-    'http://localhost:4201', 'http://127.0.0.1:4201',
-    'http://localhost:4200', 'http://127.0.0.1:4200',
-}
+# CORS allowlist config'ten (NOVA_CORS_ORIGINS). Joker ('*') güvenlik açısından reddedilir.
+_ALLOWED_ORIGINS = {o for o in config.CORS_ALLOWED_ORIGINS if o and o != '*'}
 
 
 @app.after_request
-def _add_cors(response):
+def _after_request(response):
+    # --- CORS (allowlist; joker reddedilir) ---
     origin = request.headers.get('Origin')
     if origin in _ALLOWED_ORIGINS:
         response.headers['Access-Control-Allow-Origin'] = origin
         response.headers['Vary'] = 'Origin'
     response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
     response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+
+    # --- Güvenlik başlıkları (NIS2 Art.21(1)(b); ISO/IEC 27002:2022 A.8.23) ---
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    response.headers['Cross-Origin-Opener-Policy'] = 'same-origin'
+    # API yanıtları (token/rapor içerebilir) ara önbelleğe alınmasın.
+    response.headers['Cache-Control'] = 'no-store'
+    response.headers['Pragma'] = 'no-cache'
+    # HSTS yalnızca TLS arkasında ve config açıkken gönderilir (plain HTTP'de
+    # asla — ilk ziyarette downgrade tuzağına yol açar).
+    if config.HSTS_ENABLED and request.is_secure:
+        response.headers['Strict-Transport-Security'] = (
+            f'max-age={config.HSTS_MAX_AGE}; includeSubDomains')
     return response
 
 
@@ -107,11 +146,20 @@ def _new_id(prefix: str) -> str:
 
 
 def _full_data_source(ds_id: str):
-    """data_sources tam satırını (credential dahil, sadece backend içi) döndürür."""
+    """data_sources tam satırını (credential dahil, sadece backend içi) döndürür.
+
+    Güvenlik: parola at-rest şifreli saklanır (secrets_util); burada çözülüp
+    yalnızca backend içi kullanıma (sorgu çalıştırma) sunulur. İstemciye ASLA
+    döndürülmez.
+    """
     db = get_db()
     with db._conn() as conn:
         row = conn.execute('SELECT * FROM data_sources WHERE id = ?', (ds_id,)).fetchone()
-    return dict(row) if row else None
+    if not row:
+        return None
+    d = dict(row)
+    d['password'] = secrets_util.decrypt_secret(d.get('password') or '')
+    return d
 
 
 def _load_query_row(qid: str):
@@ -308,6 +356,44 @@ def _err(message: str, status: int = 400, **extra):
     return jsonify(payload), status
 
 
+def _audit(action: str, target: str = '', detail=None, status: str = 'success',
+           actor_uid: str = '', actor_user: str = '', conn=None):
+    """Güvenlik olayını denetim (audit) loguna yazar.
+
+    Best-effort: asla hata fırlatmaz (denetim, istek akışını bozmamalı). Aktör
+    verilmezse g (kimliği doğrulanmış kullanıcı) kullanılır; login gibi g'nin
+    boş olduğu uçlarda aktör açıkça verilmelidir.
+
+    conn verilirse mevcut (muhtemelen açık) transaction içinde yazar — ikinci bir
+    bağlantı açıp SQLite tek-yazıcı kilidinde (database is locked) çıkmaza
+    düşmemek için. login/refresh gibi auth olayları açık transaction içinde
+    çağrıldığından bunu kullanır (aksi halde denetim kaydı sessizce yazılamaz).
+    """
+    try:
+        d = json.dumps(detail, ensure_ascii=False, default=str) if detail is not None else ''
+        uid = actor_uid or getattr(g, 'uid', '') or ''
+        uname = actor_user or getattr(g, 'username', '') or ''
+        ip = getattr(request, 'remote_addr', '') or ''
+        stmt = ("INSERT INTO audit_log (actor_uid, actor_user, action, target, detail, ip, status) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)")
+        params = (uid, uname, action, target, d, ip, status)
+        if conn is not None:
+            conn.execute(stmt, params)
+        else:
+            db = get_db()
+            with db._conn() as c:
+                c.execute(stmt, params)
+    except Exception:
+        logger.warning("Denetim kaydı yazılamadı (%s).", action)
+
+
+def _prune_audit(conn) -> None:
+    """Saklama süresi (AUDIT_LOG_RETENTION_DAYS) dışındaki denetim kayıtlarını siler."""
+    days = int(getattr(config, 'AUDIT_LOG_RETENTION_DAYS', 0) or 0)
+    if days > 0:
+        conn.execute("DELETE FROM audit_log WHERE ts < datetime('now', ?)", (f"-{days} days",))
+
+
 # ---------------------------------------------------------------------------
 # Kimlik doğrulama (login / profil / izinler)
 # ---------------------------------------------------------------------------
@@ -335,6 +421,7 @@ def _user_public_dict(row) -> dict:
 
 
 @app.route('/api/auth/login', methods=['POST'])
+@limiter.limit(lambda: f"{config.RATELIMIT_LOGIN_PER_MIN} per minute")
 def login():
     data = request.get_json(silent=True) or {}
     username = (data.get('username') or '').strip()
@@ -343,26 +430,170 @@ def login():
         return _err('Username and password are required.', 400)
 
     db = get_db()
+    # naive UTC (SQLite datetime('now') ile aynı zaman dilimi/format); strptime ile uyumlu.
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now_utc = now.strftime('%Y-%m-%d %H:%M:%S')  # SQLite datetime('now') ile aynı UTC formatı
     with db._conn() as conn:
         row = conn.execute(
             'SELECT u.id, u.username, u.display_name, u.email, u.role, u.role_id, '
             'u.password_hash, u.password_salt, u.is_active, '
+            'u.failed_login_attempts, u.last_failed_at, u.locked_until, '
             'r.level, r.key AS role_key, r.name AS role_name '
             'FROM users u LEFT JOIN roles r ON r.id = u.role_id WHERE u.username = ?', (username,)
         ).fetchone()
+        _prune_audit(conn)  # dönemsel denetim budaması (login başına bir kez)
 
-    # Kullanıcı adı / şifre hatalarını aynı mesajla döndür (user enumeration koruması).
-    if not row or not row['is_active'] or not row['password_hash']:
-        return _err('Invalid username or password.', 401)
-    if not auth_lib.verify_password(password, row['password_salt'], row['password_hash']):
-        return _err('Invalid username or password.', 401)
+        # Kaba kuvvet kilidi (Faz 5b): pencere dolana kadar giriş reddet.
+        if row and row['is_active'] and row['locked_until'] and row['locked_until'] > now_utc:
+            logger.warning("Kilitli hesaba giriş denemesi (uid=%s, kilit=%s).",
+                           row['id'], row['locked_until'])
+            _audit('auth.login', target=row['username'], status='deny',
+                   actor_uid=row['id'], actor_user=row['username'],
+                   detail={'locked_until': row['locked_until']}, conn=conn)
+            return _err('Hesap geçici olarak kilitli. Lütfen daha sonra tekrar deneyin.', 429)
 
-    token = auth_lib.create_token(row['id'], row['username'], row['role'], row['level'] or 0)
+        # Kullanıcı adı / şifre hatalarını aynı mesajla döndür (user enumeration koruması).
+        if not row or not row['is_active'] or not row['password_hash']:
+            _audit('auth.login', target=username, status='fail', actor_user=username, conn=conn)
+            return _err('Invalid username or password.', 401)
+
+        ok, needs_rehash = passwords.verify(password, row['password_salt'], row['password_hash'])
+        if not ok:
+            # Başarısız deneme: pencere dışıysa sayacı sıfırla, sonra artır.
+            attempts = int(row['failed_login_attempts'] or 0)
+            last = row['last_failed_at'] or ''
+            if last:
+                try:
+                    last_dt = datetime.strptime(last, '%Y-%m-%d %H:%M:%S')
+                except ValueError:
+                    last_dt = None
+                if last_dt and (now - last_dt) > timedelta(seconds=int(config.LOGIN_WINDOW_SECONDS)):
+                    attempts = 0
+            attempts += 1
+            if attempts >= int(config.LOGIN_MAX_ATTEMPTS):
+                lockout = int(config.LOGIN_LOCKOUT_SECONDS)
+                conn.execute(
+                    "UPDATE users SET failed_login_attempts=0, last_failed_at='', "
+                    "locked_until=datetime('now', ?), updated_at=datetime('now') WHERE id=?",
+                    (f"+{lockout} seconds", row['id']))
+                logger.warning("Hesap kilitlendi (uid=%s, %s deneme, %ss).",
+                               row['id'], attempts, lockout)
+                _audit('auth.login', target=row['username'], status='lock',
+                       actor_uid=row['id'], actor_user=row['username'], detail={'attempts': attempts}, conn=conn)
+            else:
+                conn.execute(
+                    "UPDATE users SET failed_login_attempts=?, last_failed_at=datetime('now'), "
+                    "updated_at=datetime('now') WHERE id=?",
+                    (attempts, row['id']))
+                _audit('auth.login', target=row['username'], status='fail',
+                       actor_uid=row['id'], actor_user=row['username'], detail={'attempts': attempts}, conn=conn)
+            return _err('Invalid username or password.', 401)
+
+        # Başarılı giriş: sayacı ve kilidi temizle.
+        if int(row['failed_login_attempts'] or 0) or row['locked_until']:
+            conn.execute(
+                "UPDATE users SET failed_login_attempts=0, last_failed_at='', locked_until='', "
+                "updated_at=datetime('now') WHERE id=?",
+                (row['id'],))
+
+        # Kademeli göç: legacy sha256 / eski argon2 parametreleri → güçlü argon2id.
+        if needs_rehash:
+            try:
+                new_hash = passwords.hash_password(password)
+                conn.execute(
+                    "UPDATE users SET password_hash=?, password_salt='', updated_at=datetime('now') WHERE id=?",
+                    (new_hash, row['id']))
+            except Exception:
+                logger.warning("Parola argon2id'ye göç edilemedi (uid=%s).", row['id'])
+
+    # Kısa ömürlü erşim token'ı (stateless) + uzun ömürlü refresh token (DB, rotation).
+    access_token = auth_lib.create_token(row['id'], row['username'], row['role'], row['level'] or 0)
+    refresh_token, refresh_hash = auth_lib.create_refresh_token()
+    try:
+        with db._conn() as conn:
+            conn.execute(
+                "INSERT INTO refresh_tokens (id, user_id, family_id, token_hash, expires_at) "
+                "VALUES (?, ?, ?, ?, datetime('now', ?))",
+                (_new_id('rt_'), row['id'], _new_id('fam_'), refresh_hash,
+                 f"+{int(config.TOKEN_REFRESH_TTL)} seconds"))
+    except Exception:
+        logger.warning("Refresh token kaydedilemedi (uid=%s).", row['id'])
+        refresh_token = ''
+    _audit('auth.login', target=row['username'], status='success',
+           actor_uid=row['id'], actor_user=row['username'])
     return jsonify({
         'success': True,
         'user': _user_public_dict(row),
-        'token': token,
+        'token': access_token,
+        'refreshToken': refresh_token,
     })
+
+
+@app.route('/api/auth/refresh', methods=['POST'])
+@limiter.limit(lambda: f"{config.RATELIMIT_LOGIN_PER_MIN} per minute")
+def refresh_access():
+    """Refresh token ile yeni erişim + refresh çifti döndürür (rotation).
+
+    Yeniden kullanım (iptal edilmiş/döndürülmüş token tekrar sunuldu) → tüm aileyi
+    iptal eder (token theft mitigation). Süresi dolmuş refresh token'lar da temizlenir.
+    """
+    body = request.get_json(silent=True) or {}
+    presented = (body.get('refreshToken') or body.get('refresh_token') or '').strip()
+    if not presented:
+        return _err('Refresh token required.', 400)
+
+    token_hash = auth_lib.hash_refresh_token(presented)
+    now_utc = datetime.now(timezone.utc).replace(tzinfo=None).strftime('%Y-%m-%d %H:%M:%S')
+    db = get_db()
+    with db._conn() as conn:
+        rt = conn.execute(
+            "SELECT id, user_id, family_id, revoked, expires_at FROM refresh_tokens WHERE token_hash=?",
+            (token_hash,)).fetchone()
+
+        # Reuse detection: iptal edilmiş token tekrar sunuldu → aile iptali.
+        if rt and rt['revoked']:
+            conn.execute("UPDATE refresh_tokens SET revoked=1 WHERE family_id=?", (rt['family_id'],))
+            logger.warning("Refresh token yeniden kullanım — aile iptal edildi (family=%s).", rt['family_id'])
+            _audit('auth.refresh', target='reuse', status='deny', actor_uid=rt['user_id'],
+                   detail={'family': rt['family_id']}, conn=conn)
+            return _err('Session invalid.', 401)
+        if not rt or rt['expires_at'] <= now_utc:
+            return _err('Session invalid or expired.', 401)
+
+        u = conn.execute(
+            "SELECT u.id, u.username, u.role, u.is_active, r.level "
+            "FROM users u LEFT JOIN roles r ON r.id = u.role_id WHERE u.id=?",
+            (rt['user_id'],)).fetchone()
+        if not u or not u['is_active']:
+            conn.execute("UPDATE refresh_tokens SET revoked=1 WHERE family_id=?", (rt['family_id'],))
+            return _err('Session invalid.', 401)
+
+        # ROTATION: eski token'ı iptal et, aynı aileden yeni çift üret.
+        new_access = auth_lib.create_token(u['id'], u['username'], u['role'], u['level'] or 0)
+        new_refresh, new_hash = auth_lib.create_refresh_token()
+        new_id = _new_id('rt_')
+        conn.execute("UPDATE refresh_tokens SET revoked=1, replaced_by=? WHERE id=?", (new_id, rt['id']))
+        conn.execute(
+            "INSERT INTO refresh_tokens (id, user_id, family_id, token_hash, expires_at) "
+            "VALUES (?, ?, ?, ?, datetime('now', ?))",
+            (new_id, u['id'], rt['family_id'], new_hash, f"+{int(config.TOKEN_REFRESH_TTL)} seconds"))
+        # Temizlik: süresi dolmuş refresh token'ları sil (tablo büyümesini önle).
+        conn.execute("DELETE FROM refresh_tokens WHERE expires_at < datetime('now')")
+
+    return jsonify({'success': True, 'token': new_access, 'refreshToken': new_refresh})
+
+
+@app.route('/api/auth/logout', methods=['POST'])
+def revoke_session():
+    """Sunulan refresh token'ı iptal eder (yalnızca bu token; diğer cihazlar kalır)."""
+    body = request.get_json(silent=True) or {}
+    presented = (body.get('refreshToken') or body.get('refresh_token') or '').strip()
+    if presented:
+        token_hash = auth_lib.hash_refresh_token(presented)
+        db = get_db()
+        with db._conn() as conn:
+            conn.execute("UPDATE refresh_tokens SET revoked=1 WHERE token_hash=?", (token_hash,))
+    return jsonify({'success': True})
 
 
 @app.route('/api/users/<uid>/profile', methods=['GET'])
@@ -449,6 +680,9 @@ def get_datasources():
 
 @app.route('/api/datasources', methods=['POST'])
 def create_datasource():
+    denied = _require_perm('datasource:manage')
+    if denied:
+        return denied
     try:
         data = request.json or {}
         name = data.get('name', '').strip()
@@ -467,23 +701,28 @@ def create_datasource():
                 (id, name, db_type, host, port, username, password, database_name, is_active, created_at, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
             ''', (
-                ds_id, name, db_type, 
-                data.get('host', ''), 
-                int(data.get('port') or 0), 
-                data.get('username', ''), 
-                data.get('password', ''), 
-                data.get('database_name', ''), 
+                ds_id, name, db_type,
+                data.get('host', ''),
+                int(data.get('port') or 0),
+                data.get('username', ''),
+                # Parola DB'de ASLA düz metin; at-rest Fernet ile şifrelenir (F6).
+                secrets_util.encrypt_secret(data.get('password', '')),
+                data.get('database_name', ''),
                 now, now
             ))
             
+        _audit('datasource.create', target=ds_id, detail={'name': name})
         return jsonify({"success": True, "data": {"id": ds_id, "name": name}})
     except Exception as e:
         logger.exception("Error creating data source")
-        return _err(str(e), 500)
+        return _err("İç sunucu hatası.", 500)
 
 
 @app.route('/api/datasources/test', methods=['POST'])
 def api_test_connection():
+    denied = _require_perm('datasource:manage')
+    if denied:
+        return denied
     try:
         data = request.json or {}
         # Prepare a mock data source dict
@@ -559,7 +798,7 @@ def api_get_tables(ds_id):
                 return jsonify({"success": True, "data": []})
     except Exception as e:
         logger.exception("Error fetching tables")
-        return _err(str(e), 500)
+        return _err("İç sunucu hatası.", 500)
 
 
 @app.route('/api/datasources/<ds_id>/tables/<table_name>', methods=['GET'])
@@ -591,7 +830,7 @@ def api_get_table_preview(ds_id, table_name):
         return _err(str(e), 400)
     except Exception as e:
         logger.exception("Error previewing table")
-        return _err(str(e), 500)
+        return _err("İç sunucu hatası.", 500)
 
 
 def _get_cached_schema(ds: dict, ds_id: str, table_name: str) -> dict:
@@ -617,7 +856,7 @@ def api_get_table_schema(ds_id, table_name):
         return _err(str(e), 400)
     except Exception as e:
         logger.exception("Error fetching schema")
-        return _err(str(e), 500)
+        return _err("İç sunucu hatası.", 500)
 
 
 @app.route('/api/datasources/<ds_id>/search-columns', methods=['GET'])
@@ -633,7 +872,7 @@ def api_search_columns(ds_id):
         return jsonify({"success": True, "data": results})
     except Exception as e:
         logger.exception("Error searching columns")
-        return _err(str(e), 500)
+        return _err("İç sunucu hatası.", 500)
 
 
 @app.route('/api/datasources/<ds_id>/check-relationship', methods=['POST'])
@@ -653,7 +892,7 @@ def api_check_relationship(ds_id):
         return jsonify({"success": True, "data": result})
     except Exception as e:
         logger.exception("Error checking relationship")
-        return _err(str(e), 500)
+        return _err("İç sunucu hatası.", 500)
 
 
 @app.route('/api/datasources/<ds_id>/functions', methods=['GET'])
@@ -666,7 +905,7 @@ def api_get_functions(ds_id):
         return jsonify({"success": True, "data": results})
     except Exception as e:
         logger.exception("Error fetching functions")
-        return _err(str(e), 500)
+        return _err("İç sunucu hatası.", 500)
 
 
 
@@ -767,7 +1006,7 @@ def create_query():
                    VALUES (?, ?, ?, ?, ?, ?, '[]', ?, ?, ?, 1)''',
                 (qid, name, body.get('description', ''), ds_id, body['sql'], params, _user_id(), allowed_roles, allowed_users))
         except Exception as exc:
-            return _err(f"Could not create query: {exc}", 409)
+            return _err("Sorgu oluşturulamadı (isim benzersiz olmalı).", 409)
     return jsonify({"success": True, "data": _query_to_dict(_load_query_row(qid))}), 201
 
 
@@ -882,6 +1121,28 @@ _SANDBOX_ENV = {
     'PYTHONUNBUFFERED': '1',
     'LC_ALL': 'C.UTF-8',
 }
+
+# Opsiyonel OS-kullanıcı izolasyonu (Faz 8, defense-in-depth): yorumlayıcı ayrı
+# düşük-ayrıcalıklı bir kullanıcı altında koşar. AST sandbox'a ek olarak süreç,
+# uygulamanın dosyalarına/anahtarlarına erişemez. Boşsa aynı kullanıcıda koşar.
+_SANDBOX_USER = (config.SANDBOX_USER or '').strip()
+
+
+def _sandbox_argv():
+    """Yorumlayıcı süreç komutunu döndür; SANDBOX_USER tanımlıysa onun altında."""
+    base = [sys.executable, _INTERPRETER_PATH]
+    if not _SANDBOX_USER:
+        return base
+    # runuser (Linux, root'tan) tercih edilir; yoksa sudo -u. İlki yoksa uyar.
+    runuser = shutil.which('runuser')
+    if runuser:
+        return [runuser, '-u', _SANDBOX_USER, '--'] + base
+    sudo = shutil.which('sudo')
+    if sudo:
+        return [sudo, '-u', _SANDBOX_USER] + base
+    logger.warning("NOVA_SANDBOX_USER=%s ayarlı ama runuser/sudo bulunamadı; "
+                   "sandbox aynı kullanıcıda koşuyor.", _SANDBOX_USER)
+    return base
 _INTERPRETER_PATH = os.path.join(_DM_DIR, 'safe_interpreter', 'interpreter.py')
 
 
@@ -895,8 +1156,12 @@ def _run_python_raw(code: str, sql_data: dict, filters: dict):
     payload = json.dumps({'code': code, 'queries_data': sql_data, 'filters': filters})
     try:
         with tempfile.TemporaryDirectory(prefix='nov4_sandbox_') as tmpdir:
+            if _SANDBOX_USER:
+                # Sandbox kullanıcısı chdir yapabilsin diye geçici dizini aç.
+                # Yorumlayıcı dosya yazmaz, bu yüzden 0777 cwd güvenlidir.
+                os.chmod(tmpdir, 0o777)
             result = subprocess.run(
-                [sys.executable, _INTERPRETER_PATH],
+                _sandbox_argv(),
                 input=payload, text=True, capture_output=True,
                 timeout=10.0, cwd=tmpdir, env=_SANDBOX_ENV, close_fds=True,
             )
@@ -1020,7 +1285,7 @@ def create_script():
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)''',
                 (sid, name, body.get('description', ''), body['code'], sql_query_ids, _user_id(), allowed_roles, allowed_users))
         except Exception as exc:
-            return _err(f"Could not create script: {exc}", 409)
+            return _err("Script oluşturulamadı (isim benzersiz olmalı).", 409)
     return jsonify({"success": True, "data": _script_to_dict(_load_script_row(sid))}), 201
 
 @app.route('/api/python/scripts/<sid>', methods=['PUT'])
@@ -1061,6 +1326,46 @@ def delete_script(sid):
     with db._conn() as conn:
         cur = conn.execute('DELETE FROM python_scripts WHERE id=?', (sid,))
     return jsonify({"success": True, "deleted": cur.rowcount > 0})
+
+
+@app.route('/api/python/scripts/<sid>/run', methods=['POST'])
+def run_saved_python_script(sid):
+    """Kayıtlı Python script'ini izole sandbox'ta çalıştır → widget verisi.
+
+    Widget tek bir seri bekler; script birden fazla veri kümesi üretirse ilkini
+    alırız. Savunma derinliği: ad-hoc /python/run ile aynı rol gate'i +
+    nesne-seviyesi ACL (_can_access_query). Satır verisi önbelleğe alınmaz.
+    """
+    if getattr(g, 'role', None) not in ('admin', 'superuser', 'engineer'):
+        return _err("You do not have permission to run Python code.", 403)
+    row = _load_script_row(sid)
+    if not row:
+        return _err("Script not found.", 404)
+    if not _can_access_query(row):
+        return _err("You do not have permission to run this script.", 403)
+    body = request.get_json(silent=True) or {}
+    filters = body.get('params') or body.get('filters') or {}
+    sql_data = _collect_sql_data(json.loads(row.get('sql_query_ids') or '[]'), filters)
+    ok, result = _run_python_raw(row['code'], sql_data, filters)
+    if not ok:
+        return _err(str(result), 422)
+    # result: {'dataset_adı': {'columns': [...], 'rows': [...]}, ...}
+    rows, columns, dataset_name = [], [], ''
+    if isinstance(result, dict) and result:
+        first_key = next(iter(result))
+        first_ds = result[first_key] or {}
+        rows = first_ds.get('rows') or []
+        columns = first_ds.get('columns') or []
+        dataset_name = str(first_key)
+    return jsonify({
+        "success": True,
+        "data": {
+            "rows": rows,
+            "columns": columns,
+            "source": "python",
+            "name": row.get('name') or dataset_name or 'Python Script'
+        }
+    })
 
 
 # ---------------------------------------------------------------------------
@@ -1123,7 +1428,7 @@ def create_template():
                 (tid, name, body.get('description', ''), json.dumps(model, ensure_ascii=False),
                  _user_id(), json.dumps(allowed_roles), json.dumps(allowed_users)))
         except Exception as exc:
-            return _err(f"Could not create template: {exc}", 409)
+            return _err("Template oluşturulamadı (isim benzersiz olmalı).", 409)
     return jsonify({"success": True, "data": {"id": tid, "name": name}}), 201
 
 
@@ -1267,7 +1572,7 @@ def render_template(tid):
         out = _engine.render_from_model(model, query_results)
     except Exception as exc:
         logger.exception("Render error")
-        return _err(f"Render error: {exc}", 500)
+        return _err("Şablon işlenirken hata oluştu.", 500)
 
     download = f"{(row['name'] or 'template').replace(' ', '_')}.xlsx"
     return send_file(
@@ -1392,7 +1697,7 @@ def create_path():
                  json.dumps(body.get('allowedRoles') or []),
                  json.dumps(body.get('allowedUsers') or [])))
         except Exception as exc:
-            return _err(f"Could not create path: {exc}", 409)
+            return _err("Path oluşturulamadı.", 409)
     return jsonify({"success": True, "data": _path_to_dict(_load_path_row(pid))}), 201
 
 
@@ -1584,9 +1889,10 @@ def create_role():
                    VALUES (?, ?, ?, ?, ?, 0, 1, ?)''',
                 (rid, key, name, body.get('description', ''), level, color))
         except Exception as exc:
-            return _err(f'Rol oluşturulamadı (anahtar benzersiz olmalı): {exc}', 409)
+            return _err('Rol oluşturulamadı (anahtar benzersiz olmalı).', 409)
         for p in perms:
             conn.execute('INSERT OR IGNORE INTO role_permissions (role_id, permission_key) VALUES (?, ?)', (rid, p))
+    _audit('role.create', target=rid, detail={'key': key, 'name': name})
     return jsonify({'success': True, 'data': {'id': rid, 'key': key, 'name': name}}), 201
 
 
@@ -1646,6 +1952,7 @@ def delete_role(rid):
         if cnt > 0:
             return _err(f'Bu role atanmış {cnt} kullanıcı var; önce kullanıcıları başka role taşıyın.', 409)
         conn.execute('DELETE FROM roles WHERE id=?', (rid,))
+    _audit('role.delete', target=rid)
     return jsonify({'success': True, 'deleted': True})
 
 
@@ -1722,6 +2029,9 @@ def admin_create_user():
     password = body.get('password') or ''
     if not username or not password:
         return _err('Kullanıcı adı ve şifre zorunludur.', 400)
+    policy_issues = passwords.validate_password_policy(password, username=username)
+    if policy_issues:
+        return _err(' '.join(policy_issues), 400)
     role_id = (body.get('role_id') or body.get('roleId') or '').strip()
     role_row = _load_role_row(role_id) if role_id else None
     if not role_row:
@@ -1731,7 +2041,7 @@ def admin_create_user():
     display_name = (body.get('display_name') or body.get('displayName') or '').strip()
     email = (body.get('email') or '').strip()
     is_active = 1 if body.get('is_active', body.get('isActive', True)) else 0
-    pw_hash, pw_salt = _hash_password(password)
+    pw_hash = passwords.hash_password(password)  # argon2id; tuz PHC içinde (salt='')
     uid = _new_id('u_')
     db = get_db()
     with db._conn() as conn:
@@ -1739,9 +2049,10 @@ def admin_create_user():
             conn.execute(
                 '''INSERT INTO users (id, username, display_name, email, password_hash, password_salt, role, role_id, is_active)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-                (uid, username, display_name, email, pw_hash, pw_salt, role_row['key'], role_id, is_active))
+                (uid, username, display_name, email, pw_hash, '', role_row['key'], role_id, is_active))
         except Exception as exc:
-            return _err(f'Kullanıcı oluşturulamadı (kullanıcı adı benzersiz olmalı): {exc}', 409)
+            return _err('Kullanıcı oluşturulamadı (kullanıcı adı benzersiz olmalı).', 409)
+    _audit('user.create', target=uid, detail={'username': username})
     return jsonify({'success': True, 'data': {'id': uid, 'username': username}}), 201
 
 
@@ -1793,6 +2104,7 @@ def admin_delete_user(uid):
     db = get_db()
     with db._conn() as conn:
         cur = conn.execute('DELETE FROM users WHERE id=?', (uid,))
+    _audit('user.delete', target=uid)
     return jsonify({'success': True, 'deleted': cur.rowcount > 0})
 
 
@@ -1805,16 +2117,19 @@ def admin_reset_password(uid):
         return _err('Yetkiniz yok.', 403)
     body = request.get_json(silent=True) or {}
     password = body.get('password') or ''
-    if len(password) < 4:
-        return _err('Şifre en az 4 karakter olmalı.', 400)
-    pw_hash, pw_salt = _hash_password(password)
     db = get_db()
     with db._conn() as conn:
-        cur = conn.execute(
-            "UPDATE users SET password_hash=?, password_salt=?, updated_at=datetime('now') WHERE id=?",
-            (pw_hash, pw_salt, uid))
-        if cur.rowcount == 0:
+        urow = conn.execute('SELECT username FROM users WHERE id=?', (uid,)).fetchone()
+        if not urow:
             return _err('User not found.', 404)
+        policy_issues = passwords.validate_password_policy(password, username=urow['username'])
+        if policy_issues:
+            return _err(' '.join(policy_issues), 400)
+        pw_hash = passwords.hash_password(password)  # argon2id; tuz PHC içinde
+        cur = conn.execute(
+            "UPDATE users SET password_hash=?, password_salt='', updated_at=datetime('now') WHERE id=?",
+            (pw_hash, uid))
+    _audit('user.reset_password', target=uid)
     return jsonify({'success': True})
 
 
@@ -1889,9 +2204,75 @@ def admin_update_sharing(otype, oid):
             (json.dumps(allowed_roles), json.dumps(allowed_users), oid))
         if cur.rowcount == 0:
             return _err('Nesne bulunamadı.', 404)
+    _audit('share.update', target=f'{otype}:{oid}')
     return jsonify({'success': True})
 
 
+@app.route('/api/admin/audit', methods=['GET'])
+def admin_audit_log():
+    """Denetim günlüğünü listeler (yalnızca admin/superuser). Filtre: action."""
+    if not _is_admin():
+        return _err('Yetkisiz.', 403)
+    try:
+        limit = min(int(request.args.get('limit', 200)), 1000)
+        offset = max(int(request.args.get('offset', 0)), 0)
+    except ValueError:
+        limit, offset = 200, 0
+    action = (request.args.get('action') or '').strip()
+    db = get_db()
+    with db._conn() as conn:
+        if action:
+            rows = conn.execute(
+                "SELECT id,ts,actor_uid,actor_user,action,target,detail,ip,status "
+                "FROM audit_log WHERE action=? ORDER BY id DESC LIMIT ? OFFSET ?",
+                (action, limit, offset)).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT id,ts,actor_uid,actor_user,action,target,detail,ip,status "
+                "FROM audit_log ORDER BY id DESC LIMIT ? OFFSET ?",
+                (limit, offset)).fetchall()
+    return jsonify({'success': True, 'data': [dict(r) for r in rows]})
+
+
+# ---------------------------------------------------------------------------
+# Global hata işleyiciler — tutarlı JSON yanıtı + iç detay sızıntısı yok.
+# ---------------------------------------------------------------------------
+
+@app.errorhandler(500)
+def _handle_500(e):
+    logger.exception("Unhandled server error")
+    return _err("İç sunucu hatası.", 500)
+
+
+@app.errorhandler(404)
+def _handle_404(e):
+    return _err("Kaynak bulunamadı.", 404)
+
+
+@app.errorhandler(405)
+def _handle_405(e):
+    return _err("Metoda izin verilmiyor.", 405)
+
+
+@app.errorhandler(413)
+def _handle_413(e):
+    return _err("İstek gövdesi çok büyük.", 413)
+
+
+@app.errorhandler(429)
+def _handle_429(e):
+    # Rate limit aşıldı (Flask-Limiter). _err (Response, status) döndürür —
+    # başlık eklemek için Response'u açıp Retry-After koyarız, sonra status ile döneriz.
+    body, status = _err("Çok fazla istek. Lütfen daha sonra tekrar deneyin.", 429)
+    body.headers['Retry-After'] = '60'
+    return body, status
+
+
 if __name__ == '__main__':
-    logger.info("Starting Nov4 API...")
-    app.run(host='0.0.0.0', port=5001, debug=True)
+    if config.IS_PRODUCTION or config.IS_STAGING:
+        logger.error(
+            "Üretim/staging ortamında `python api_server.py` (Flask dev sunucusu) KULLANMAYIN. "
+            "Bunun yerine gunicorn ile çalıştırın: gunicorn -c deploy/gunicorn.conf.py 'api_server:app'")
+    logger.info("Starting Nov4 API (env=%s, debug=%s, bind=%s:%s)...",
+                config.ENV, config.DEBUG, config.BIND_HOST, config.BIND_PORT)
+    app.run(host=config.BIND_HOST, port=config.BIND_PORT, debug=config.DEBUG)

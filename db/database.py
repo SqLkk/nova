@@ -254,16 +254,63 @@ CREATE TABLE IF NOT EXISTS path_defs (
     created_at      TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+-- Refresh token rotation + revocation (Faz 4). Token HASH olarak saklanır:
+-- DB sızıntısında opak token kullanılamaz. family_id → yeniden kullanım tespiti.
+CREATE TABLE IF NOT EXISTS refresh_tokens (
+    id           TEXT PRIMARY KEY,
+    user_id      TEXT NOT NULL,
+    family_id    TEXT NOT NULL,           -- tek login oturumu; rotation aynı aileden
+    token_hash   TEXT NOT NULL UNIQUE,    -- sha256(opak token)
+    issued_at    TEXT NOT NULL DEFAULT (datetime('now')),
+    expires_at   TEXT NOT NULL,
+    revoked      INTEGER NOT NULL DEFAULT 0,
+    replaced_by  TEXT DEFAULT '',
+    created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user   ON refresh_tokens(user_id);
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_family ON refresh_tokens(family_id);
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_hash   ON refresh_tokens(token_hash);
+
+-- Denetim (audit) logu (Faz 9). Güvenlik olayları: kimlik doğrulama, kullanıcı/rol
+-- yönetimi, parola sıfırlama, paylaşım değişikliği, veri kaynağı yönetimi, sandbox
+-- kullanımı. NIS2 Art.21(1)(b)/(i); ISO/IEC 27002:2022 A.8.15-A.8.16.
+CREATE TABLE IF NOT EXISTS audit_log (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts          TEXT NOT NULL DEFAULT (datetime('now')),
+    actor_uid   TEXT DEFAULT '',
+    actor_user  TEXT DEFAULT '',
+    action      TEXT NOT NULL,
+    target      TEXT DEFAULT '',
+    detail      TEXT DEFAULT '',          -- JSON
+    ip          TEXT DEFAULT '',
+    status      TEXT DEFAULT ''           -- success | fail | deny
+);
+CREATE INDEX IF NOT EXISTS idx_audit_ts    ON audit_log(ts);
+CREATE INDEX IF NOT EXISTS idx_audit_actor ON audit_log(actor_uid);
+CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_log(action);
 """
 
 def _generate_salt() -> str:
     return uuid.uuid4().hex
 
 def _hash_password(password: str, salt: str = None) -> tuple:
-    if salt is None:
-        salt = _generate_salt()
-    hashed = hashlib.sha256(f'{salt}:{password}'.encode()).hexdigest()
-    return hashed, salt
+    """Parolayı hashler → (hash, salt).
+
+    Öncelik argon2id'dir (backend `passwords` modülü); salt PHC içinde olduğundan
+    salt='' döner. Modül kullanılamıyorsa legacy sha256(salt:password)'e düşer
+    (yalnızca bağımsız/önyükleme kullanımı için; uygulama bağlamında her zaman
+    argon2id üretilir). Seeding/yığın içindir; kullanıcıdan gelen parolalarda
+    politika (passwords.validate_password_policy) ayrıca uygulanmalıdır.
+    """
+    try:
+        from passwords import hash_password as _argon2_hash
+        return (_argon2_hash(password), "")
+    except Exception:
+        if salt is None:
+            salt = _generate_salt()
+        hashed = hashlib.sha256(f'{salt}:{password}'.encode()).hexdigest()
+        return hashed, salt
 
 def _new_id(prefix: str = '') -> str:
     short = uuid.uuid4().hex[:12]
@@ -301,6 +348,10 @@ class Database:
                 "ALTER TABLE users ADD COLUMN role_id TEXT DEFAULT ''",
                 "ALTER TABLE report_templates ADD COLUMN allowed_roles TEXT DEFAULT '[]'",
                 "ALTER TABLE report_templates ADD COLUMN allowed_users TEXT DEFAULT '[]'",
+                # Kaba kuvvet kilidi (Faz 5b): başarısız deneme sayacı/pencere + kilit sonu.
+                "ALTER TABLE users ADD COLUMN failed_login_attempts INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE users ADD COLUMN last_failed_at TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE users ADD COLUMN locked_until TEXT NOT NULL DEFAULT ''",
             ):
                 try:
                     conn.execute(stmt)
