@@ -15,16 +15,20 @@ import base64
 import hashlib
 import hmac
 import json
+import secrets as _secrets
 import time
 
 from config import config
+import passwords as _pw  # argon2id + legacy sha256 doğrulama/migrasyon
 
 _SECRET = (config.HMAC_SECRET_KEY or "").encode("utf-8")
 if not config.HMAC_SECRET_KEY:
     # Boş secret_production'da olmamalı; burada sadece uyarı.
     raise RuntimeError("config.HMAC_SECRET_KEY boş olamaz.")
 
-_TOKEN_TTL = 12 * 3600  # 12 saat
+# Erişim token ömrü kısa (varsayılan 15 dk); süre dolumunda istemci refresh ile
+# yeniler. config.TOKEN_ACCESS_TTL (saniye).
+_TOKEN_TTL = int(getattr(config, "TOKEN_ACCESS_TTL", 900))
 
 
 def _b64(data: bytes) -> str:
@@ -38,14 +42,17 @@ def _ub64(s: str) -> bytes:
     return base64.urlsafe_b64decode(s + pad)
 
 
-def hash_password(password: str, salt: str) -> str:
-    """database._hash_password ile aynı algoritma — sha256(salt:password)."""
-    return hashlib.sha256(f"{salt}:{password}".encode()).hexdigest()
+def hash_password(password: str, salt: str = None) -> str:
+    """argon2id PHC string döndürür. (salt geri uyumluluk için yok sayılır —
+    argon2id tuzunu PHC içinde üretir.) Detay için passwords.hash_password."""
+    return _pw.hash_password(password)
 
 
 def verify_password(password: str, salt: str, expected_hash: str) -> bool:
-    actual = hash_password(password, salt or "")
-    return hmac.compare_digest(actual, expected_hash or "")
+    """Parolayı doğrular (argon2id + legacy sha256). Rehash ihtiyacını bildirmez;
+    göç sinyali gerekiyorsa doğrudan passwords.verify() kullanın."""
+    ok, _needs_rehash = _pw.verify(password, salt, expected_hash)
+    return ok
 
 
 def create_token(user_id: str, username: str, role: str, level: int = 0, ttl: int = _TOKEN_TTL) -> str:
@@ -79,3 +86,27 @@ def verify_token(token: str) -> dict | None:
         return payload
     except Exception:
         return None
+
+
+# ---------------------------------------------------------------------------
+# Refresh token (Faz 4) — opak, DB'de HASH olarak saklanır.
+# ---------------------------------------------------------------------------
+# Erişim token'ı stateless ve kısa ömürlüdür; refresh token ise DB tarafında
+# doğrulanır, her kullanımda DÖNDÜRÜLÜR (rotation) ve yeniden kullanım tüm aileyi
+# iptal eder (token theft mitigation). Token'ın kendisi DB'ye YAZILMAZ; yalnızca
+# sha256(token) saklanır → DB sızıntısında token kullanılamaz.
+
+def create_refresh_token() -> tuple:
+    """Yeni opak refresh token üretir.
+
+    Dönüş: (token, token_hash)
+      token      — istemciye verilecek opak string (DB'ye YAZILMAZ).
+      token_hash — DB'ye saklanacak sha256(token).
+    """
+    token = _secrets.token_urlsafe(48)
+    return token, hash_refresh_token(token)
+
+
+def hash_refresh_token(token: str) -> str:
+    """Opak refresh token'ın sha256 özetini döndürür (DB aramaları için)."""
+    return hashlib.sha256((token or "").encode("utf-8")).hexdigest()
