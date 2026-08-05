@@ -237,6 +237,23 @@ export class WidgetComponent implements OnInit, OnDestroy, OnChanges {
         }),
         catchError(err => of({ status: 'error' as string, data: null, message: err.message }))
       );
+    } else if (path.startsWith('python://')) {
+      const scriptId = path.substring('python://'.length);
+      return this.apiService.runSavedPythonScript(scriptId).pipe(
+        map((res: any) => {
+          if (res && res.status === 'success' && res.data) {
+            const rows = res.data.rows || [];
+            const columns = Object.keys(rows[0] || {});
+            const isNum = (v: any): boolean => typeof v === 'number' ? !isNaN(v) : (typeof v === 'string' && /^-?\d+(\.\d+)?$/.test(v.trim()));
+            const numericCol = columns.find(c => rows.slice(0, 5).some(r => isNum(r[c]))) || columns[0];
+            const toNum = (v: any): number => typeof v === 'number' ? (isNaN(v) ? 0 : v) : (typeof v === 'string' ? (parseFloat(v) || 0) : 0);
+            const dataValues = rows.map((r: any) => toNum(r[numericCol]));
+            return { status: 'success', data: dataValues, message: `PYTHON ${rows.length} kayıt` };
+          }
+          return { status: 'error', data: [], message: 'No Python data' };
+        }),
+        catchError(err => of({ status: 'error' as string, data: null, message: err.message }))
+      );
     } else if (this.isRealtimePath(path)) {
       const satz = this.getSatzFromPath(path);
       // To prevent flat-line starting values on page load/refresh, fetch actual historical backup values from SYS,
@@ -1379,7 +1396,18 @@ export class WidgetComponent implements OnInit, OnDestroy, OnChanges {
         return;
       }
     }
-    
+
+    // Check if Python mode is active
+    if (this.dataSourceType === 'python' || (this.currentDataPaths.length > 0 && this.currentDataPaths[0]?.startsWith('python://'))) {
+      const scriptId = this.currentDataPaths[0]?.startsWith('python://')
+        ? this.currentDataPaths[0].substring('python://'.length)
+        : this.currentDataPaths[0];
+      if (scriptId) {
+        this.fetchPythonData(scriptId);
+        return;
+      }
+    }
+
     // If formula is set, we must fetch ALL paths in currentDataPaths to evaluate the formula.
     // Otherwise, we only fetch active paths.
     const hasFormula = !!(this.formula && this.formula.trim());
@@ -1583,6 +1611,79 @@ export class WidgetComponent implements OnInit, OnDestroy, OnChanges {
     });
   }
   
+  fetchPythonData(scriptId: string): void {
+    this.apiService.runSavedPythonScript(scriptId).subscribe({
+      next: res => {
+        if (res && res.status === 'success' && res.data) {
+          const rows = res.data.rows || [];
+          const name = res.data.name || 'Python Script';
+          this.description = `Python: "${name}" (${rows.length} rows)`;
+          this._renderRowsCompact(rows, name);
+        } else {
+          this.generateFallbackData(scriptId, 'PYTHON', 'python://' + scriptId);
+        }
+      },
+      error: err => {
+        console.error('Failed to load Python widget data:', err);
+        this.generateFallbackData(scriptId, 'PYTHON', 'python://' + scriptId);
+      }
+    });
+  }
+
+  /** Satır listesini (SQL/Python) widget grafiğine dönüştürür — kompakt, SQL
+   *  yoluna dokunmadan Python widget'ları için. Boş/sayısal-uyumsuz durumları
+   *  nazikçe ele alır. */
+  private _renderRowsCompact(rows: any[], label: string): void {
+    if (!rows || rows.length === 0) {
+      this.currentValue = 0;
+      this.chartData.labels = ['No Data'];
+      this.chartData.datasets = [{
+        data: [0], label: 'No Data', fill: false,
+        borderColor: '#9CA3AF', backgroundColor: 'rgba(156, 163, 175, 0.1)', pointRadius: 0
+      }];
+      this.chartData = { ...this.chartData };
+      this.cdr.detectChanges();
+      return;
+    }
+    const columns = Object.keys(rows[0] || {});
+    const isNum = (v: any): boolean => {
+      if (typeof v === 'number') return !isNaN(v);
+      if (typeof v === 'string') return /^-?\d+(\.\d+)?$/.test(v.trim());
+      return false;
+    };
+    const numericCol = columns.find(c => rows.slice(0, 5).some(r => isNum(r[c]))) || columns[0];
+    const labelCol = columns.find(c => c !== numericCol && /time|date|name|label|path/i.test(c)) || columns[0];
+    const toNum = (v: any): number => {
+      if (typeof v === 'number') return isNaN(v) ? 0 : v;
+      if (typeof v === 'string') { const n = parseFloat(v); return isNaN(n) ? 0 : n; }
+      return 0;
+    };
+    const dataValues = rows.map(r => toNum(r[numericCol]));
+    this.currentValue = dataValues[dataValues.length - 1];
+    if (this.currentValue !== null && this.currentValue !== undefined) {
+      this.checkThresholds(this.currentValue);
+    }
+    const colors = this.getColorsForDataType('sql', 0);
+    this.chartData.labels = rows.map(r => {
+      const v = r[labelCol];
+      return v !== null && v !== undefined ? String(v) : '';
+    });
+    this.chartData.datasets = [{
+      data: dataValues,
+      label: `${numericCol} (${label})`,
+      fill: this.widgetType === 'area-chart',
+      tension: 0.4,
+      borderColor: colors.border,
+      backgroundColor: colors.background,
+      pointRadius: this.chartData.labels.length > 20 ? 0 : 3,
+      pointHoverRadius: 6,
+      borderWidth: 3,
+      cubicInterpolationMode: 'monotone' as const
+    }];
+    this.chartData = { ...this.chartData };
+    this.cdr.detectChanges();
+  }
+
   // Tekli veri yolu için veri çekme
   fetchDataForPath(path: string): void {
     ////console.log('🟢 [WIDGET] Veri çekiliyor - Path:', path, 'Veri kaynağı:', this.dataSourceType);

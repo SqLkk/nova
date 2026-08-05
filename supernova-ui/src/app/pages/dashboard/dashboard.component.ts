@@ -201,4 +201,55 @@ export class DashboardComponent implements OnInit, OnDestroy {
     }
     this.closeWidgetConfig();
   }
+
+  // --- app-widget canlı motor köprüsü ---
+
+  private readonly noPaths: string[] = [];
+  private pathsCache = new Map<string, string[]>();
+
+  /** Widget canlı bir SQL/Python kaynağına bağlı mı (yoksa placeholder göster)? */
+  hasLiveDataSource(w: Widget): boolean {
+    return !!(w && (w.assignedQueryId || w.assignedPythonId));
+  }
+
+  /** app-widget dataSourceType girdisi. */
+  widgetDataSourceType(w: Widget): 'sql' | 'python' {
+    return w.assignedPythonId ? 'python' : 'sql';
+  }
+
+  /** app-widget initialPaths girdisi (sql://<queryId> | python://<scriptId>).
+   *  Referans-kararlı (cache'li) — change-detection gereksiz re-fetch tetiklemez. */
+  widgetInitialPaths(w: Widget): string[] {
+    const key = w.id + '::sql:' + (w.assignedQueryId || '') + '::py:' + (w.assignedPythonId || '');
+    const cached = this.pathsCache.get(key);
+    if (cached) return cached;
+    let paths: string[];
+    if (w.assignedQueryId) paths = ['sql://' + w.assignedQueryId];
+    else if (w.assignedPythonId) paths = ['python://' + w.assignedPythonId];
+    else paths = this.noPaths;
+    this.pathsCache.set(key, paths);
+    return paths;
+  }
+
+  /** Katalog visualType → app-widget widgetType eşlemesi. */
+  widgetChartType(w: Widget): string {
+    const map: Record<string, string> = {
+      'Line Chart': 'line-chart',
+      'Area Chart': 'area-chart',
+      'Bar Chart': 'bar-chart',
+      'Donut Chart': 'doughnut',
+      'Gauge Chart': 'gauge',
+      'Data Grid': 'data-table',
+      'List View': 'table',
+      'KPI Card': 'value',
+      'Scorecard': 'value',
+      'Sparkline': 'line-chart',
+      'Heatmap': 'heatmap',
+      'Live Stream': 'line-chart',
+      'Status Board': 'value',
+      'Timeline': 'line-chart',
+      'Map View': 'table'
+    };
+    return w?.config?.widgetType || map[w?.config?.visualType] || 'line-chart';
+  }
 }

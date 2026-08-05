@@ -175,8 +175,21 @@
           <!-- Scanning Line Animation -->
           <div class="absolute top-0 left-0 right-0 h-[2px] bg-[rgb(var(--accent-primary))] opacity-50 shadow-[0_0_10px_rgb(var(--accent-primary))] animate-scan pointer-events-none z-0"></div>
 
-          <!-- Center Preview Mockup -->
-          <div class="relative z-10 flex-1 flex flex-col items-center justify-center w-full" [ngSwitch]="widget.config?.visualType">
+          <!-- LIVE WIDGET (configured SQL data source → real app-widget engine) -->
+          <div *ngIf="hasLiveDataSource(widget)" class="relative z-10 flex-1 w-full min-h-0 p-2 flex flex-col">
+            <app-widget
+              [instanceId]="widget.id"
+              [title]="widget.title"
+              [icon]="widget.icon"
+              [widgetType]="widgetChartType(widget)"
+              [dataSourceType]="widgetDataSourceType(widget)"
+              [initialPaths]="widgetInitialPaths(widget)"
+              [showHeader]="false">
+            </app-widget>
+          </div>
+
+          <!-- Center Preview Mockup (unconfigured placeholder) -->
+          <div *ngIf="!hasLiveDataSource(widget)" class="relative z-10 flex-1 flex flex-col items-center justify-center w-full" [ngSwitch]="widget.config?.visualType">
             
             <!-- Line/Area Chart Preview -->
             <div *ngSwitchCase="'Line Chart'" class="w-full flex items-end justify-between h-16 px-2 space-x-1 opacity-70">

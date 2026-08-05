@@ -106,7 +106,46 @@ export class ApiService {
   searchHistoricalPaths(q: any, limit?: any, mode?: any): Observable<any> { return of({data: []}); }
   getRealTimeHierarchyStructure(): Observable<any> { return of({data: []}); }
   getRealTimeElementsStructure(): Observable<any> { return of({data: []}); }
-  getSavedExplorationData(id: any): Observable<any> { return of({}); }
+  getSavedExplorationData(id: any): Observable<any> {
+    // Kayıtlı SQL sorgusunu preview endpoint'i üzerinden çalıştırır ve widget'ın
+    // beklediği {status, data:{rows, source, name}} zarfına reshape eder.
+    // Backend: POST /api/queries/<id>/preview → {success, data:{columns, rows, ...}}.
+    if (!id) {
+      return of({ status: 'error', data: null, message: 'No query id provided.' });
+    }
+    return this.post<any>(`queries/${id}/preview`, { limit: 100 }).pipe(
+      map((result: any) => ({
+        status: 'success',
+        data: {
+          rows: result?.rows || [],
+          columns: result?.columns || [],
+          source: 'sql',
+          name: 'Saved SQL Query'
+        }
+      })),
+      catchError(() => of({ status: 'error', data: null, message: 'SQL preview failed.' }))
+    );
+  }
+
+  runSavedPythonScript(id: any): Observable<any> {
+    // Kayıtlı Python script'ini sandbox'ta çalıştırır (backend: POST /api/python/scripts/<id>/run)
+    // ve widget'ın beklediği {status, data:{rows, source, name}} zarfına reshape eder.
+    if (!id) {
+      return of({ status: 'error', data: null, message: 'No script id provided.' });
+    }
+    return this.post<any>(`python/scripts/${id}/run`, {}).pipe(
+      map((result: any) => ({
+        status: 'success',
+        data: {
+          rows: result?.rows || [],
+          columns: result?.columns || [],
+          source: 'python',
+          name: result?.name || 'Python Script'
+        }
+      })),
+      catchError(() => of({ status: 'error', data: null, message: 'Python run failed.' }))
+    );
+  }
 
   // --- MORE STUBS ---
   previewReport(reportId: any, options: any): Observable<any> { return of({}); }
@@ -114,10 +153,20 @@ export class ApiService {
   updateRawReport(reportId: any, options: any): Observable<any> { return of({}); }
   getReportSchedule(reportId: any): Observable<any> { return of({}); }
   saveReportSchedule(reportId: any, payload: any): Observable<any> { return of({}); }
-  readRawDataHIS(path: any, mins: any): Observable<any> { return of({}); }
-  readRawDataWithSatz(path: any, satz: any): Observable<any> { return of({}); }
-  readRawData(path: any): Observable<any> { return of({}); }
-  getHistoricalData(params: any): Observable<any> { return of({}); }
+  // SCADA/historian entegrasyonu bu kod tabanında yok — nazik hata zarfı döner
+  // (widget çökmez; canlı veri SQL/Python modundan gelir). Historian ileride.
+  readRawDataHIS(path: any, mins: any): Observable<any> {
+    return of({ status: 'error', data: null, message: 'SCADA historian not configured.' });
+  }
+  readRawDataWithSatz(path: any, satz: any): Observable<any> {
+    return of({ status: 'error', data: null, message: 'SCADA historian not configured.' });
+  }
+  readRawData(path: any): Observable<any> {
+    return of({ status: 'error', data: null, message: 'SCADA historian not configured.' });
+  }
+  getHistoricalData(params: any): Observable<any> {
+    return of({ status: 'error', data: null, message: 'Historical source not configured.' });
+  }
   analyzeReport(id: any): Observable<any> { return of({}); }
   getUserTemplate(id: any, userId: any): Observable<any> { return of({}); }
 }
