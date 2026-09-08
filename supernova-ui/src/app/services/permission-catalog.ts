@@ -69,6 +69,7 @@ export const PERMISSION_CATALOG: PermissionGroup[] = [
       { key: 'share:paths', label: 'Network-map / path paylaşımı' },
       { key: 'share:queries', label: 'Sorgu paylaşımı' },
       { key: 'share:scripts', label: 'Python script paylaşımı' },
+      { key: 'share:dashboards', label: 'Dashboard paylaşımı' },
     ],
   },
   {

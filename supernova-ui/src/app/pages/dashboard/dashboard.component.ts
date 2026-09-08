@@ -3,7 +3,9 @@ import { TranslateService } from '@ngx-translate/core';
 import { CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
 import { v4 as uuidv4 } from 'uuid';
 import { Subscription } from 'rxjs';
-import { DashboardEditService, Widget } from '../../services/dashboard-edit.service';
+import { DashboardEditService, Widget, DashboardSummary, DashboardDetail } from '../../services/dashboard-edit.service';
+import { AuthService } from '../../services/auth.service';
+import { AdminService } from '../../services/admin.service';
 
 export interface DataConnection {
   id: string;
@@ -35,6 +37,41 @@ export { Widget };
 export class DashboardComponent implements OnInit, OnDestroy {
   editMode = false;
 
+  // Multi-Dashboard State
+  dashboards: DashboardSummary[] = [];
+  activeDashboard: DashboardDetail | null = null;
+  activeDashboardId = '';
+  showDashboardSelector = false;
+  dashboardSearch = '';
+  loadingDashboard = false;
+
+  // Create & Settings Modal
+  showCreateModal = false;
+  createForm = { name: '', description: '', isDefault: false };
+  showSettingsModal = false;
+  settingsForm = { name: '', description: '', isDefault: false };
+
+  // Sharing Modal State
+  showSharingModal = false;
+  sharingDashboard: DashboardSummary | DashboardDetail | null = null;
+  shareRoles = new Set<string>();
+  shareUsers: string[] = [];
+  shareUserInput = '';
+  shareSaving = false;
+  roleKeys = ['admin', 'engineer', 'operator', 'viewer'];
+  shareUsersList: any[] = [];
+  loadingUsers = false;
+
+  // Notifications & Confirmations
+  notificationMsg = '';
+  private notifTimer: any = null;
+  confirmDialog: { show: boolean; title: string; message: string; action: () => void } = {
+    show: false,
+    title: '',
+    message: '',
+    action: () => {}
+  };
+
   // Generic Data Connections
   connections: DataConnection[] = [
     { id: 'db-main', name: 'Primary Database', status: 'online', latencyMs: 12 },
@@ -63,36 +100,14 @@ export class DashboardComponent implements OnInit, OnDestroy {
   constructor(
     private cdr: ChangeDetectorRef,
     private translate: TranslateService,
-    public dashEdit: DashboardEditService
+    public dashEdit: DashboardEditService,
+    public auth: AuthService,
+    private admin: AdminService
   ) {}
 
   ngOnInit(): void {
-    // Load dashboard from API
-    this.subs.push(
-      this.dashEdit.loadMyDashboard().subscribe({
-        next: (res) => {
-          if (res.success && res.data.layout && res.data.layout.length > 0) {
-            this.activeWidgets = res.data.layout;
-          } else {
-            // Initialize with some default widgets for WOW factor if layout is empty
-            const catalog = this.dashEdit.getWidgetCatalog();
-            const production = catalog.find(c => c.category === 'Production');
-            const analytics = catalog.find(c => c.category === 'Analytics');
-            const energy = catalog.find(c => c.category === 'Energy');
-
-            this.activeWidgets = [
-              { ...(production?.widgets[0] || catalog[0].widgets[0]), id: uuidv4() },
-              { ...(analytics?.widgets[0] || catalog[0].widgets[0]), id: uuidv4() },
-              { ...(energy?.widgets[0] || catalog[0].widgets[0]), id: uuidv4() },
-            ];
-          }
-          this.cdr.detectChanges();
-        },
-        error: (err) => {
-          console.error('Failed to load dashboard', err);
-        }
-      })
-    );
+    this.loadRolesList();
+    this.loadDashboardsList();
 
     // Listen for edit mode changes from service
     this.subs.push(
@@ -117,8 +132,95 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.subs.forEach(s => s.unsubscribe());
-    // Ensure edit mode is off when leaving dashboard
+    if (this.notifTimer) clearTimeout(this.notifTimer);
     this.dashEdit.setEditMode(false);
+  }
+
+  // ---- Multi-Dashboard Lifecycle ----
+
+  loadDashboardsList(selectId?: string): void {
+    this.subs.push(
+      this.dashEdit.listDashboards().subscribe({
+        next: (res) => {
+          if (res.success) {
+            this.dashboards = res.data || [];
+            if (selectId) {
+              this.loadDashboard(selectId);
+            } else if (this.activeDashboardId && this.dashboards.some(d => d.id === this.activeDashboardId)) {
+              this.loadDashboard(this.activeDashboardId);
+            } else if (this.dashboards.length > 0) {
+              const def = this.dashboards.find(d => d.isDefault) || this.dashboards[0];
+              this.loadDashboard(def.id);
+            } else {
+              this.loadFallbackMyDashboard();
+            }
+          }
+          this.cdr.detectChanges();
+        },
+        error: (err) => {
+          console.error('Failed to list dashboards', err);
+          this.loadFallbackMyDashboard();
+        }
+      })
+    );
+  }
+
+  loadFallbackMyDashboard(): void {
+    this.subs.push(
+      this.dashEdit.loadMyDashboard().subscribe({
+        next: (res) => {
+          if (res.success && res.data) {
+            this.activeDashboardId = res.data.id;
+            this.activeDashboard = res.data as any;
+            if (res.data.layout && res.data.layout.length > 0) {
+              this.activeWidgets = res.data.layout;
+            } else {
+              this.initDefaultWidgets();
+            }
+          }
+          this.cdr.detectChanges();
+        },
+        error: (err) => console.error('Failed to load my dashboard', err)
+      })
+    );
+  }
+
+  loadDashboard(id: string): void {
+    this.loadingDashboard = true;
+    this.activeDashboardId = id;
+    this.subs.push(
+      this.dashEdit.getDashboard(id).subscribe({
+        next: (res) => {
+          this.loadingDashboard = false;
+          if (res.success && res.data) {
+            this.activeDashboard = res.data;
+            this.activeWidgets = res.data.layout || [];
+            if (this.activeWidgets.length === 0) {
+              this.initDefaultWidgets();
+            }
+          }
+          this.cdr.detectChanges();
+        },
+        error: (err) => {
+          this.loadingDashboard = false;
+          console.error('Failed to load dashboard', err);
+          this.notify('Dashboard yüklenirken hata oluştu.');
+        }
+      })
+    );
+  }
+
+  initDefaultWidgets(): void {
+    const catalog = this.dashEdit.getWidgetCatalog();
+    const production = catalog.find(c => c.category === 'Production');
+    const analytics = catalog.find(c => c.category === 'Analytics');
+    const energy = catalog.find(c => c.category === 'Energy');
+
+    this.activeWidgets = [
+      { ...(production?.widgets[0] || catalog[0].widgets[0]), id: uuidv4() },
+      { ...(analytics?.widgets[0] || catalog[0].widgets[0]), id: uuidv4() },
+      { ...(energy?.widgets[0] || catalog[0].widgets[0]), id: uuidv4() },
+    ];
   }
 
   toggleEditMode(): void {
@@ -126,17 +228,313 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   finishEditing(): void {
-    this.dashEdit.saveMyDashboard(this.activeWidgets).subscribe({
-      next: (res) => {
-        if (res.success) {
+    const saveObs = this.activeDashboardId
+      ? this.dashEdit.saveDashboardLayout(this.activeDashboardId, this.activeWidgets)
+      : this.dashEdit.saveMyDashboard(this.activeWidgets);
+
+    this.subs.push(
+      saveObs.subscribe({
+        next: (res) => {
+          if (res.success) {
+            this.dashEdit.setEditMode(false);
+            if (this.activeDashboard) {
+              this.activeDashboard.layout = [...this.activeWidgets];
+            }
+            this.notify('Dashboard düzeni başarıyla kaydedildi.');
+          }
+        },
+        error: (err) => {
+          console.error('Failed to save dashboard', err);
           this.dashEdit.setEditMode(false);
+          this.notify('Dashboard kaydedilirken hata oluştu.');
         }
-      },
-      error: (err) => {
-        console.error('Failed to save dashboard', err);
-        this.dashEdit.setEditMode(false); // still close on error for now
+      })
+    );
+  }
+
+  // ---- Dashboard Switching & Selector ----
+
+  toggleDashboardSelector(): void {
+    this.showDashboardSelector = !this.showDashboardSelector;
+  }
+
+  closeDashboardSelector(): void {
+    this.showDashboardSelector = false;
+    this.dashboardSearch = '';
+  }
+
+  selectDashboard(d: DashboardSummary): void {
+    this.closeDashboardSelector();
+    if (this.activeDashboardId !== d.id) {
+      this.loadDashboard(d.id);
+    }
+  }
+
+  get currentUserId(): string {
+    return this.auth.getCurrentUser()?.id || '';
+  }
+
+  isOwner(d: DashboardSummary | DashboardDetail | null): boolean {
+    if (!d) return false;
+    return !!d.owner && d.owner === this.currentUserId;
+  }
+
+  canAllManage(): boolean {
+    return this.auth.isAdmin() || this.auth.isSuperUser();
+  }
+
+  canModify(d: DashboardSummary | DashboardDetail | null): boolean {
+    if (!d) return false;
+    return this.isOwner(d) || this.canAllManage();
+  }
+
+  canManageVisibility(d: DashboardSummary | DashboardDetail | null): boolean {
+    if (!d) return false;
+    return this.canModify(d) || this.auth.hasPermission('share:dashboards');
+  }
+
+  userChecklistMode(): boolean {
+    return this.canAllManage();
+  }
+
+  get myDashboards(): DashboardSummary[] {
+    const q = this.dashboardSearch.trim().toLowerCase();
+    return this.dashboards.filter(d => this.isOwner(d) && (!q || d.name.toLowerCase().includes(q)));
+  }
+
+  get sharedDashboards(): DashboardSummary[] {
+    const q = this.dashboardSearch.trim().toLowerCase();
+    return this.dashboards.filter(d => !this.isOwner(d) && (!q || d.name.toLowerCase().includes(q)));
+  }
+
+  // ---- CRUD & Actions ----
+
+  openCreateModal(): void {
+    this.createForm = { name: '', description: '', isDefault: false };
+    this.showCreateModal = true;
+    this.closeDashboardSelector();
+  }
+
+  closeCreateModal(): void {
+    this.showCreateModal = false;
+  }
+
+  submitCreateDashboard(): void {
+    const name = this.createForm.name.trim() || 'Yeni Dashboard';
+    this.subs.push(
+      this.dashEdit.createDashboard({
+        name,
+        description: this.createForm.description.trim(),
+        isDefault: this.createForm.isDefault,
+        layout: []
+      }).subscribe({
+        next: (res) => {
+          this.closeCreateModal();
+          this.notify(`"${name}" dashboard'ı oluşturuldu.`);
+          this.loadDashboardsList(res.data.id);
+        },
+        error: (err) => {
+          console.error('Failed to create dashboard', err);
+          this.notify('Dashboard oluşturulamadı.');
+        }
+      })
+    );
+  }
+
+  openSettingsModal(): void {
+    if (!this.activeDashboard) return;
+    this.settingsForm = {
+      name: this.activeDashboard.name,
+      description: this.activeDashboard.description || '',
+      isDefault: this.activeDashboard.isDefault
+    };
+    this.showSettingsModal = true;
+  }
+
+  closeSettingsModal(): void {
+    this.showSettingsModal = false;
+  }
+
+  saveSettings(): void {
+    if (!this.activeDashboard) return;
+    const id = this.activeDashboard.id;
+    const name = this.settingsForm.name.trim() || this.activeDashboard.name;
+    this.subs.push(
+      this.dashEdit.updateDashboard(id, {
+        name,
+        description: this.settingsForm.description.trim(),
+        isDefault: this.settingsForm.isDefault
+      }).subscribe({
+        next: () => {
+          this.closeSettingsModal();
+          this.notify('Dashboard ayarları güncellendi.');
+          this.loadDashboardsList(id);
+        },
+        error: (err) => {
+          console.error('Failed to update dashboard', err);
+          this.notify('Ayarlar kaydedilemedi.');
+        }
+      })
+    );
+  }
+
+  duplicateActiveDashboard(): void {
+    if (!this.activeDashboard) return;
+    const id = this.activeDashboard.id;
+    this.subs.push(
+      this.dashEdit.duplicateDashboard(id).subscribe({
+        next: (res) => {
+          this.notify(`"${res.data.name}" oluşturuldu.`);
+          this.loadDashboardsList(res.data.id);
+        },
+        error: (err) => {
+          console.error('Failed to duplicate dashboard', err);
+          this.notify('Kopyalama başarısız oldu.');
+        }
+      })
+    );
+  }
+
+  confirmDeleteActiveDashboard(): void {
+    if (!this.activeDashboard) return;
+    const id = this.activeDashboard.id;
+    const name = this.activeDashboard.name;
+    this.confirmDialog = {
+      show: true,
+      title: 'Dashboard Sil',
+      message: `"${name}" dashboard'ını silmek istediğinize emin misiniz? Bu işlem geri alınamaz.`,
+      action: () => {
+        this.confirmDialog.show = false;
+        this.subs.push(
+          this.dashEdit.deleteDashboard(id).subscribe({
+            next: () => {
+              this.notify(`"${name}" silindi.`);
+              this.activeDashboardId = '';
+              this.activeDashboard = null;
+              this.loadDashboardsList();
+            },
+            error: (err) => {
+              console.error('Failed to delete dashboard', err);
+              this.notify('Dashboard silinemedi.');
+            }
+          })
+        );
       }
-    });
+    };
+  }
+
+  // ---- Paylaşım (Sharing) ----
+
+  loadRolesList(): void {
+    this.subs.push(
+      this.admin.getRoles().subscribe({
+        next: (roles) => {
+          if (roles?.length) {
+            this.roleKeys = roles.map(r => r.key);
+          }
+        },
+        error: () => {}
+      })
+    );
+  }
+
+  loadUsersList(): void {
+    this.loadingUsers = true;
+    this.subs.push(
+      this.admin.getAdminUsers().subscribe({
+        next: (users) => {
+          this.shareUsersList = users || [];
+          this.loadingUsers = false;
+          this.cdr.detectChanges();
+        },
+        error: () => {
+          this.loadingUsers = false;
+          this.cdr.detectChanges();
+        }
+      })
+    );
+  }
+
+  openSharing(d?: DashboardSummary | DashboardDetail): void {
+    const target = d || this.activeDashboard;
+    if (!target || !this.canManageVisibility(target)) return;
+    this.sharingDashboard = target;
+    this.shareRoles = new Set(target.allowedRoles || []);
+    this.shareUsers = [...(target.allowedUsers || [])];
+    this.shareUserInput = '';
+    this.showSharingModal = true;
+    if (this.userChecklistMode() && !this.shareUsersList.length && !this.loadingUsers) {
+      this.loadUsersList();
+    }
+  }
+
+  closeSharing(): void {
+    this.showSharingModal = false;
+    this.sharingDashboard = null;
+  }
+
+  toggleShareRole(key: string): void {
+    if (this.shareRoles.has(key)) this.shareRoles.delete(key);
+    else this.shareRoles.add(key);
+  }
+
+  isShareRoleOn(key: string): boolean {
+    return this.shareRoles.has(key);
+  }
+
+  toggleShareUser(id: string): void {
+    const i = this.shareUsers.indexOf(id);
+    if (i >= 0) this.shareUsers.splice(i, 1);
+    else this.shareUsers.push(id);
+  }
+
+  isShareUserOn(id: string): boolean {
+    return this.shareUsers.includes(id);
+  }
+
+  addShareUserInput(): void {
+    const v = this.shareUserInput.trim();
+    if (!v) return;
+    if (!this.shareUsers.some(u => u.toLowerCase() === v.toLowerCase())) {
+      this.shareUsers.push(v);
+    }
+    this.shareUserInput = '';
+  }
+
+  removeShareUser(name: string): void {
+    this.shareUsers = this.shareUsers.filter(u => u !== name);
+  }
+
+  saveSharing(): void {
+    if (!this.sharingDashboard) return;
+    this.shareSaving = true;
+    const id = this.sharingDashboard.id;
+    this.subs.push(
+      this.dashEdit.updateSharing(id, [...this.shareRoles], this.shareUsers).subscribe({
+        next: () => {
+          this.shareSaving = false;
+          this.notify('Paylaşım izinleri kaydedildi.');
+          this.closeSharing();
+          this.loadDashboardsList(id);
+        },
+        error: (err) => {
+          this.shareSaving = false;
+          console.error('Failed to update sharing', err);
+          this.notify('Paylaşım kaydedilemedi.');
+          this.cdr.detectChanges();
+        }
+      })
+    );
+  }
+
+  notify(msg: string): void {
+    this.notificationMsg = msg;
+    if (this.notifTimer) clearTimeout(this.notifTimer);
+    this.notifTimer = setTimeout(() => {
+      this.notificationMsg = '';
+      this.cdr.detectChanges();
+    }, 3500);
+    this.cdr.detectChanges();
   }
 
   cancelEditing(): void {

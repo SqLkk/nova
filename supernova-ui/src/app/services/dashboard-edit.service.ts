@@ -18,6 +18,24 @@ export interface Widget {
   assignedPythonId?: string;
 }
 
+export interface DashboardSummary {
+  id: string;
+  name: string;
+  description?: string;
+  owner: string;
+  ownerName?: string;
+  isDefault: boolean;
+  allowedRoles: string[];
+  allowedUsers: string[];
+  widgetCount?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface DashboardDetail extends DashboardSummary {
+  layout: Widget[];
+}
+
 /**
  * Dashboard ↔ Navigation haberleşme servisi.
  * Edit modu açıldığında navigation sidebar'ı widget kataloğuna dönüşür.
@@ -54,12 +72,44 @@ export class DashboardEditService {
 
   // --- API ---
 
-  loadMyDashboard(): Observable<{ success: boolean; data: { id: string; name: string; layout: Widget[] } }> {
+  loadMyDashboard(): Observable<{ success: boolean; data: { id: string; name: string; description?: string; isDefault?: boolean; layout: Widget[] } }> {
     return this.http.get<any>(`${this.apiUrl}/dashboards/me`);
   }
 
   saveMyDashboard(layout: Widget[]): Observable<{ success: boolean }> {
     return this.http.put<any>(`${this.apiUrl}/dashboards/me`, { layout });
+  }
+
+  listDashboards(): Observable<{ success: boolean; data: DashboardSummary[] }> {
+    return this.http.get<any>(`${this.apiUrl}/dashboards`);
+  }
+
+  getDashboard(id: string): Observable<{ success: boolean; data: DashboardDetail }> {
+    return this.http.get<any>(`${this.apiUrl}/dashboards/${id}`);
+  }
+
+  createDashboard(dto: { name: string; description?: string; layout?: Widget[]; isDefault?: boolean }): Observable<{ success: boolean; data: { id: string; name: string } }> {
+    return this.http.post<any>(`${this.apiUrl}/dashboards`, dto);
+  }
+
+  updateDashboard(id: string, dto: { name?: string; description?: string; layout?: Widget[]; isDefault?: boolean }): Observable<{ success: boolean; data: { id: string } }> {
+    return this.http.put<any>(`${this.apiUrl}/dashboards/${id}`, dto);
+  }
+
+  saveDashboardLayout(id: string, layout: Widget[]): Observable<{ success: boolean }> {
+    return this.http.put<any>(`${this.apiUrl}/dashboards/${id}`, { layout });
+  }
+
+  duplicateDashboard(id: string): Observable<{ success: boolean; data: { id: string; name: string } }> {
+    return this.http.post<any>(`${this.apiUrl}/dashboards/${id}/duplicate`, {});
+  }
+
+  deleteDashboard(id: string): Observable<{ success: boolean; deleted: boolean }> {
+    return this.http.delete<any>(`${this.apiUrl}/dashboards/${id}`);
+  }
+
+  updateSharing(id: string, allowedRoles: string[], allowedUsers: string[]): Observable<{ success: boolean }> {
+    return this.http.put<any>(`${this.apiUrl}/dashboards/${id}/sharing`, { allowedRoles, allowedUsers });
   }
 
   getAvailableQueries(): Observable<{ success: boolean; data: any[] }> {

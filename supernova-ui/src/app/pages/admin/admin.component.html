@@ -129,6 +129,7 @@
         <button [class.active]="sharingType==='paths'" *ngIf="canShareType('paths')" (click)="switchSharingType('paths')"><i class="fas fa-diagram-project"></i> Network Map'ler</button>
         <button [class.active]="sharingType==='queries'" *ngIf="canShareType('queries')" (click)="switchSharingType('queries')"><i class="fas fa-code"></i> Sorgular</button>
         <button [class.active]="sharingType==='scripts'" *ngIf="canShareType('scripts')" (click)="switchSharingType('scripts')"><i class="fas fa-python"></i> Script'ler</button>
+        <button [class.active]="sharingType==='dashboards'" *ngIf="canShareType('dashboards')" (click)="switchSharingType('dashboards')"><i class="fas fa-meteor"></i> Dashboard'lar</button>
       </div>
       <div class="search-wrap small">
         <i class="fas fa-search search-icon"></i>

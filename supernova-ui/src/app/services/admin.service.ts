@@ -24,7 +24,7 @@ export interface AdminUserDetail extends AdminUser {
   permissions: string[];
   allowedPages: string[];
   overrides: { permission_key: string; granted: number }[];
-  ownedCounts: { templates: number; paths: number; queries: number; scripts: number };
+  ownedCounts: { templates: number; paths: number; queries: number; scripts: number; dashboards?: number };
 }
 
 export interface SharingItem {
@@ -32,7 +32,7 @@ export interface SharingItem {
   allowedRoles: string[]; allowedUsers: string[];
 }
 
-export type SharingType = 'templates' | 'paths' | 'queries' | 'scripts';
+export type SharingType = 'templates' | 'paths' | 'queries' | 'scripts' | 'dashboards';
 
 @Injectable({ providedIn: 'root' })
 export class AdminService {

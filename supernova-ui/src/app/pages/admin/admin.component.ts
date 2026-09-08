@@ -118,7 +118,7 @@ export class AdminComponent implements OnInit {
   get showUsersTab(): boolean { return this.can('user:view'); }
   get showRolesTab(): boolean { return this.can('role:view'); }
   get showSharingTab(): boolean {
-    return this.can('share:templates') || this.can('share:paths') || this.can('share:queries') || this.can('share:scripts');
+    return this.can('share:templates') || this.can('share:paths') || this.can('share:queries') || this.can('share:scripts') || this.can('share:dashboards');
   }
   get showDatasourcesTab(): boolean { return this.can('datasource:view'); }
 
