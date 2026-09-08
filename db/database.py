@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 _DB_DIR = os.path.dirname(os.path.abspath(__file__))
 _DB_PATH = os.path.join(_DB_DIR, 'supernova_reports.db')
-_SCHEMA_VERSION = 2
+_SCHEMA_VERSION = 3
 
 # ---------------------------------------------------------------------------
 # RBAC: rol seviyeleri + izin kataloğu + varsayılan rol izinleri
@@ -62,6 +62,7 @@ PERMISSION_CATALOG = [
         ('share:paths', 'Network-map / path paylaşımı'),
         ('share:queries', 'Sorgu paylaşımı'),
         ('share:scripts', 'Python script paylaşımı'),
+        ('share:dashboards', 'Dashboard paylaşımı'),
     ]},
     {'group': 'datasources', 'permissions': [
         ('datasource:view', 'Veri kaynaklarını görüntüle'),
@@ -81,6 +82,7 @@ DEFAULT_ROLE_PERMISSIONS = {
         'page:table-explorer', 'page:template-builder', 'page:query-creator',
         'page:python-workspace', 'page:settings', 'page:profile',
         'share:templates', 'share:paths', 'share:queries', 'share:scripts',
+        'share:dashboards',
         'datasource:view',
     ],
     'operator': [
@@ -145,13 +147,18 @@ CREATE TABLE IF NOT EXISTS user_permissions (
 );
 
 CREATE TABLE IF NOT EXISTS dashboards (
-    id          TEXT PRIMARY KEY,
-    user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    name        TEXT NOT NULL DEFAULT 'My Dashboard',
-    layout      TEXT DEFAULT '{}',
-    is_active   INTEGER NOT NULL DEFAULT 1,
-    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    id            TEXT PRIMARY KEY,
+    user_id       TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    owner_id      TEXT DEFAULT '',
+    name          TEXT NOT NULL DEFAULT 'My Dashboard',
+    description   TEXT NOT NULL DEFAULT '',
+    layout        TEXT DEFAULT '[]',
+    is_default    INTEGER NOT NULL DEFAULT 0,
+    allowed_roles TEXT DEFAULT '[]',
+    allowed_users TEXT DEFAULT '[]',
+    is_active     INTEGER NOT NULL DEFAULT 1,
+    created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS widgets (
@@ -352,11 +359,22 @@ class Database:
                 "ALTER TABLE users ADD COLUMN failed_login_attempts INTEGER NOT NULL DEFAULT 0",
                 "ALTER TABLE users ADD COLUMN last_failed_at TEXT NOT NULL DEFAULT ''",
                 "ALTER TABLE users ADD COLUMN locked_until TEXT NOT NULL DEFAULT ''",
+                # Dashboards çoklu dashboard & ACL genişletmesi (Faz 1)
+                "ALTER TABLE dashboards ADD COLUMN description TEXT DEFAULT ''",
+                "ALTER TABLE dashboards ADD COLUMN owner_id TEXT DEFAULT ''",
+                "ALTER TABLE dashboards ADD COLUMN is_default INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE dashboards ADD COLUMN allowed_roles TEXT DEFAULT '[]'",
+                "ALTER TABLE dashboards ADD COLUMN allowed_users TEXT DEFAULT '[]'",
             ):
                 try:
                     conn.execute(stmt)
                 except sqlite3.OperationalError:
                     pass
+            try:
+                conn.execute("UPDATE dashboards SET owner_id = user_id WHERE (owner_id IS NULL OR owner_id = '') AND user_id IS NOT NULL AND user_id != ''")
+                conn.execute("UPDATE dashboards SET user_id = owner_id WHERE (user_id IS NULL OR user_id = '') AND owner_id IS NOT NULL AND owner_id != ''")
+            except Exception:
+                pass
             count = conn.execute('SELECT COUNT(*) as c FROM users').fetchone()['c']
             if count == 0:
                 self._seed_demo_data(conn)

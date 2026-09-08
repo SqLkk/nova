@@ -197,7 +197,7 @@ def _query_to_dict(row: dict) -> dict:
 
 
 def _can_access_query(row: dict) -> bool:
-    """Kullanıcının bu sorguya erişimi var mı?
+    """Kullanıcının bu nesneye (sorgu/şablon/dashboard/script/path) erişimi var mı?
 
     Kural: admin/superuser her şeyi; sahip her zaman; değilse
     rolü allowed_roles içinde veya kimliği (username/uid) allowed_users içinde olmalı.
@@ -206,7 +206,8 @@ def _can_access_query(row: dict) -> bool:
     role = getattr(g, 'role', None)
     if role in ('admin', 'superuser'):
         return True
-    if row.get('owner_id') and row['owner_id'] == getattr(g, 'uid', None):
+    owner = row.get('owner_id') or row.get('user_id')
+    if owner and owner == getattr(g, 'uid', None):
         return True
     allowed_roles = json.loads(row.get('allowed_roles') or '[]')
     allowed_users = json.loads(row.get('allowed_users') or '[]')
@@ -222,10 +223,11 @@ def _can_access_query(row: dict) -> bool:
 
 
 def _can_modify_query(row: dict) -> bool:
-    """Sorgu düzenleme/silme: sahip veya admin."""
+    """Nesne düzenleme/silme: sahip veya admin."""
     if getattr(g, 'role', None) in ('admin', 'superuser'):
         return True
-    return bool(row.get('owner_id')) and row['owner_id'] == getattr(g, 'uid', None)
+    owner = row.get('owner_id') or row.get('user_id')
+    return bool(owner) and owner == getattr(g, 'uid', None)
 
 
 # ---------------------------------------------------------------------------
@@ -909,46 +911,318 @@ def api_get_functions(ds_id):
 
 
 
-@app.route('/api/dashboards/me', methods=['GET'])
-def get_my_dashboard():
+# ---------------------------------------------------------------------------
+# Dashboards — Çoklu dashboard CRUD, ACL paylaşım, kopyalama, varsayılan
+# ---------------------------------------------------------------------------
+
+@app.route('/api/dashboards', methods=['GET'])
+def list_dashboards():
+    """Kullanıcının erişebildiği tüm aktif dashboard'ları listeler (ACL korumalı)."""
     db = get_db()
     with db._conn() as conn:
-        row = conn.execute('SELECT id, name, layout FROM dashboards WHERE user_id = ?', (g.uid,)).fetchone()
+        rows = [dict(r) for r in conn.execute(
+            '''SELECT d.id, d.name, d.description, d.user_id, d.owner_id,
+                      u.display_name AS owner_name,
+                      d.is_default, d.allowed_roles, d.allowed_users,
+                      d.layout, d.is_active, d.created_at, d.updated_at
+               FROM dashboards d
+               LEFT JOIN users u ON u.id = COALESCE(NULLIF(d.owner_id, ''), d.user_id)
+               WHERE d.is_active = 1
+               ORDER BY d.is_default DESC, datetime(d.updated_at) DESC''')]
+    visible = []
+    for r in rows:
+        r['owner_id'] = r.get('owner_id') or r.get('user_id') or ''
+        if not _can_access_query(r):
+            continue
+        layout_raw = r.get('layout') or '[]'
+        if isinstance(layout_raw, str):
+            try:
+                layout_list = json.loads(layout_raw)
+            except Exception:
+                layout_list = []
+        else:
+            layout_list = layout_raw or []
+        widget_count = len(layout_list) if isinstance(layout_list, list) else 0
+        visible.append({
+            'id': r['id'],
+            'name': r['name'],
+            'description': r.get('description', '') or '',
+            'owner': r['owner_id'],
+            'ownerName': r.get('owner_name') or '',
+            'isDefault': bool(r.get('is_default')),
+            'allowedRoles': json.loads(r.get('allowed_roles') or '[]'),
+            'allowedUsers': json.loads(r.get('allowed_users') or '[]'),
+            'widgetCount': widget_count,
+            'createdAt': r.get('created_at'),
+            'updatedAt': r.get('updated_at'),
+        })
+    return jsonify({"success": True, "data": visible})
+
+
+@app.route('/api/dashboards/<did>', methods=['GET'])
+def get_dashboard(did):
+    """Tekil dashboard getirir (layout + ACL; yetki kontrolü)."""
+    db = get_db()
+    with db._conn() as conn:
+        row = conn.execute(
+            '''SELECT d.*, u.display_name AS owner_name
+               FROM dashboards d
+               LEFT JOIN users u ON u.id = COALESCE(NULLIF(d.owner_id, ''), d.user_id)
+               WHERE d.id = ? AND d.is_active = 1''',
+            (did,)).fetchone()
+    if not row:
+        return _err("Dashboard bulunamadı.", 404)
+    data = dict(row)
+    data['owner_id'] = data.get('owner_id') or data.get('user_id') or ''
+    if not _can_access_query(data):
+        return _err("Erişim yetkiniz yok.", 403)
+    layout = data.get('layout') or '[]'
+    if isinstance(layout, str):
+        try:
+            layout = json.loads(layout)
+        except Exception:
+            layout = []
+    data['layout'] = layout
+    data['owner'] = data['owner_id']
+    data['isDefault'] = bool(data.get('is_default'))
+    data['allowedRoles'] = json.loads(data.get('allowed_roles') or '[]')
+    data['allowedUsers'] = json.loads(data.get('allowed_users') or '[]')
+    return jsonify({"success": True, "data": data})
+
+
+@app.route('/api/dashboards', methods=['POST'])
+def create_dashboard():
+    """Yeni dashboard oluşturur."""
+    body = request.get_json(silent=True) or {}
+    name = (body.get('name') or '').strip() or "Yeni Dashboard"
+    description = (body.get('description') or '').strip()
+    did = (body.get('id') or '').strip() or ('d_' + uuid.uuid4().hex[:12])
+    layout = body.get('layout') or []
+    if isinstance(layout, str):
+        try:
+            layout = json.loads(layout)
+        except Exception:
+            layout = []
+    is_default = 1 if (body.get('is_default') or body.get('isDefault')) else 0
+    allowed_roles = body.get('allowedRoles') or body.get('allowed_roles') or []
+    allowed_users = body.get('allowedUsers') or body.get('allowed_users') or []
+    uid = _user_id()
+    now = datetime.now().isoformat()
+    db = get_db()
+    with db._conn() as conn:
+        if is_default:
+            conn.execute('UPDATE dashboards SET is_default = 0 WHERE (user_id = ? OR owner_id = ?)', (uid, uid))
+        conn.execute(
+            '''INSERT INTO dashboards
+               (id, user_id, owner_id, name, description, layout, is_default, allowed_roles, allowed_users, is_active, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)''',
+            (did, uid, uid, name, description, json.dumps(layout, ensure_ascii=False),
+             is_default, json.dumps(allowed_roles), json.dumps(allowed_users), now, now)
+        )
+    _audit('dashboard.create', target=did)
+    return jsonify({"success": True, "data": {"id": did, "name": name}}), 201
+
+
+@app.route('/api/dashboards/<did>', methods=['PUT'])
+def update_dashboard(did):
+    """Dashboard başlık, açıklama, düzen (layout) veya varsayılanlık durumunu günceller."""
+    body = request.get_json(silent=True) or {}
+    db = get_db()
+    with db._conn() as conn:
+        row = conn.execute('SELECT id, user_id, owner_id FROM dashboards WHERE id = ?', (did,)).fetchone()
         if not row:
-            # Create a default dashboard for the user
+            return _err("Dashboard bulunamadı.", 404)
+        r = dict(row)
+        r['owner_id'] = r.get('owner_id') or r.get('user_id') or ''
+        if not _can_modify_query(r):
+            return _err("Bu dashboard'ı düzenleme yetkiniz yok.", 403)
+        
+        uid = _user_id()
+        now = datetime.now().isoformat()
+        
+        if 'isDefault' in body or 'is_default' in body:
+            is_def_val = 1 if (body.get('isDefault') or body.get('is_default')) else 0
+            if is_def_val:
+                conn.execute('UPDATE dashboards SET is_default = 0 WHERE (user_id = ? OR owner_id = ?) AND id != ?', (uid, uid, did))
+            conn.execute('UPDATE dashboards SET is_default = ? WHERE id = ?', (is_def_val, did))
+
+        updates = []
+        params = []
+        if 'name' in body:
+            updates.append('name = ?')
+            params.append((body.get('name') or '').strip() or 'Dashboard')
+        if 'description' in body:
+            updates.append('description = ?')
+            params.append((body.get('description') or '').strip())
+        if 'layout' in body:
+            layout = body.get('layout') or []
+            if isinstance(layout, str):
+                try:
+                    layout = json.loads(layout)
+                except Exception:
+                    layout = []
+            updates.append('layout = ?')
+            params.append(json.dumps(layout, ensure_ascii=False))
+            
+        if updates:
+            updates.append('updated_at = ?')
+            params.append(now)
+            params.append(did)
+            conn.execute(f"UPDATE dashboards SET {', '.join(updates)} WHERE id = ?", params)
+        
+    _audit('dashboard.update', target=did)
+    return jsonify({"success": True, "data": {"id": did}})
+
+
+@app.route('/api/dashboards/<did>/sharing', methods=['PUT'])
+def update_dashboard_sharing(did):
+    """Dashboard ACL: allowed_roles / allowed_users (sahip / admin / share:dashboards)."""
+    body = request.get_json(silent=True) or {}
+    db = get_db()
+    with db._conn() as conn:
+        row = conn.execute('SELECT id, user_id, owner_id FROM dashboards WHERE id = ?', (did,)).fetchone()
+        if not row:
+            return _err("Dashboard bulunamadı.", 404)
+        r = dict(row)
+        r['owner_id'] = r.get('owner_id') or r.get('user_id') or ''
+        if not (_can_modify_query(r) or _has_perm('share:dashboards')):
+            return _err("Paylaşım düzenleme yetkiniz yok.", 403)
+        allowed_roles = body.get('allowedRoles') or body.get('allowed_roles') or []
+        allowed_users = body.get('allowedUsers') or body.get('allowed_users') or []
+        conn.execute(
+            '''UPDATE dashboards SET allowed_roles=?, allowed_users=?, updated_at=datetime('now') WHERE id=?''',
+            (json.dumps(allowed_roles), json.dumps(allowed_users), did))
+    _audit('dashboard.share', target=did)
+    return jsonify({"success": True})
+
+
+@app.route('/api/dashboards/<did>/duplicate', methods=['POST'])
+def duplicate_dashboard(did):
+    """Mevcut dashboard'ın bir kopyasını oluşturur."""
+    db = get_db()
+    with db._conn() as conn:
+        row = conn.execute('SELECT * FROM dashboards WHERE id = ?', (did,)).fetchone()
+        if not row:
+            return _err("Dashboard bulunamadı.", 404)
+        r = dict(row)
+        r['owner_id'] = r.get('owner_id') or r.get('user_id') or ''
+        if not _can_access_query(r):
+            return _err("Erişim yetkiniz yok.", 403)
+        new_id = 'd_' + uuid.uuid4().hex[:12]
+        new_name = f"{r['name']} (Kopya)"
+        uid = _user_id()
+        now = datetime.now().isoformat()
+        conn.execute(
+            '''INSERT INTO dashboards
+               (id, user_id, owner_id, name, description, layout, is_default, allowed_roles, allowed_users, is_active, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, 0, '[]', '[]', 1, ?, ?)''',
+            (new_id, uid, uid, new_name, r.get('description', '') or '', r.get('layout', '[]'), now, now)
+        )
+    _audit('dashboard.duplicate', target=new_id)
+    return jsonify({"success": True, "data": {"id": new_id, "name": new_name}}), 201
+
+
+@app.route('/api/dashboards/<did>', methods=['DELETE'])
+def delete_dashboard(did):
+    """Dashboard siler (sahip veya admin)."""
+    db = get_db()
+    with db._conn() as conn:
+        row = conn.execute('SELECT id, user_id, owner_id FROM dashboards WHERE id = ?', (did,)).fetchone()
+        if not row:
+            return _err("Dashboard bulunamadı.", 404)
+        r = dict(row)
+        r['owner_id'] = r.get('owner_id') or r.get('user_id') or ''
+        if not _can_modify_query(r):
+            return _err("Bu dashboard'ı silme yetkiniz yok.", 403)
+        cur = conn.execute('DELETE FROM dashboards WHERE id = ?', (did,))
+    _audit('dashboard.delete', target=did)
+    return jsonify({"success": True, "deleted": cur.rowcount > 0})
+
+
+@app.route('/api/dashboards/me', methods=['GET'])
+def get_my_dashboard():
+    """Geriye dönük uyumluluk: aktif/varsayılan dashboard'ı getirir veya oluşturur."""
+    db = get_db()
+    with db._conn() as conn:
+        # 1. Varsayılan dashboard
+        row = conn.execute(
+            '''SELECT id, name, description, layout, is_default, allowed_roles, allowed_users
+               FROM dashboards
+               WHERE (user_id = ? OR owner_id = ?) AND is_active = 1 AND is_default = 1
+               LIMIT 1''',
+            (g.uid, g.uid)).fetchone()
+        
+        # 2. Kullanıcının en son güncellenen herhangi bir dashboard'u
+        if not row:
+            row = conn.execute(
+                '''SELECT id, name, description, layout, is_default, allowed_roles, allowed_users
+                   FROM dashboards
+                   WHERE (user_id = ? OR owner_id = ?) AND is_active = 1
+                   ORDER BY datetime(updated_at) DESC LIMIT 1''',
+                (g.uid, g.uid)).fetchone()
+        
+        # 3. Yoksa yeni bir varsayılan dashboard oluştur
+        if not row:
             new_id = 'd_' + uuid.uuid4().hex[:12]
             now = datetime.now().isoformat()
             conn.execute(
-                '''INSERT INTO dashboards (id, user_id, name, layout, is_active, created_at, updated_at)
-                   VALUES (?, ?, 'My Dashboard', '[]', 1, ?, ?)''',
-                (new_id, g.uid, now, now)
+                '''INSERT INTO dashboards
+                   (id, user_id, owner_id, name, description, layout, is_default, allowed_roles, allowed_users, is_active, created_at, updated_at)
+                   VALUES (?, ?, ?, 'My Dashboard', '', '[]', 1, '[]', '[]', 1, ?, ?)''',
+                (new_id, g.uid, g.uid, now, now)
             )
-            return jsonify({"success": True, "data": {"id": new_id, "name": "My Dashboard", "layout": []}})
+            return jsonify({"success": True, "data": {
+                "id": new_id, "name": "My Dashboard", "description": "",
+                "layout": [], "isDefault": True, "allowedRoles": [], "allowedUsers": []
+            }})
         
-        layout = json.loads(row['layout']) if row['layout'] else []
-        return jsonify({"success": True, "data": {"id": row['id'], "name": row['name'], "layout": layout}})
+        layout_val = row['layout']
+        if isinstance(layout_val, str):
+            try:
+                layout = json.loads(layout_val) if layout_val else []
+            except Exception:
+                layout = []
+        else:
+            layout = layout_val or []
+
+        return jsonify({"success": True, "data": {
+            "id": row['id'],
+            "name": row['name'],
+            "description": row.get('description', '') or '',
+            "isDefault": bool(row.get('is_default')),
+            "allowedRoles": json.loads(row.get('allowed_roles') or '[]'),
+            "allowedUsers": json.loads(row.get('allowed_users') or '[]'),
+            "layout": layout
+        }})
+
 
 @app.route('/api/dashboards/me', methods=['PUT'])
 def update_my_dashboard():
-    req = request.get_json() or {}
+    """Geriye dönük uyumluluk: aktif/varsayılan dashboard layout'unu günceller."""
+    req = request.get_json(silent=True) or {}
     layout = req.get('layout', [])
     
     db = get_db()
     with db._conn() as conn:
-        row = conn.execute('SELECT id FROM dashboards WHERE user_id = ?', (g.uid,)).fetchone()
+        row = conn.execute(
+            '''SELECT id FROM dashboards
+               WHERE (user_id = ? OR owner_id = ?) AND is_active = 1
+               ORDER BY is_default DESC, datetime(updated_at) DESC LIMIT 1''',
+            (g.uid, g.uid)).fetchone()
         now = datetime.now().isoformat()
         
         if not row:
             new_id = 'd_' + uuid.uuid4().hex[:12]
             conn.execute(
-                '''INSERT INTO dashboards (id, user_id, name, layout, is_active, created_at, updated_at)
-                   VALUES (?, ?, 'My Dashboard', ?, 1, ?, ?)''',
-                (new_id, g.uid, json.dumps(layout, ensure_ascii=False), now, now)
+                '''INSERT INTO dashboards
+                   (id, user_id, owner_id, name, description, layout, is_default, allowed_roles, allowed_users, is_active, created_at, updated_at)
+                   VALUES (?, ?, ?, 'My Dashboard', '', ?, 1, '[]', '[]', 1, ?, ?)''',
+                (new_id, g.uid, g.uid, json.dumps(layout, ensure_ascii=False), now, now)
             )
         else:
             conn.execute(
-                'UPDATE dashboards SET layout = ?, updated_at = ? WHERE user_id = ?',
-                (json.dumps(layout, ensure_ascii=False), now, g.uid)
+                'UPDATE dashboards SET layout = ?, updated_at = ? WHERE id = ?',
+                (json.dumps(layout, ensure_ascii=False), now, row['id'])
             )
             
     return jsonify({"success": True})
@@ -1829,6 +2103,7 @@ _SHARING_TABLES = {
     'paths': ('path_defs', 'share:paths'),
     'queries': ('queries', 'share:queries'),
     'scripts': ('python_scripts', 'share:scripts'),
+    'dashboards': ('dashboards', 'share:dashboards'),
 }
 
 
@@ -2010,6 +2285,7 @@ def admin_get_user(uid):
             'paths': conn.execute('SELECT COUNT(*) c FROM path_defs WHERE owner_id=?', (uid,)).fetchone()['c'],
             'queries': conn.execute('SELECT COUNT(*) c FROM queries WHERE owner_id=?', (uid,)).fetchone()['c'],
             'scripts': conn.execute('SELECT COUNT(*) c FROM python_scripts WHERE owner_id=?', (uid,)).fetchone()['c'],
+            'dashboards': conn.execute('SELECT COUNT(*) c FROM dashboards WHERE (owner_id=? OR user_id=?) AND is_active=1', (uid, uid)).fetchone()['c'],
         }
     u['permissions'] = perms
     u['allowedPages'] = sorted(p.split(':', 1)[1] for p in perms if p.startswith('page:'))
