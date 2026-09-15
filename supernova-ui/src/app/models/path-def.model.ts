@@ -3,17 +3,19 @@
  * kayıtlı tanımlar (PathDef). Backend path_engine.py ile birebir eşleşir.
  */
 
-export type PathStructure = 'tree' | 'binary_tree' | 'sequence' | 'grouped';
+export type PathStructure = 'tree' | 'binary_tree' | 'sequence' | 'grouped' | 'dag';
 
 /** Kolon eşlemesi + ayarlar (yapı tipine göre farklı alanlar kullanılır). */
 export interface PathConfig {
-  /** tree/binary_tree/sequence: düğüm kimliği kolonu. */
+  /** tree/binary_tree/sequence/dag: düğüm kimliği kolonu. */
   id_col?: string;
-  /** tree/binary_tree: üst düğüm kolonu. */
+  /** tree/binary_tree/dag: üst düğüm kolonu (dag için virgülle ayrılmış birden çok ebeveyn). */
   parent_col?: string;
+  /** dag: çoklu ebeveyn kolonu alternatifi */
+  parents_col?: string;
   /** hepsi: etiket (görünen ad) kolonu. */
   label_col?: string;
-  /** tree/binary_tree: opsiyonel tip/renk kolonu. */
+  /** tree/binary_tree/dag: opsiyonel tip/renk kolonu. */
   type_col?: string;
   /** tree/binary_tree: "kök" anlamına gelen parent değeri (boş = null/empty). */
   root_value?: string;
@@ -25,6 +27,14 @@ export interface PathConfig {
   group_col?: string;
   /** Hedef veri / eşleşme kolonu (örn. pointid) */
   target_col?: string;
+  /** Canlı sağlık puanı kolonu (örn. health_score, oee_percent) */
+  health_col?: string;
+  /** Canlı durum kolonu (örn. status, state) */
+  status_col?: string;
+  /** Rozet kolonu */
+  badge_col?: string;
+  /** Renk kolonu */
+  color_col?: string;
 }
 
 /** Yapıdaki tek düğüm. */
@@ -32,11 +42,17 @@ export interface PathNode {
   id: string;
   label: string;
   parent: string;
+  parents?: string[];
   depth: number;
   /** Kök → bu düğüm id zinciri. */
   path: string[];
   type: string;
   children: string[];
+  /** Canlı sağlık ve durum rozetleri */
+  healthScore?: number;
+  status?: string;
+  statusColor?: string;
+  badge?: string;
   /** Orijinal sorgu satırı (arama/önizleme için). */
   row?: Record<string, unknown>;
 }

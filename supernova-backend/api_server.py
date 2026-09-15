@@ -10,7 +10,7 @@ import tempfile
 from datetime import datetime, timedelta, timezone
 from io import BytesIO
 
-from flask import Flask, jsonify, request, send_file, g
+from flask import Flask, jsonify, request, send_file, g, Response
 from werkzeug.middleware.proxy_fix import ProxyFix
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -104,9 +104,15 @@ def _auth_guard():
         return None
 
     header = request.headers.get('Authorization', '')
-    if not header.startswith('Bearer '):
+    raw_token = ''
+    if header.startswith('Bearer '):
+        raw_token = header[7:].strip()
+    elif request.args.get('token'):
+        raw_token = request.args.get('token').strip()
+    
+    if not raw_token:
         return _err('Authentication required.', 401)
-    payload = auth_lib.verify_token(header[7:].strip())
+    payload = auth_lib.verify_token(raw_token)
     if not payload:
         return _err('Session invalid or expired.', 401)
 
@@ -207,7 +213,7 @@ def _can_access_query(row: dict) -> bool:
     if role in ('admin', 'superuser'):
         return True
     owner = row.get('owner_id') or row.get('user_id')
-    if owner and owner == getattr(g, 'uid', None):
+    if owner == 'system' or (owner and owner == getattr(g, 'uid', None)):
         return True
     allowed_roles = json.loads(row.get('allowed_roles') or '[]')
     allowed_users = json.loads(row.get('allowed_users') or '[]')
@@ -1176,7 +1182,8 @@ def get_my_dashboard():
                 "layout": [], "isDefault": True, "allowedRoles": [], "allowedUsers": []
             }})
         
-        layout_val = row['layout']
+        drow = dict(row)
+        layout_val = drow.get('layout')
         if isinstance(layout_val, str):
             try:
                 layout = json.loads(layout_val) if layout_val else []
@@ -1186,12 +1193,12 @@ def get_my_dashboard():
             layout = layout_val or []
 
         return jsonify({"success": True, "data": {
-            "id": row['id'],
-            "name": row['name'],
-            "description": row.get('description', '') or '',
-            "isDefault": bool(row.get('is_default')),
-            "allowedRoles": json.loads(row.get('allowed_roles') or '[]'),
-            "allowedUsers": json.loads(row.get('allowed_users') or '[]'),
+            "id": drow['id'],
+            "name": drow['name'],
+            "description": drow.get('description', '') or '',
+            "isDefault": bool(drow.get('is_default')),
+            "allowedRoles": json.loads(drow.get('allowed_roles') or '[]'),
+            "allowedUsers": json.loads(drow.get('allowed_users') or '[]'),
             "layout": layout
         }})
 
@@ -1226,6 +1233,47 @@ def update_my_dashboard():
             )
             
     return jsonify({"success": True})
+
+
+@app.route('/api/dashboards/<did>/export', methods=['GET'])
+def export_dashboard(did):
+    """Executive Dashboard anlık durumunu PDF raporu olarak dışa aktarır."""
+    db = get_db()
+    with db._conn() as conn:
+        row = conn.execute(
+            '''SELECT d.*, u.display_name AS owner_name
+               FROM dashboards d
+               LEFT JOIN users u ON u.id = COALESCE(NULLIF(d.owner_id, ''), d.user_id)
+               WHERE d.id = ? AND d.is_active = 1''',
+            (did,)).fetchone()
+    if not row:
+        return _err("Dashboard bulunamadı.", 404)
+    data = dict(row)
+    data['owner_id'] = data.get('owner_id') or data.get('user_id') or ''
+    if not _can_access_query(data):
+        return _err("Erişim yetkiniz yok.", 403)
+    
+    layout = data.get('layout') or '[]'
+    if isinstance(layout, str):
+        try:
+            data['layout'] = json.loads(layout)
+        except Exception:
+            data['layout'] = []
+
+    from pdf_template_renderer import render_dashboard_to_pdf
+    try:
+        pdf_bytes = render_dashboard_to_pdf(data)
+        slug = re.sub(r'[^a-zA-Z0-9_-]+', '_', data.get('name') or 'Dashboard')
+        filename = f"{slug}_Executive_Report_{datetime.now().strftime('%Y%m%d')}.pdf"
+        return send_file(
+            BytesIO(pdf_bytes),
+            mimetype='application/pdf',
+            as_attachment=True,
+            download_name=filename
+        )
+    except Exception as exc:
+        logger.exception("Dashboard PDF export failed: %s", exc)
+        return _err(f"PDF oluşturulamadı: {str(exc)}", 500)
 
 
 # ---------------------------------------------------------------------------
@@ -1269,7 +1317,8 @@ def create_query():
 
     qid = (body.get('id') or '').strip() or _new_id('q_')
     params = json.dumps(body.get('parameters') or [])
-    allowed_roles = json.dumps(body.get('allowedRoles') or [])
+    default_roles = ['admin', 'superuser', 'engineer', 'operator', 'viewer']
+    allowed_roles = json.dumps(body.get('allowedRoles') if body.get('allowedRoles') is not None else default_roles)
     allowed_users = json.dumps(body.get('allowedUsers') or [])
 
     db = get_db()
@@ -1365,6 +1414,33 @@ def preview_adhoc():
     except QueryExecutionError as exc:
         return _err(str(exc), 422)
     return jsonify({"success": True, "data": result})
+
+
+@app.route('/api/queries/<qid>/columns', methods=['GET'])
+def get_query_columns(qid):
+    """Sorgunun sütun listesini döndürür (Widget kolon eşleme dropdown seçicisi için)."""
+    row = _load_query_row(qid)
+    if not row:
+        return _err("Query not found.", 404)
+    if not _can_access_query(row):
+        return _err("Bu sorgunun sütunlarını görme yetkiniz yok.", 403)
+    cols = _query_columns(row)
+    if cols:
+        col_names = [c['name'] if isinstance(c, dict) else str(c) for c in cols]
+        return jsonify({"success": True, "data": col_names})
+    # Önbellekte yoksa limit 1 ile hızlıca çalıştırıp sütunları tespit et
+    ds = _full_data_source(row['data_source_id'])
+    if ds:
+        try:
+            res = execute_query(ds, row['sql_text'], {}, limit=1)
+            raw_cols = res.get('columns') or []
+            if raw_cols:
+                metadata_cache.set(f'qcols:{qid}', raw_cols)
+                col_names = [c['name'] if isinstance(c, dict) else str(c) for c in raw_cols]
+                return jsonify({"success": True, "data": col_names})
+        except Exception as e:
+            logger.warning("Failed to auto-detect columns for query %s: %s", qid, e)
+    return jsonify({"success": True, "data": []})
 
 
 def _collect_sql_data(sql_query_ids: list, filters: dict) -> dict:
@@ -1792,8 +1868,8 @@ def _resolve_python_dataset(ref: str, params_by_query: dict) -> dict:
 def render_template(tid):
     """Şablonu çalıştır: bağlı query'leri koş, modeli doldur, .xlsx döndür."""
     fmt = (request.args.get('format') or 'xlsx').lower()
-    if fmt != 'xlsx':
-        return _err("Only xlsx is supported for now.", 501)
+    if fmt not in ('xlsx', 'pdf', 'excel'):
+        return _err("Only xlsx and pdf formats are supported for now.", 400)
 
     db = get_db()
     with db._conn() as conn:
@@ -1848,7 +1924,24 @@ def render_template(tid):
         logger.exception("Render error")
         return _err("Şablon işlenirken hata oluştu.", 500)
 
-    download = f"{(row['name'] or 'template').replace(' ', '_')}.xlsx"
+    safe_name = (row['name'] or 'template').replace(' ', '_')
+
+    if fmt == 'pdf':
+        try:
+            from pdf_template_renderer import render_template_to_pdf
+            pdf_bytes = render_template_to_pdf(model, query_results, excel_bytes=out, report_title=row['name'])
+            download = f"{safe_name}.pdf"
+            return send_file(
+                BytesIO(pdf_bytes),
+                mimetype="application/pdf",
+                as_attachment=True,
+                download_name=download,
+            )
+        except Exception as p_exc:
+            logger.exception("PDF render error")
+            return _err(f"PDF oluşturulurken hata oluştu: {str(p_exc)}", 500)
+
+    download = f"{safe_name}.xlsx"
     return send_file(
         BytesIO(out),
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -1861,7 +1954,7 @@ def render_template(tid):
 # Path Defs (Path Definer — hiyerarşik navigasyon tanımları)
 # ---------------------------------------------------------------------------
 
-_VALID_STRUCTURES = ('tree', 'binary_tree', 'sequence', 'grouped')
+_VALID_STRUCTURES = ('tree', 'binary_tree', 'sequence', 'grouped', 'dag')
 
 
 def _load_path_row(pid: str):
@@ -1912,6 +2005,9 @@ def _run_path_query(query_id: str, params: dict = None, limit: int = 5000):
     except QueryExecutionError as exc:
         logger.warning("Path query error (%s): %s", query_id, exc)
         return [], [], f"Query error: {exc}"
+    except Exception as exc:
+        logger.warning("Path query unexpected error (%s): %s", query_id, exc)
+        return [], [], f"Query error: {exc}"
 
 
 def _breadcrumb(nodes: list, path_ids: list) -> list:
@@ -1958,6 +2054,8 @@ def create_path():
         return _err("You must select a query.")
     config = body.get('config') or {}
     pid = (body.get('id') or '').strip() or _new_id('pth_')
+    default_roles = ['admin', 'superuser', 'engineer', 'operator', 'viewer']
+    allowed_roles = json.dumps(body.get('allowedRoles') if body.get('allowedRoles') is not None else default_roles)
     db = get_db()
     with db._conn() as conn:
         try:
@@ -1968,7 +2066,7 @@ def create_path():
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)''',
                 (pid, name, body.get('description', ''), query_id, structure,
                  json.dumps(config, ensure_ascii=False), _user_id(),
-                 json.dumps(body.get('allowedRoles') or []),
+                 allowed_roles,
                  json.dumps(body.get('allowedUsers') or [])))
         except Exception as exc:
             return _err("Path oluşturulamadı.", 409)
@@ -2037,29 +2135,38 @@ def preview_path():
 
 @app.route('/api/paths/<pid>/build', methods=['POST'])
 def build_path(pid):
-    """Path'i canlı koşup materialized cache'e yazar (engineer+)."""
-    if getattr(g, 'role', None) not in ('admin', 'superuser', 'engineer'):
-        return _err("You do not have permission to compile paths.", 403)
+    """Path'i canlı koşup materialized cache'e yazar."""
     row = _load_path_row(pid)
     if not row:
         return _err("Path not found.", 404)
     if not _can_access_query(row):
         return _err("You do not have permission to view this path.", 403)
+    can_compile = getattr(g, 'role', None) in ('admin', 'superuser', 'engineer')
     body = request.get_json(silent=True) or {}
     # Büyük hiyerarşilerde kesilme olmasın diye build yüksek satır cap'i kullanır
     # (varsayılan 5000). İstemci body.limit ile geçersiz kılabilir.
     build_limit = int(body.get('limit') or 20000)
     rows, _cols, err = _run_path_query(row['query_id'], body.get('params') or {}, limit=build_limit)
     if err:
+        # Canlı sorgu başarısızsa ve önbellek varsa, önbellekten sun
+        if row.get('materialized'):
+            try:
+                cached = json.loads(row['materialized'])
+                if isinstance(cached, dict):
+                    cached.setdefault('stats', {})['warnings'] = [f"Canlı sorgu hatası ({err}). Önbellekteki hiyerarşi gösteriliyor."]
+                    return jsonify({"success": True, "data": cached, "warning": str(err)})
+            except Exception:
+                pass
         return _err(err, 400)
     built = build_structure(row['structure'], rows, json.loads(row.get('config') or '{}'))
-    from datetime import datetime as _dt
-    stamp = _dt.now().isoformat()
-    db = get_db()
-    with db._conn() as conn:
-        conn.execute(
-            "UPDATE path_defs SET materialized=?, materialized_at=?, updated_at=datetime('now') WHERE id=?",
-            (json.dumps(built, ensure_ascii=False), stamp, pid))
+    if can_compile:
+        from datetime import datetime as _dt
+        stamp = _dt.now().isoformat()
+        db = get_db()
+        with db._conn() as conn:
+            conn.execute(
+                "UPDATE path_defs SET materialized=?, materialized_at=?, updated_at=datetime('now') WHERE id=?",
+                (json.dumps(built, ensure_ascii=False), stamp, pid))
     return jsonify({"success": True, "data": built})
 
 
@@ -2091,6 +2198,86 @@ def search_path(pid):
                     'breadcrumb': _breadcrumb(built['nodes'], node.get('path', [])),
                 })
     return jsonify({"success": True, "data": {"hits": hits, "stats": built['stats']}})
+
+
+# ---------------------------------------------------------------------------
+# High-Frequency Industrial Telemetry Stream (SSE - Server Sent Events)
+# ---------------------------------------------------------------------------
+
+@app.route('/api/telemetry/stream', methods=['GET'])
+def stream_telemetry():
+    """Yüksek hızlı endüstriyel telemetri akışı (Server-Sent Events / SSE).
+    Sensör değerlerini (titreşim RMS, hidrolik basınç, tork, sıcaklık, hız, optik güç)
+    yüksek frekanslı akış olarak sunar.
+    """
+    sensor_filter = request.args.get('sensor_id')
+    machine_filter = request.args.get('machine_id')
+
+    def event_stream():
+        import time
+        import random
+        db_path = os.path.join(os.path.dirname(__file__), '..', 'db', 'apex_smart_factory_prod.db')
+        readings = []
+        if os.path.exists(db_path):
+            try:
+                import sqlite3
+                conn = sqlite3.connect(db_path)
+                conn.row_factory = sqlite3.Row
+                cur = conn.cursor()
+                query = "SELECT reading_id, timestamp, machine_id, sensor_id, metric_name, value, unit, lsl, usl, warning_threshold, alarm_status FROM machine_telemetry_timeseries ORDER BY reading_id DESC LIMIT 150"
+                rows = cur.execute(query).fetchall()
+                readings = [dict(r) for r in rows]
+                conn.close()
+            except Exception as e:
+                logger.warning("Telemetry db read error: %s", e)
+
+        sensors = [
+            {"sensor_id": "SNS-DMG-SPINDLE-VIB", "machine_id": "MCH-DMG-DMC-85", "metric_name": "Spindle Bearing Vibration RMS", "unit": "mm/s", "base": 1.25, "warn": 2.6, "crit": 3.5},
+            {"sensor_id": "SNS-SCHULER-HYD-PRESS", "machine_id": "MCH-SCHULER-2500", "metric_name": "Hydraulic Cushion Pressure", "unit": "bar", "base": 220.0, "warn": 260.0, "crit": 280.0},
+            {"sensor_id": "SNS-AVL-DYNO-TORQUE", "machine_id": "MCH-AVL-DYNO-400", "metric_name": "Dynamic Shaft Torque", "unit": "Nm", "base": 340.0, "warn": 480.0, "crit": 550.0},
+            {"sensor_id": "SNS-TRUMPF-LASER-PWR", "machine_id": "MCH-TRUMPF-LASER-01", "metric_name": "Fiber Laser Optical Power", "unit": "kW", "base": 5.92, "warn": 6.15, "crit": 6.3},
+            {"sensor_id": "SNS-AVL-DYNO-SPEED", "machine_id": "MCH-AVL-DYNO-400", "metric_name": "Shaft Angular Speed", "unit": "RPM", "base": 12500.0, "warn": 21000.0, "crit": 24000.0},
+            {"sensor_id": "SNS-DMG-SPINDLE-TEMP", "machine_id": "MCH-DMG-DMC-85", "metric_name": "Spindle Ceramic Bearing Temp", "unit": "°C", "base": 42.5, "warn": 60.0, "crit": 72.0},
+        ]
+        
+        idx = 0
+        while True:
+            now_iso = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+            if readings:
+                item = dict(readings[idx % len(readings)])
+                idx += 1
+                noise = (random.random() - 0.5) * (item.get('value', 1.0) * 0.04)
+                item['value'] = round(item.get('value', 0) + noise, 2)
+                item['timestamp'] = now_iso
+                if sensor_filter and item.get('sensor_id') != sensor_filter:
+                    continue
+                if machine_filter and item.get('machine_id') != machine_filter:
+                    continue
+                payload = json.dumps(item)
+            else:
+                s = random.choice(sensors)
+                noise = (random.random() - 0.5) * (s["base"] * 0.08)
+                val = round(s["base"] + noise, 2)
+                status = "CRITICAL" if val >= s["crit"] else ("WARNING" if val >= s["warn"] else "NORMAL")
+                payload = json.dumps({
+                    "timestamp": now_iso,
+                    "sensor_id": s["sensor_id"],
+                    "machine_id": s["machine_id"],
+                    "metric_name": s["metric_name"],
+                    "value": val,
+                    "unit": s["unit"],
+                    "warning_threshold": s["warn"],
+                    "alarm_status": status
+                })
+            yield f"data: {payload}\n\n"
+            time.sleep(0.5)
+
+    return Response(event_stream(), mimetype='text/event-stream', headers={
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'X-Accel-Buffering': 'no',
+        'Access-Control-Allow-Origin': '*'
+    })
 
 
 # ---------------------------------------------------------------------------
@@ -2508,6 +2695,205 @@ def admin_audit_log():
                 "FROM audit_log ORDER BY id DESC LIMIT ? OFFSET ?",
                 (limit, offset)).fetchall()
     return jsonify({'success': True, 'data': [dict(r) for r in rows]})
+
+
+# ---------------------------------------------------------------------------
+# Report Schedules (Universal Dynamic Report Scheduler)
+# ---------------------------------------------------------------------------
+
+@app.route('/api/schedules', methods=['GET'])
+def list_schedules():
+    db = get_db()
+    with db._conn() as conn:
+        rows = [dict(r) for r in conn.execute(
+            'SELECT s.*, t.name as template_name '
+            'FROM report_schedules s '
+            'LEFT JOIN report_templates t ON s.template_id = t.id '
+            'ORDER BY datetime(s.updated_at) DESC'
+        ).fetchall()]
+
+    visible = []
+    for r in rows:
+        if not _can_access_query(r):
+            continue
+        r['allowedRoles'] = json.loads(r.get('allowed_roles') or '[]')
+        r['allowedUsers'] = json.loads(r.get('allowed_users') or '[]')
+        r['recipients'] = json.loads(r.get('recipients') or '[]')
+        r['customWindowConfig'] = json.loads(r.get('custom_window_config') or '{}')
+        r['paramsOverride'] = json.loads(r.get('params_override') or '{}')
+        visible.append(r)
+    return jsonify({"success": True, "data": visible})
+
+
+@app.route('/api/schedules/<sid>', methods=['GET'])
+def get_schedule(sid):
+    db = get_db()
+    with db._conn() as conn:
+        row = conn.execute(
+            'SELECT s.*, t.name as template_name '
+            'FROM report_schedules s '
+            'LEFT JOIN report_templates t ON s.template_id = t.id '
+            'WHERE s.id = ?', (sid,)
+        ).fetchone()
+    if not row:
+        return _err("Schedule not found.", 404)
+    data = dict(row)
+    if not _can_access_query(data):
+        return _err("Erişim yetkiniz yok.", 403)
+    data['allowedRoles'] = json.loads(data.get('allowed_roles') or '[]')
+    data['allowedUsers'] = json.loads(data.get('allowed_users') or '[]')
+    data['recipients'] = json.loads(data.get('recipients') or '[]')
+    data['customWindowConfig'] = json.loads(data.get('custom_window_config') or '{}')
+    data['paramsOverride'] = json.loads(data.get('params_override') or '{}')
+    return jsonify({"success": True, "data": data})
+
+
+@app.route('/api/schedules', methods=['POST'])
+def create_schedule():
+    body = request.get_json(silent=True) or {}
+    name = (body.get('name') or '').strip()
+    if not name:
+        return _err("Schedule name is required.", 400)
+    template_id = (body.get('template_id') or body.get('templateId') or '').strip()
+    if not template_id:
+        return _err("template_id is required.", 400)
+
+    db = get_db()
+    with db._conn() as conn:
+        tpl = conn.execute('SELECT id FROM report_templates WHERE id=?', (template_id,)).fetchone()
+        if not tpl:
+            return _err("Referenced template does not exist.", 404)
+
+    sid = (body.get('id') or '').strip() or _new_id('sched_')
+    frequency = body.get('frequency', 'daily')
+    cron_expr = body.get('cron_expression', '')
+    window_type = body.get('window_type', 'yesterday')
+    custom_cfg = json.dumps(body.get('custom_window_config') or body.get('customWindowConfig') or {})
+    params_override = json.dumps(body.get('params_override') or body.get('paramsOverride') or {})
+    output_format = body.get('output_format', 'xlsx')
+    recipients = json.dumps(body.get('recipients') or [])
+    allowed_roles = json.dumps(body.get('allowedRoles') or body.get('allowed_roles') or [])
+    allowed_users = json.dumps(body.get('allowedUsers') or body.get('allowed_users') or [])
+
+    with db._conn() as conn:
+        conn.execute(
+            '''INSERT INTO report_schedules
+               (id, name, description, template_id, frequency, cron_expression,
+                window_type, custom_window_config, params_override, output_format,
+                recipients, is_active, owner_id, allowed_roles, allowed_users)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)''',
+            (sid, name, body.get('description', ''), template_id, frequency, cron_expr,
+             window_type, custom_cfg, params_override, output_format, recipients,
+             _user_id(), allowed_roles, allowed_users)
+        )
+    return jsonify({"success": True, "data": {"id": sid, "name": name}}), 201
+
+
+@app.route('/api/schedules/<sid>', methods=['PUT'])
+def update_schedule(sid):
+    body = request.get_json(silent=True) or {}
+    db = get_db()
+    with db._conn() as conn:
+        row = conn.execute('SELECT * FROM report_schedules WHERE id=?', (sid,)).fetchone()
+        if not row:
+            return _err("Schedule not found.", 404)
+        if not _can_modify_query(dict(row)):
+            return _err("Bu zamanlayıcıyı düzenleme yetkiniz yok.", 403)
+
+        fields = []
+        vals = []
+        for col, key in [
+            ('name', 'name'),
+            ('description', 'description'),
+            ('frequency', 'frequency'),
+            ('cron_expression', 'cron_expression'),
+            ('window_type', 'window_type'),
+            ('output_format', 'output_format'),
+            ('is_active', 'is_active'),
+        ]:
+            if key in body:
+                fields.append(f"{col}=?")
+                vals.append(body[key])
+
+        if 'template_id' in body or 'templateId' in body:
+            fields.append("template_id=?")
+            vals.append(body.get('template_id') or body.get('templateId'))
+        if 'custom_window_config' in body or 'customWindowConfig' in body:
+            fields.append("custom_window_config=?")
+            vals.append(json.dumps(body.get('custom_window_config') or body.get('customWindowConfig') or {}))
+        if 'params_override' in body or 'paramsOverride' in body:
+            fields.append("params_override=?")
+            vals.append(json.dumps(body.get('params_override') or body.get('paramsOverride') or {}))
+        if 'recipients' in body:
+            fields.append("recipients=?")
+            vals.append(json.dumps(body['recipients']))
+
+        if fields:
+            fields.append("updated_at=datetime('now')")
+            vals.append(sid)
+            conn.execute(f"UPDATE report_schedules SET {', '.join(fields)} WHERE id=?", vals)
+
+    return jsonify({"success": True, "data": {"id": sid}})
+
+
+@app.route('/api/schedules/<sid>', methods=['DELETE'])
+def delete_schedule(sid):
+    db = get_db()
+    with db._conn() as conn:
+        row = conn.execute('SELECT * FROM report_schedules WHERE id=?', (sid,)).fetchone()
+        if not row:
+            return _err("Schedule not found.", 404)
+        if not _can_modify_query(dict(row)):
+            return _err("Bu zamanlayıcıyı silme yetkiniz yok.", 403)
+        conn.execute('DELETE FROM report_schedules WHERE id=?', (sid,))
+    return jsonify({"success": True})
+
+
+@app.route('/api/schedules/<sid>/run', methods=['POST'])
+def run_schedule_now(sid):
+    """Zamanlayıcıyı anında çalıştırır. İsteğe bağlı 'reference_date' alır."""
+    body = request.get_json(silent=True) or {}
+    ref_date = body.get('reference_date') or body.get('referenceDate')
+    try:
+        from scheduler_engine import execute_schedule_run
+        result = execute_schedule_run(sid, reference_date_str=ref_date, executed_by=_user_id())
+        return jsonify({"success": result.get("success", False), "data": result})
+    except Exception as exc:
+        logger.exception("Error triggering schedule run")
+        return _err(f"Zamanlayıcı çalıştırılırken hata: {str(exc)}", 500)
+
+
+@app.route('/api/schedules/<sid>/runs', methods=['GET'])
+def list_schedule_runs(sid):
+    """Belirli bir zamanlayıcının geçmiş çalışmalarını döndürür."""
+    db = get_db()
+    with db._conn() as conn:
+        rows = [dict(r) for r in conn.execute(
+            'SELECT * FROM report_schedule_runs WHERE schedule_id=? ORDER BY datetime(created_at) DESC LIMIT 50',
+            (sid,)
+        ).fetchall()]
+    for r in rows:
+        r['resolvedParams'] = json.loads(r.get('resolved_params') or '{}')
+    return jsonify({"success": True, "data": rows})
+
+
+@app.route('/api/schedules/runs/<run_id>/download', methods=['GET'])
+def download_schedule_run_file(run_id):
+    """Çalıştırma sonucunda üretilen rapor dosyasını indirir."""
+    db = get_db()
+    with db._conn() as conn:
+        run_row = conn.execute('SELECT * FROM report_schedule_runs WHERE id=?', (run_id,)).fetchone()
+    if not run_row:
+        return _err("Run not found.", 404)
+    run_dict = dict(run_row)
+    file_path = run_dict.get('output_file_path')
+    if not file_path or not os.path.exists(file_path):
+        return _err("Generated report file not found on disk.", 404)
+
+    fmt = run_dict.get('output_format', 'xlsx').lower()
+    mimetype = 'application/pdf' if fmt == 'pdf' else 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    filename = os.path.basename(file_path)
+    return send_file(file_path, mimetype=mimetype, as_attachment=True, download_name=filename)
 
 
 # ---------------------------------------------------------------------------

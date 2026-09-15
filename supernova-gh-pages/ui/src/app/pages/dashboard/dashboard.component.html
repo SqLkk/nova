@@ -18,12 +18,138 @@
   <main class="relative z-10 p-8 overflow-y-auto h-full">
     
     <!-- Header -->
-    <div class="flex items-center justify-between mb-8">
-      <div>
-        <h2 class="text-4xl font-black tracking-tight bg-gradient-to-r from-[rgb(var(--accent-primary))] via-[rgb(var(--accent-soft))] to-[rgb(var(--accent-secondary))] bg-clip-text text-transparent drop-shadow-[0_0_15px_rgb(var(--accent-primary)/0.3)]">
-          SUPER NOVA
-        </h2>
-        <p class="text-[rgb(201,196,186)] mt-1 font-medium tracking-wide text-sm">Advanced Business Intelligence Hub</p>
+    <div class="flex flex-wrap items-center justify-between gap-4 mb-8">
+      <div class="flex items-center space-x-6">
+        <div>
+          <h2 class="text-4xl font-black tracking-tight bg-gradient-to-r from-[rgb(var(--accent-primary))] via-[rgb(var(--accent-soft))] to-[rgb(var(--accent-secondary))] bg-clip-text text-transparent drop-shadow-[0_0_15px_rgb(var(--accent-primary)/0.3)]">
+            SUPER NOVA
+          </h2>
+          <p class="text-[rgb(201,196,186)] mt-1 font-medium tracking-wide text-sm">Advanced Business Intelligence Hub</p>
+        </div>
+
+        <!-- Dashboard Selector & Management Toolbar -->
+        <div class="relative flex items-center space-x-2">
+          <!-- Dashboard Switcher Dropdown Button -->
+          <div class="relative">
+            <button (click)="toggleDashboardSelector()"
+                    class="flex items-center space-x-2.5 px-4 py-2.5 rounded-xl bg-[rgb(31,27,38)]/90 hover:bg-[rgb(45,39,55)] border border-[rgb(82,74,90)] hover:border-[rgb(var(--accent-primary))]/50 transition-all text-white font-semibold text-sm cursor-pointer shadow-lg backdrop-blur-md">
+              <i class="fas fa-layer-group text-[rgb(var(--accent-primary))]"></i>
+              <span class="max-w-[170px] truncate">{{ activeDashboard?.name || 'My Dashboard' }}</span>
+              <span *ngIf="activeDashboard?.isDefault" class="text-amber-400 text-xs font-bold" title="Varsayılan Dashboard">★</span>
+              <i class="fas fa-chevron-down text-xs text-[rgb(163,154,137)] transition-transform duration-200" [class.rotate-180]="showDashboardSelector"></i>
+            </button>
+
+            <!-- Dropdown Menu -->
+            <div *ngIf="showDashboardSelector"
+                 class="absolute left-0 top-full mt-2 w-80 bg-[rgb(20,17,27)] border border-[rgb(82,74,90)] rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.85)] z-50 overflow-hidden backdrop-blur-xl animate-fade-in">
+              <!-- Search & New -->
+              <div class="p-3 border-b border-[rgb(82,74,90)]/60 bg-[rgb(31,27,38)]/70 space-y-2">
+                <div class="flex items-center space-x-2">
+                  <div class="relative flex-1">
+                    <i class="fas fa-search absolute left-3 top-2.5 text-xs text-[rgb(163,154,137)]"></i>
+                    <input type="text" [(ngModel)]="dashboardSearch" placeholder="Dashboard ara..."
+                           class="w-full bg-[rgb(20,17,27)] border border-[rgb(82,74,90)]/60 text-xs text-white rounded-lg pl-8 pr-3 py-1.5 focus:outline-none focus:border-[rgb(var(--accent-primary))]">
+                  </div>
+                  <button (click)="openCreateModal()"
+                          title="Yeni Dashboard"
+                          class="px-2.5 py-1.5 bg-[rgb(var(--accent-primary))]/20 hover:bg-[rgb(var(--accent-primary))]/30 text-[rgb(var(--accent-primary))] border border-[rgb(var(--accent-primary))]/40 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center space-x-1 shrink-0">
+                    <i class="fas fa-plus"></i>
+                    <span>Yeni</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Dashboard Lists -->
+              <div class="max-h-72 overflow-y-auto p-2 space-y-3">
+                <!-- Benim Dashboard'larım -->
+                <div>
+                  <div class="text-[10px] uppercase font-bold text-[rgb(163,154,137)] tracking-wider px-2 py-1 flex items-center justify-between">
+                    <span>Benim Dashboard'larım</span>
+                    <span class="text-[9px] bg-[rgb(82,74,90)]/30 px-1.5 py-0.5 rounded">{{ myDashboards.length }}</span>
+                  </div>
+                  <div *ngIf="myDashboards.length === 0" class="text-xs text-[rgb(163,154,137)] px-2 py-1.5 italic">
+                    Henüz bir dashboard yok.
+                  </div>
+                  <button *ngFor="let d of myDashboards"
+                          (click)="selectDashboard(d)"
+                          [class.bg-[rgb(var(--accent-primary))]/15]="d.id === activeDashboardId"
+                          [class.border-[rgb(var(--accent-primary))]/40]="d.id === activeDashboardId"
+                          class="w-full text-left p-2 rounded-xl hover:bg-[rgb(31,27,38)] border border-transparent transition-all flex items-center justify-between group cursor-pointer">
+                    <div class="min-w-0 flex-1 pr-2">
+                      <div class="flex items-center space-x-1.5">
+                        <span class="text-xs font-semibold text-white truncate">{{ d.name }}</span>
+                        <span *ngIf="d.isDefault" class="text-[10px] text-amber-400 font-bold" title="Varsayılan">★</span>
+                      </div>
+                      <p *ngIf="d.description" class="text-[10px] text-[rgb(163,154,137)] truncate">{{ d.description }}</p>
+                    </div>
+                    <div class="flex items-center space-x-1.5 text-[10px] text-[rgb(163,154,137)] font-mono shrink-0">
+                      <span>{{ d.widgetCount || 0 }} modül</span>
+                      <i *ngIf="d.id === activeDashboardId" class="fas fa-check text-[rgb(var(--accent-primary))] ml-1"></i>
+                    </div>
+                  </button>
+                </div>
+
+                <!-- Benimle Paylaşılanlar -->
+                <div *ngIf="sharedDashboards.length > 0">
+                  <div class="text-[10px] uppercase font-bold text-[rgb(163,154,137)] tracking-wider px-2 py-1 flex items-center justify-between border-t border-[rgb(82,74,90)]/40 pt-2">
+                    <span>Paylaşılanlar</span>
+                    <span class="text-[9px] bg-[rgb(82,74,90)]/30 px-1.5 py-0.5 rounded">{{ sharedDashboards.length }}</span>
+                  </div>
+                  <button *ngFor="let d of sharedDashboards"
+                          (click)="selectDashboard(d)"
+                          [class.bg-[rgb(var(--accent-primary))]/15]="d.id === activeDashboardId"
+                          [class.border-[rgb(var(--accent-primary))]/40]="d.id === activeDashboardId"
+                          class="w-full text-left p-2 rounded-xl hover:bg-[rgb(31,27,38)] border border-transparent transition-all flex items-center justify-between group cursor-pointer">
+                    <div class="min-w-0 flex-1 pr-2">
+                      <div class="flex items-center space-x-1.5">
+                        <span class="text-xs font-semibold text-white truncate">{{ d.name }}</span>
+                      </div>
+                      <p class="text-[10px] text-[rgb(163,154,137)] truncate">Sahip: {{ d.ownerName || d.owner }}</p>
+                    </div>
+                    <div class="flex items-center space-x-1.5 text-[10px] text-[rgb(163,154,137)] font-mono shrink-0">
+                      <span>{{ d.widgetCount || 0 }} modül</span>
+                      <i *ngIf="d.id === activeDashboardId" class="fas fa-check text-[rgb(var(--accent-primary))] ml-1"></i>
+                    </div>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Quick Action Buttons for the Active Dashboard -->
+          <div class="flex items-center space-x-1 bg-[rgb(31,27,38)]/70 backdrop-blur-md p-1 rounded-xl border border-[rgb(82,74,90)]/60">
+            <!-- Ayarlar / Yeniden Adlandır -->
+            <button (click)="openSettingsModal()"
+                    [disabled]="!canModify(activeDashboard)"
+                    title="Dashboard Ayarları (Ad, Açıklama, Varsayılan)"
+                    class="w-8 h-8 rounded-lg flex items-center justify-center text-[rgb(201,196,186)] hover:text-white hover:bg-[rgb(82,74,90)]/40 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
+              <i class="fas fa-cog text-xs"></i>
+            </button>
+
+            <!-- Paylaşım -->
+            <button (click)="openSharing()"
+                    [disabled]="!canManageVisibility(activeDashboard)"
+                    title="Erişim & Paylaşım Yönetimi (Roller, Kullanıcılar)"
+                    class="w-8 h-8 rounded-lg flex items-center justify-center text-[rgb(201,196,186)] hover:text-[rgb(var(--accent-primary))] hover:bg-[rgb(82,74,90)]/40 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
+              <i class="fas fa-share-nodes text-xs"></i>
+            </button>
+
+            <!-- Kopyala (Duplicate) -->
+            <button (click)="duplicateActiveDashboard()"
+                    title="Dashboard'ı Kopyala"
+                    class="w-8 h-8 rounded-lg flex items-center justify-center text-[rgb(201,196,186)] hover:text-white hover:bg-[rgb(82,74,90)]/40 transition-all cursor-pointer">
+              <i class="fas fa-copy text-xs"></i>
+            </button>
+
+            <!-- Sil -->
+            <button (click)="confirmDeleteActiveDashboard()"
+                    [disabled]="!canModify(activeDashboard) || dashboards.length <= 1"
+                    title="Dashboard'ı Sil"
+                    class="w-8 h-8 rounded-lg flex items-center justify-center text-[rgb(201,196,186)] hover:text-rose-400 hover:bg-rose-500/10 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
+              <i class="fas fa-trash-alt text-xs"></i>
+            </button>
+          </div>
+        </div>
       </div>      
       
       <div class="flex items-center space-x-4">
@@ -37,6 +163,54 @@
           </div>
         </div>
         
+        <!-- Export Dashboard Dropdown -->
+        <div class="relative">
+          <button (click)="toggleExportDropdown()"
+                  title="Pano ve Rapor İhracı (PDF, PNG, Yazdır)"
+                  class="flex items-center space-x-2 px-4 py-2.5 bg-[rgb(31,27,38)]/80 backdrop-blur-md border border-[rgb(82,74,90)] text-[rgb(201,196,186)] hover:text-white hover:border-[rgb(var(--accent-primary))]/50 rounded-xl font-semibold shadow-lg hover:shadow-[0_0_20px_rgb(var(--accent-primary)/0.2)] transition-all duration-300 cursor-pointer text-sm">
+            <i class="fas fa-file-export text-[rgb(var(--accent-primary))]"></i>
+            <span>Export Dashboard</span>
+            <i class="fas fa-chevron-down text-[10px] text-[rgb(163,154,137)] ml-1" [class.rotate-180]="exportDropdownOpen"></i>
+          </button>
+
+          <!-- Export Menu -->
+          <div *ngIf="exportDropdownOpen"
+               class="absolute right-0 top-full mt-2 w-64 bg-[rgb(20,17,27)] border border-[rgb(82,74,90)] rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.85)] z-50 overflow-hidden backdrop-blur-xl animate-fade-in p-2 space-y-1">
+            <button (click)="exportDashboardPdf()"
+                    class="w-full text-left p-2.5 rounded-xl hover:bg-[rgb(31,27,38)] transition-all flex items-center space-x-3 text-white group cursor-pointer">
+              <div class="w-8 h-8 rounded-lg bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400 group-hover:bg-rose-500 group-hover:text-white transition-colors">
+                <i class="fas fa-file-pdf text-xs"></i>
+              </div>
+              <div>
+                <p class="text-xs font-bold">Executive PDF İndir</p>
+                <p class="text-[9px] text-[rgb(163,154,137)]">ReportLab resmi A4 yönetici raporu</p>
+              </div>
+            </button>
+
+            <button (click)="exportDashboardPng()"
+                    class="w-full text-left p-2.5 rounded-xl hover:bg-[rgb(31,27,38)] transition-all flex items-center space-x-3 text-white group cursor-pointer">
+              <div class="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 group-hover:bg-cyan-500 group-hover:text-white transition-colors">
+                <i class="fas fa-image text-xs"></i>
+              </div>
+              <div>
+                <p class="text-xs font-bold">PNG Görüntüsü İndir</p>
+                <p class="text-[9px] text-[rgb(163,154,137)]">Yüksek çözünürlüklü anlık pano</p>
+              </div>
+            </button>
+
+            <button (click)="exportDashboardPrint()"
+                    class="w-full text-left p-2.5 rounded-xl hover:bg-[rgb(31,27,38)] transition-all flex items-center space-x-3 text-white group cursor-pointer border-t border-[rgb(82,74,90)]/40 mt-1 pt-2">
+              <div class="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 group-hover:bg-amber-500 group-hover:text-white transition-colors">
+                <i class="fas fa-print text-xs"></i>
+              </div>
+              <div>
+                <p class="text-xs font-bold">Yazdır / PDF Olarak Kaydet</p>
+                <p class="text-[9px] text-[rgb(163,154,137)]">Tarayıcı yazdırma & PDF önizleme</p>
+              </div>
+            </button>
+          </div>
+        </div>
+
         <!-- Edit Dashboard Toggle -->
         <button *ngIf="!editMode"
           class="group flex items-center px-5 py-2.5 bg-[rgb(31,27,38)]/80 backdrop-blur-md border border-[rgb(82,74,90)] text-[rgb(201,196,186)] hover:text-white hover:border-[rgb(var(--accent-primary))]/50 rounded-xl font-semibold shadow-lg hover:shadow-[0_0_20px_rgb(var(--accent-primary)/0.2)] transition-all duration-300 cursor-pointer"
@@ -175,103 +349,59 @@
           <!-- Scanning Line Animation -->
           <div class="absolute top-0 left-0 right-0 h-[2px] bg-[rgb(var(--accent-primary))] opacity-50 shadow-[0_0_10px_rgb(var(--accent-primary))] animate-scan pointer-events-none z-0"></div>
 
-          <!-- Center Preview Mockup -->
-          <div class="relative z-10 flex-1 flex flex-col items-center justify-center w-full" [ngSwitch]="widget.config?.visualType">
+          <!-- LIVE WIDGET (configured SQL data source → real app-widget engine) -->
+          <div *ngIf="hasLiveDataSource(widget)" class="relative z-10 flex-1 w-full min-h-0 p-2 flex flex-col">
+            <app-widget
+              [instanceId]="widget.id"
+              [title]="widget.title"
+              [icon]="widget.icon"
+              [widgetType]="widgetChartType(widget)"
+              [dataSourceType]="widgetDataSourceType(widget)"
+              [initialPaths]="widgetInitialPaths(widget)"
+              [assignedPathId]="widget.config?.assignedPathId || widget.assignedPathId"
+              [sqlValueColumn]="widget.config?.sqlValueColumn || widget.sqlValueColumn"
+              [sqlLabelColumn]="widget.config?.sqlLabelColumn || widget.sqlLabelColumn"
+              [refreshRate]="widget.config?.refreshInterval || widget.refreshInterval || 10000"
+              [showHeader]="false">
+            </app-widget>
+          </div>
+
+          <!-- Center Preview Mockup (unconfigured placeholder) -->
+          <div *ngIf="!hasLiveDataSource(widget)" class="relative z-10 flex-1 flex flex-col items-center justify-center w-full" [ngSwitch]="widget.config?.visualType">
             
-            <!-- Line Chart Preview -->
-            <div *ngSwitchCase="'Line Chart'" class="w-full h-24 relative flex flex-col justify-between p-2">
-              <svg class="w-full h-16 text-[rgb(var(--accent-primary))]" viewBox="0 0 100 40" preserveAspectRatio="none">
-                <!-- Grid Lines -->
-                <line x1="0" y1="10" x2="100" y2="10" stroke="rgba(255,255,255,0.05)" stroke-width="0.5" />
-                <line x1="0" y1="20" x2="100" y2="20" stroke="rgba(255,255,255,0.05)" stroke-width="0.5" />
-                <line x1="0" y1="30" x2="100" y2="30" stroke="rgba(255,255,255,0.05)" stroke-width="0.5" />
-                <!-- Line Path -->
-                <path d="M0,35 Q15,5 30,25 T60,15 T90,30 L100,10" fill="none" stroke="currentColor" stroke-width="2" class="drop-shadow-[0_0_4px_rgb(var(--accent-primary))]" />
-              </svg>
-              <div class="flex justify-between items-center text-[10px] text-slate-400 font-mono mt-1 border-t border-slate-700/30 pt-1">
-                <span>08:00</span>
-                <span class="text-[rgb(var(--accent-primary))] font-bold">Trend OEE: 81.3%</span>
-                <span>16:00</span>
-              </div>
+            <!-- Line/Area Chart Preview -->
+            <div *ngSwitchCase="'Line Chart'" class="w-full flex items-end justify-between h-16 px-2 space-x-1 opacity-70">
+              <div class="w-1/6 bg-gradient-to-t from-[rgb(var(--accent-primary))] to-transparent h-1/3 rounded-t-sm"></div>
+              <div class="w-1/6 bg-gradient-to-t from-[rgb(var(--accent-primary))] to-transparent h-2/3 rounded-t-sm"></div>
+              <div class="w-1/6 bg-gradient-to-t from-[rgb(var(--accent-primary))] to-transparent h-1/2 rounded-t-sm"></div>
+              <div class="w-1/6 bg-gradient-to-t from-[rgb(var(--accent-primary))] to-transparent h-full rounded-t-sm"></div>
+              <div class="w-1/6 bg-gradient-to-t from-[rgb(var(--accent-primary))] to-transparent h-3/4 rounded-t-sm"></div>
             </div>
             
-            <!-- Area Chart Preview -->
-            <div *ngSwitchCase="'Area Chart'" class="w-full h-24 relative flex flex-col justify-between p-2">
-              <svg class="w-full h-16 text-emerald-400" viewBox="0 0 100 40" preserveAspectRatio="none">
-                <defs>
-                  <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stop-color="currentColor" stop-opacity="0.3"/>
-                    <stop offset="100%" stop-color="currentColor" stop-opacity="0.0"/>
-                  </linearGradient>
-                </defs>
-                <path d="M0,40 L0,25 Q20,5 45,28 T80,10 L100,20 L100,40 Z" fill="url(#areaGrad)" />
-                <path d="M0,25 Q20,5 45,28 T80,10 L100,20" fill="none" stroke="currentColor" stroke-width="2" class="drop-shadow-[0_0_4px_rgba(52,211,153,0.5)]" />
-              </svg>
-              <div class="flex justify-between items-center text-[10px] text-slate-400 font-mono mt-1 border-t border-slate-700/30 pt-1">
-                <span>Temp Live</span>
-                <span class="text-emerald-400 font-bold">68.4 °C</span>
-                <span>Normal</span>
-              </div>
+            <div *ngSwitchCase="'Area Chart'" class="w-full flex items-end justify-between h-16 px-2 space-x-1 opacity-70">
+              <div class="w-1/6 bg-gradient-to-t from-[rgb(var(--accent-primary))] to-transparent h-1/3 rounded-t-sm"></div>
+              <div class="w-1/6 bg-gradient-to-t from-[rgb(var(--accent-primary))] to-transparent h-2/3 rounded-t-sm"></div>
+              <div class="w-1/6 bg-gradient-to-t from-[rgb(var(--accent-primary))] to-transparent h-1/2 rounded-t-sm"></div>
+              <div class="w-1/6 bg-gradient-to-t from-[rgb(var(--accent-primary))] to-transparent h-full rounded-t-sm"></div>
+              <div class="w-1/6 bg-gradient-to-t from-[rgb(var(--accent-primary))] to-transparent h-3/4 rounded-t-sm"></div>
             </div>
 
             <!-- Bar Chart Preview -->
-            <div *ngSwitchCase="'Bar Chart'" class="w-full h-24 flex flex-col justify-between p-2">
-              <div class="flex items-end justify-around h-16 w-full px-2">
-                <div class="flex flex-col items-center w-6">
-                  <span class="text-[8px] text-slate-400 mb-1">120k</span>
-                  <div class="w-3 bg-indigo-500/20 border border-indigo-500/40 h-8 rounded-t-sm shadow-[0_0_10px_rgba(99,102,241,0.2)]"></div>
-                  <span class="text-[8px] text-slate-500 mt-1">L1</span>
-                </div>
-                <div class="flex flex-col items-center w-6">
-                  <span class="text-[8px] text-emerald-400 mb-1">450k</span>
-                  <div class="w-3 bg-emerald-500 h-12 rounded-t-sm shadow-[0_0_10px_rgba(16,185,129,0.4)]"></div>
-                  <span class="text-[8px] text-slate-500 mt-1">L2</span>
-                </div>
-                <div class="flex flex-col items-center w-6">
-                  <span class="text-[8px] text-slate-400 mb-1">280k</span>
-                  <div class="w-3 bg-indigo-500/40 border border-indigo-500/60 h-10 rounded-t-sm shadow-[0_0_10px_rgba(99,102,241,0.3)]"></div>
-                  <span class="text-[8px] text-slate-500 mt-1">L3</span>
-                </div>
-                <div class="flex flex-col items-center w-6">
-                  <span class="text-[8px] text-amber-500 mb-1">310k</span>
-                  <div class="w-3 bg-amber-500 h-11 rounded-t-sm shadow-[0_0_10px_rgba(245,158,11,0.4)]"></div>
-                  <span class="text-[8px] text-slate-500 mt-1">L4</span>
-                </div>
-              </div>
-              <div class="text-center text-[10px] text-slate-400 font-mono border-t border-slate-700/30 pt-1">
-                Total Energy: <span class="text-emerald-400 font-bold">1,160 kW</span>
-              </div>
+            <div *ngSwitchCase="'Bar Chart'" class="w-full flex items-end justify-center h-16 space-x-2 opacity-80">
+              <div class="w-3 bg-[rgb(var(--accent-primary))] h-1/4 rounded-sm shadow-[0_0_10px_rgb(var(--accent-primary)/0.5)]"></div>
+              <div class="w-3 bg-[rgb(var(--accent-primary))] h-3/4 rounded-sm shadow-[0_0_10px_rgb(var(--accent-primary)/0.5)]"></div>
+              <div class="w-3 bg-[rgb(var(--accent-soft))] h-1/2 rounded-sm shadow-[0_0_10px_rgb(var(--accent-soft)/0.5)]"></div>
+              <div class="w-3 bg-[rgb(var(--accent-primary))] h-full rounded-sm shadow-[0_0_10px_rgb(var(--accent-primary)/0.5)]"></div>
             </div>
 
             <!-- Gauge Preview -->
-            <div *ngSwitchCase="'Gauge Chart'" class="w-full h-24 flex flex-col items-center justify-center p-2">
-              <div class="relative w-24 h-12 overflow-hidden flex items-end justify-center">
-                <!-- Gauge Arc -->
-                <div class="absolute top-0 left-0 w-24 h-24 rounded-full border-[6px] border-slate-800 border-t-indigo-500 border-l-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.2)]"></div>
-                <!-- Reading Text -->
-                <div class="relative z-10 text-xl font-black text-white tracking-wider mb-0.5">85.2%</div>
-              </div>
-              <div class="text-[9px] text-slate-400 font-mono uppercase tracking-wider mt-2">
-                OEE Target Status: <span class="text-emerald-400 font-bold">OPTIMAL</span>
-              </div>
+            <div *ngSwitchCase="'Gauge Chart'" class="relative w-20 h-10 overflow-hidden opacity-80">
+              <div class="absolute top-0 left-0 w-20 h-20 rounded-full border-4 border-t-[rgb(var(--accent-primary))] border-l-[rgb(var(--accent-primary))] border-r-[rgb(var(--accent-soft))] border-b-transparent shadow-[0_0_15px_rgb(var(--accent-primary)/0.3)_inset]"></div>
+              <div class="absolute bottom-0 left-1/2 w-1 h-8 bg-white origin-bottom -translate-x-1/2 rotate-45 rounded-t-full shadow-[0_0_5px_white]"></div>
             </div>
 
             <!-- Donut Chart Preview -->
-            <div *ngSwitchCase="'Donut Chart'" class="w-full h-24 flex items-center justify-center gap-4 p-2">
-              <div class="relative w-16 h-16 flex items-center justify-center shrink-0">
-                <svg class="w-full h-full -rotate-90" viewBox="0 0 36 36">
-                  <!-- Grey background ring -->
-                  <path class="text-slate-800" stroke="currentColor" stroke-width="3" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                  <!-- Colored foreground rings -->
-                  <path class="text-emerald-500 drop-shadow-[0_0_4px_rgba(16,185,129,0.4)]" stroke-dasharray="75, 100" stroke="currentColor" stroke-width="3" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                </svg>
-                <div class="absolute text-xs font-black text-white">75%</div>
-              </div>
-              <div class="flex flex-col space-y-1 text-[9px] font-mono text-slate-400">
-                <div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-emerald-500"></span> Active (15)</div>
-                <div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-amber-500"></span> Warn (2)</div>
-                <div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-rose-500"></span> Down (4)</div>
-              </div>
+            <div *ngSwitchCase="'Donut Chart'" class="relative w-16 h-16 rounded-full border-4 border-[rgb(var(--accent-primary))] border-r-[rgb(var(--accent-soft))] opacity-80 shadow-[0_0_15px_rgb(var(--accent-primary)/0.3)]">
             </div>
 
             <!-- Data Grid Preview -->
@@ -290,13 +420,9 @@
             </div>
 
             <!-- KPI Card Preview -->
-            <div *ngSwitchCase="'KPI Card'" class="w-full h-24 flex flex-col items-center justify-center p-2">
-              <div class="text-3xl font-black text-emerald-400 tracking-wider drop-shadow-[0_0_12px_rgba(52,211,153,0.3)]">
-                12.4 t
-              </div>
-              <div class="text-[9px] text-[rgb(163,154,137)] uppercase tracking-widest mt-1.5 font-bold">
-                CO2 Emissions · Saved 15%
-              </div>
+            <div *ngSwitchCase="'KPI Card'" class="flex flex-col items-center">
+              <div class="text-2xl font-bold text-white tracking-wider drop-shadow-[0_0_8px_white]">--</div>
+              <div class="text-[10px] text-[rgb(var(--accent-primary))] uppercase tracking-widest mt-1">Metric</div>
             </div>
 
             <!-- Default / Fallback Preview (Orb) -->
@@ -350,36 +476,120 @@
         
         <!-- Source Type Toggle -->
         <div class="space-y-2">
-          <label class="text-xs font-bold text-[rgb(163,154,137)] uppercase tracking-wider">Source Type</label>
-          <div class="flex rounded-xl bg-[rgb(31,27,38)] p-1 border border-[rgb(82,74,90)]">
-            <button class="flex-1 py-2 text-sm font-semibold rounded-lg transition-all cursor-pointer"
+          <label class="text-xs font-bold text-[rgb(163,154,137)] uppercase tracking-wider">Veri Kaynağı Tipi (Source Type)</label>
+          <div class="grid grid-cols-3 gap-2 rounded-xl bg-[rgb(31,27,38)] p-1 border border-[rgb(82,74,90)]">
+            <button class="py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer flex items-center justify-center space-x-1.5"
                     [ngClass]="configuringWidget.dataSourceType === 'sql' ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 shadow-[0_0_15px_rgba(99,102,241,0.2)]' : 'text-[rgb(163,154,137)] hover:text-white border border-transparent'"
                     (click)="configuringWidget.dataSourceType = 'sql'">
-              <i class="fas fa-database mr-2"></i> SQL Query
+              <i class="fas fa-database"></i>
+              <span>SQL Query</span>
             </button>
-            <button class="flex-1 py-2 text-sm font-semibold rounded-lg transition-all cursor-pointer"
+            <button class="py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer flex items-center justify-center space-x-1.5"
                     [ngClass]="configuringWidget.dataSourceType === 'python' ? 'bg-[rgb(var(--accent-primary))]/20 text-[rgb(var(--accent-primary))] border border-[rgb(var(--accent-primary))]/30 shadow-[0_0_15px_rgb(var(--accent-primary)/0.2)]' : 'text-[rgb(163,154,137)] hover:text-white border border-transparent'"
                     (click)="configuringWidget.dataSourceType = 'python'">
-              <i class="fab fa-python mr-2"></i> Python Script
+              <i class="fab fa-python"></i>
+              <span>Python</span>
+            </button>
+            <button class="py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer flex items-center justify-center space-x-1.5"
+                    [ngClass]="configuringWidget.dataSourceType === 'path' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.2)]' : 'text-[rgb(163,154,137)] hover:text-white border border-transparent'"
+                    (click)="configuringWidget.dataSourceType = 'path'">
+              <i class="fas fa-sitemap"></i>
+              <span>Path / Ağaç</span>
             </button>
           </div>
         </div>
 
-        <!-- Selection Dropdowns -->
-        <div class="space-y-2" *ngIf="configuringWidget.dataSourceType === 'sql'">
-          <label class="text-xs font-bold text-[rgb(163,154,137)] uppercase tracking-wider">Available Queries</label>
-          <select [(ngModel)]="configuringWidget.assignedQueryId" class="w-full bg-[rgb(31,27,38)] border border-[rgb(82,74,90)] text-white text-sm rounded-xl px-4 py-3 focus:outline-none focus:border-indigo-500 focus:shadow-[0_0_15px_rgba(99,102,241,0.2)] transition-all cursor-pointer">
-            <option [ngValue]="undefined" disabled>-- Select a SQL Query --</option>
-            <option *ngFor="let q of availableSqlQueries" [ngValue]="q.id">{{ q.name }}</option>
+        <!-- SQL Queries & Column Mapping Dropdowns -->
+        <div class="space-y-4" *ngIf="configuringWidget.dataSourceType === 'sql'">
+          <div class="space-y-1.5">
+            <label class="text-xs font-bold text-[rgb(163,154,137)] uppercase tracking-wider">Kullanılabilir SQL Sorguları</label>
+            <select [ngModel]="configuringWidget.assignedQueryId" 
+                    (ngModelChange)="onQueryChange($event)"
+                    class="w-full bg-[rgb(31,27,38)] border border-[rgb(82,74,90)] text-white text-sm rounded-xl px-4 py-2.5 focus:outline-none focus:border-indigo-500 focus:shadow-[0_0_15px_rgba(99,102,241,0.2)] transition-all cursor-pointer">
+              <option [ngValue]="undefined" disabled>-- Bir SQL Sorgusu Seçin --</option>
+              <option *ngFor="let q of availableSqlQueries" [ngValue]="q.id">{{ q.name }}</option>
+            </select>
+          </div>
+
+          <!-- Kolon Eşleme Seçicisi (Dropdown Picker) -->
+          <div *ngIf="configuringWidget.assignedQueryId" class="p-4 rounded-2xl bg-[rgb(31,27,38)]/60 border border-[rgb(82,74,90)]/60 space-y-3 animate-fade-in">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-indigo-400 uppercase tracking-wider flex items-center">
+                <i class="fas fa-columns mr-1.5"></i> Kolon Eşleme (Column Mapping)
+              </span>
+              <span *ngIf="loadingColumns" class="text-[10px] text-indigo-300 animate-pulse">Sütunlar okunuyor...</span>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3" *ngIf="!loadingColumns && availableQueryColumns.length > 0">
+              <!-- sqlValueColumn Dropdown -->
+              <div class="space-y-1">
+                <label class="text-[11px] font-semibold text-[rgb(201,196,186)]">Değer Kolonu (Metrik / Sayı)</label>
+                <select [(ngModel)]="configuringWidget.config.sqlValueColumn"
+                        class="w-full bg-[rgb(20,17,27)] border border-[rgb(82,74,90)] text-white text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-indigo-400 cursor-pointer">
+                  <option [ngValue]="undefined">-- Otomatik Algıla --</option>
+                  <option *ngFor="let c of availableQueryColumns" [ngValue]="c">{{ c }}</option>
+                </select>
+              </div>
+
+              <!-- sqlLabelColumn Dropdown -->
+              <div class="space-y-1">
+                <label class="text-[11px] font-semibold text-[rgb(201,196,186)]">Etiket / Zaman Kolonu</label>
+                <select [(ngModel)]="configuringWidget.config.sqlLabelColumn"
+                        class="w-full bg-[rgb(20,17,27)] border border-[rgb(82,74,90)] text-white text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-indigo-400 cursor-pointer">
+                  <option [ngValue]="undefined">-- Otomatik Algıla --</option>
+                  <option *ngFor="let c of availableQueryColumns" [ngValue]="c">{{ c }}</option>
+                </select>
+              </div>
+            </div>
+
+            <p class="text-[10px] text-[rgb(163,154,137)]">
+              Seçilen sorgunun kolonları otomatik tespit edilmiştir. İlgili eksen veya değer için istediğiniz kolonu açılır listeden belirleyebilirsiniz.
+            </p>
+          </div>
+        </div>
+
+        <!-- Python Scripts -->
+        <div class="space-y-2" *ngIf="configuringWidget.dataSourceType === 'python'">
+          <label class="text-xs font-bold text-[rgb(163,154,137)] uppercase tracking-wider">Kullanılabilir Python Betikleri</label>
+          <select [(ngModel)]="configuringWidget.assignedPythonId" class="w-full bg-[rgb(31,27,38)] border border-[rgb(82,74,90)] text-white text-sm rounded-xl px-4 py-2.5 focus:outline-none focus:border-[rgb(var(--accent-primary))] focus:shadow-[0_0_15px_rgb(var(--accent-primary)/0.2)] transition-all cursor-pointer">
+            <option [ngValue]="undefined" disabled>-- Bir Python Betiği Seçin --</option>
+            <option *ngFor="let p of availablePythonScripts" [ngValue]="p.id">{{ p.name }}</option>
           </select>
         </div>
 
-        <div class="space-y-2" *ngIf="configuringWidget.dataSourceType === 'python'">
-          <label class="text-xs font-bold text-[rgb(163,154,137)] uppercase tracking-wider">Available Scripts</label>
-          <select [(ngModel)]="configuringWidget.assignedPythonId" class="w-full bg-[rgb(31,27,38)] border border-[rgb(82,74,90)] text-white text-sm rounded-xl px-4 py-3 focus:outline-none focus:border-[rgb(var(--accent-primary))] focus:shadow-[0_0_15px_rgb(var(--accent-primary)/0.2)] transition-all cursor-pointer">
-            <option [ngValue]="undefined" disabled>-- Select a Python Script --</option>
-            <option *ngFor="let p of availablePythonScripts" [ngValue]="p.id">{{ p.name }}</option>
+        <!-- Path / Hiyerarşi Seçici -->
+        <div class="space-y-2" *ngIf="configuringWidget.dataSourceType === 'path'">
+          <label class="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center">
+            <i class="fas fa-network-wired mr-1.5"></i> Path Definer Hiyerarşisi (Ağaç / Sıra / DAG)
+          </label>
+          <select [(ngModel)]="configuringWidget.assignedPathId" class="w-full bg-[rgb(31,27,38)] border border-emerald-500/50 text-white text-sm rounded-xl px-4 py-2.5 focus:outline-none focus:border-emerald-400 focus:shadow-[0_0_15px_rgba(16,185,129,0.2)] transition-all cursor-pointer">
+            <option [ngValue]="undefined" disabled>-- Bir Path Hiyerarşisi Seçin --</option>
+            <option *ngFor="let p of availablePaths" [ngValue]="p.id">
+              {{ p.name }} [{{ p.structure | uppercase }}]
+            </option>
           </select>
+          <p class="text-[10px] text-[rgb(163,154,137)]">
+            Path Definer ile oluşturulmuş canlı ekipman ağacı, üretim rotası veya süreç DAG mini-haritası panoya gömülür.
+          </p>
+        </div>
+
+        <!-- Widget Başına Yenileme Periyodu (Per-Widget Refresh) -->
+        <div class="space-y-1.5 pt-2 border-t border-[rgb(82,74,90)]/40">
+          <label class="text-xs font-bold text-[rgb(163,154,137)] uppercase tracking-wider flex items-center">
+            <i class="fas fa-clock-rotate-left mr-1.5 text-cyan-400"></i> Widget Başına Yenileme Periyodu (Refresh Rate)
+          </label>
+          <select [(ngModel)]="configuringWidget.config.refreshInterval"
+                  class="w-full bg-[rgb(31,27,38)] border border-[rgb(82,74,90)] text-white text-sm rounded-xl px-4 py-2.5 focus:outline-none focus:border-cyan-400 transition-all cursor-pointer">
+            <option [ngValue]="2000">⚡ 2 saniye (Yüksek Hızlı Telemetri / Titreşim)</option>
+            <option [ngValue]="5000">⏱️ 5 saniye (Gerçek Zamanlı Akış / SCADA Hücre)</option>
+            <option [ngValue]="10000">🔄 10 saniye (Standart İzleme)</option>
+            <option [ngValue]="30000">📊 30 saniye (Orta Periyot)</option>
+            <option [ngValue]="60000">⏳ 1 dakika (Ağır OEE & Kalite Sorguları)</option>
+            <option [ngValue]="300000">📅 5 dakika (Periyodik Enerji / Çevre Özeti)</option>
+          </select>
+          <p class="text-[10px] text-[rgb(163,154,137)]">
+            Kritik sensörleri 2-5 saniyede, ağır üretim/OEE hesaplarını 1 dakikada bir güncelleyerek sunucu yükünü optimize edebilirsiniz.
+          </p>
         </div>
       </div>
 
@@ -393,5 +603,228 @@
         </button>
       </div>
     </div>
+  </div>
+
+  <!-- Create Dashboard Modal -->
+  <div *ngIf="showCreateModal"
+       class="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-md animate-modal-in">
+    <div class="relative w-full max-w-md bg-[rgb(20,17,27)] rounded-3xl border border-[rgb(82,74,90)] shadow-[0_20px_50px_rgba(0,0,0,0.85)] overflow-hidden flex flex-col">
+      <div class="px-6 py-4 border-b border-[rgb(82,74,90)] bg-[rgb(31,27,38)]/80 flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-xl bg-[rgb(var(--accent-primary))]/10 border border-[rgb(var(--accent-primary))]/30 flex items-center justify-center shadow-[0_0_15px_rgb(var(--accent-primary)/0.2)]">
+            <i class="fas fa-plus text-[rgb(var(--accent-primary))]"></i>
+          </div>
+          <div>
+            <h3 class="text-white font-bold tracking-wide">Yeni Dashboard</h3>
+            <p class="text-[10px] text-[rgb(163,154,137)] uppercase tracking-widest">Özelleştirilmiş Nova Matrisi</p>
+          </div>
+        </div>
+        <button (click)="closeCreateModal()" class="text-[rgb(163,154,137)] hover:text-white transition-colors cursor-pointer w-8 h-8 flex items-center justify-center rounded-full hover:bg-[rgb(82,74,90)]/30">
+          <i class="fas fa-times text-base"></i>
+        </button>
+      </div>
+      <div class="p-6 space-y-4">
+        <div class="space-y-1.5">
+          <label class="text-xs font-bold text-[rgb(163,154,137)] uppercase tracking-wider">Dashboard Adı</label>
+          <input type="text" [(ngModel)]="createForm.name" placeholder="Örn: Fabrika İzleme Merkezi"
+                 class="w-full bg-[rgb(31,27,38)] border border-[rgb(82,74,90)] text-white text-sm rounded-xl px-4 py-2.5 focus:outline-none focus:border-[rgb(var(--accent-primary))]">
+        </div>
+        <div class="space-y-1.5">
+          <label class="text-xs font-bold text-[rgb(163,154,137)] uppercase tracking-wider">Açıklama</label>
+          <textarea [(ngModel)]="createForm.description" placeholder="Dashboard hakkında kısa açıklama..." rows="2"
+                    class="w-full bg-[rgb(31,27,38)] border border-[rgb(82,74,90)] text-white text-sm rounded-xl px-4 py-2.5 focus:outline-none focus:border-[rgb(var(--accent-primary))] resize-none"></textarea>
+        </div>
+        <div class="flex items-center space-x-2 pt-1">
+          <input type="checkbox" id="createIsDefault" [(ngModel)]="createForm.isDefault"
+                 class="w-4 h-4 rounded bg-[rgb(31,27,38)] border border-[rgb(82,74,90)] text-[rgb(var(--accent-primary))] focus:ring-0 cursor-pointer">
+          <label for="createIsDefault" class="text-xs text-[rgb(201,196,186)] cursor-pointer select-none font-medium">
+            Varsayılan dashboard'ım olarak ayarla
+          </label>
+        </div>
+      </div>
+      <div class="px-6 py-4 border-t border-[rgb(82,74,90)] bg-[rgb(20,17,27)] flex justify-end space-x-3">
+        <button (click)="closeCreateModal()" class="px-4 py-2 rounded-xl border border-[rgb(82,74,90)] text-[rgb(201,196,186)] hover:bg-[rgb(82,74,90)] hover:text-white transition-all text-sm font-semibold cursor-pointer">
+          İptal
+        </button>
+        <button (click)="submitCreateDashboard()" class="px-5 py-2 rounded-xl bg-gradient-to-r from-[rgb(var(--accent-primary))] to-[rgb(var(--accent-soft))] text-white shadow-[0_0_15px_rgb(var(--accent-primary)/0.3)] hover:shadow-[0_0_25px_rgb(var(--accent-primary)/0.5)] transition-all text-sm font-bold cursor-pointer">
+          <i class="fas fa-check mr-1.5"></i> Oluştur
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dashboard Settings Modal -->
+  <div *ngIf="showSettingsModal && activeDashboard"
+       class="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-md animate-modal-in">
+    <div class="relative w-full max-w-md bg-[rgb(20,17,27)] rounded-3xl border border-[rgb(82,74,90)] shadow-[0_20px_50px_rgba(0,0,0,0.85)] overflow-hidden flex flex-col">
+      <div class="px-6 py-4 border-b border-[rgb(82,74,90)] bg-[rgb(31,27,38)]/80 flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-xl bg-[rgb(var(--accent-primary))]/10 border border-[rgb(var(--accent-primary))]/30 flex items-center justify-center shadow-[0_0_15px_rgb(var(--accent-primary)/0.2)]">
+            <i class="fas fa-cog text-[rgb(var(--accent-primary))]"></i>
+          </div>
+          <div>
+            <h3 class="text-white font-bold tracking-wide">Dashboard Ayarları</h3>
+            <p class="text-[10px] text-[rgb(163,154,137)] uppercase tracking-widest">Yapılandırma & Varsayılan</p>
+          </div>
+        </div>
+        <button (click)="closeSettingsModal()" class="text-[rgb(163,154,137)] hover:text-white transition-colors cursor-pointer w-8 h-8 flex items-center justify-center rounded-full hover:bg-[rgb(82,74,90)]/30">
+          <i class="fas fa-times text-base"></i>
+        </button>
+      </div>
+      <div class="p-6 space-y-4">
+        <div class="space-y-1.5">
+          <label class="text-xs font-bold text-[rgb(163,154,137)] uppercase tracking-wider">Dashboard Adı</label>
+          <input type="text" [(ngModel)]="settingsForm.name"
+                 class="w-full bg-[rgb(31,27,38)] border border-[rgb(82,74,90)] text-white text-sm rounded-xl px-4 py-2.5 focus:outline-none focus:border-[rgb(var(--accent-primary))]">
+        </div>
+        <div class="space-y-1.5">
+          <label class="text-xs font-bold text-[rgb(163,154,137)] uppercase tracking-wider">Açıklama</label>
+          <textarea [(ngModel)]="settingsForm.description" rows="2"
+                    class="w-full bg-[rgb(31,27,38)] border border-[rgb(82,74,90)] text-white text-sm rounded-xl px-4 py-2.5 focus:outline-none focus:border-[rgb(var(--accent-primary))] resize-none"></textarea>
+        </div>
+        <div class="flex items-center space-x-2 pt-1">
+          <input type="checkbox" id="settingsIsDefault" [(ngModel)]="settingsForm.isDefault"
+                 class="w-4 h-4 rounded bg-[rgb(31,27,38)] border border-[rgb(82,74,90)] text-[rgb(var(--accent-primary))] focus:ring-0 cursor-pointer">
+          <label for="settingsIsDefault" class="text-xs text-[rgb(201,196,186)] cursor-pointer select-none font-medium">
+            Varsayılan dashboard olarak işaretle
+          </label>
+        </div>
+      </div>
+      <div class="px-6 py-4 border-t border-[rgb(82,74,90)] bg-[rgb(20,17,27)] flex justify-end space-x-3">
+        <button (click)="closeSettingsModal()" class="px-4 py-2 rounded-xl border border-[rgb(82,74,90)] text-[rgb(201,196,186)] hover:bg-[rgb(82,74,90)] hover:text-white transition-all text-sm font-semibold cursor-pointer">
+          İptal
+        </button>
+        <button (click)="saveSettings()" class="px-5 py-2 rounded-xl bg-gradient-to-r from-[rgb(var(--accent-primary))] to-[rgb(var(--accent-soft))] text-white shadow-[0_0_15px_rgb(var(--accent-primary)/0.3)] hover:shadow-[0_0_25px_rgb(var(--accent-primary)/0.5)] transition-all text-sm font-bold cursor-pointer">
+          <i class="fas fa-save mr-1.5"></i> Kaydet
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dashboard Sharing / Access Control Modal -->
+  <div *ngIf="showSharingModal && sharingDashboard"
+       class="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-md animate-modal-in">
+    <div class="relative w-full max-w-lg bg-[rgb(20,17,27)] rounded-3xl border border-[rgb(82,74,90)] shadow-[0_20px_50px_rgba(0,0,0,0.85)] overflow-hidden flex flex-col">
+      <div class="px-6 py-4 border-b border-[rgb(82,74,90)] bg-[rgb(31,27,38)]/80 flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-xl bg-[rgb(var(--accent-primary))]/10 border border-[rgb(var(--accent-primary))]/30 flex items-center justify-center shadow-[0_0_15px_rgb(var(--accent-primary)/0.2)]">
+            <i class="fas fa-shield-halved text-[rgb(var(--accent-primary))]"></i>
+          </div>
+          <div>
+            <h3 class="text-white font-bold tracking-wide">Erişim & Paylaşım İzinleri</h3>
+            <p class="text-[10px] text-[rgb(163,154,137)] uppercase tracking-widest truncate max-w-[280px]">{{ sharingDashboard.name }}</p>
+          </div>
+        </div>
+        <button (click)="closeSharing()" class="text-[rgb(163,154,137)] hover:text-white transition-colors cursor-pointer w-8 h-8 flex items-center justify-center rounded-full hover:bg-[rgb(82,74,90)]/30">
+          <i class="fas fa-times text-base"></i>
+        </button>
+      </div>
+
+      <div class="p-6 space-y-6 max-h-[65vh] overflow-y-auto">
+        <!-- Roller -->
+        <div class="space-y-2">
+          <label class="text-xs font-bold text-[rgb(163,154,137)] uppercase tracking-wider">İzinli Roller</label>
+          <p class="text-[11px] text-[rgb(163,154,137)]">Seçilen rollere sahip tüm kullanıcılar bu dashboard'ı görüntüleyebilir.</p>
+          <div class="grid grid-cols-2 gap-2 pt-1">
+            <button type="button" *ngFor="let key of roleKeys"
+                    (click)="toggleShareRole(key)"
+                    [class.border-[rgb(var(--accent-primary))]]="isShareRoleOn(key)"
+                    [class.bg-[rgb(var(--accent-primary))]/15]="isShareRoleOn(key)"
+                    [class.text-white]="isShareRoleOn(key)"
+                    class="p-2.5 rounded-xl border border-[rgb(82,74,90)] bg-[rgb(31,27,38)] hover:bg-[rgb(45,39,55)] text-left text-xs font-semibold text-[rgb(201,196,186)] transition-all flex items-center justify-between cursor-pointer">
+              <span class="capitalize">{{ key }}</span>
+              <i class="fas fa-check text-[rgb(var(--accent-primary))]" *ngIf="isShareRoleOn(key)"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Kullanıcılar -->
+        <div class="space-y-2">
+          <label class="text-xs font-bold text-[rgb(163,154,137)] uppercase tracking-wider">Özel Kullanıcı İzinleri</label>
+
+          <!-- Admin olmayan kullanıcılar için chip / input -->
+          <ng-container *ngIf="!userChecklistMode()">
+            <p class="text-[11px] text-[rgb(163,154,137)]">Kullanıcı adı girerek özel erişim verin.</p>
+            <div class="flex items-center space-x-2 pt-1">
+              <input type="text" [(ngModel)]="shareUserInput" (keyup.enter)="addShareUserInput()"
+                     placeholder="Kullanıcı adı..."
+                     class="flex-1 bg-[rgb(31,27,38)] border border-[rgb(82,74,90)] text-white text-xs rounded-xl px-3.5 py-2 focus:outline-none focus:border-[rgb(var(--accent-primary))]">
+              <button (click)="addShareUserInput()" class="px-3 py-2 bg-[rgb(82,74,90)]/60 hover:bg-[rgb(82,74,90)] text-white rounded-xl text-xs font-bold cursor-pointer transition-all">
+                <i class="fas fa-plus"></i>
+              </button>
+            </div>
+            <div class="flex flex-wrap gap-1.5 pt-2" *ngIf="shareUsers.length > 0">
+              <span *ngFor="let u of shareUsers"
+                    class="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-[rgb(31,27,38)] border border-[rgb(82,74,90)] text-xs text-white">
+                <span>{{ u }}</span>
+                <button (click)="removeShareUser(u)" class="text-[rgb(163,154,137)] hover:text-rose-400 cursor-pointer">
+                  <i class="fas fa-times text-[10px]"></i>
+                </button>
+              </span>
+            </div>
+          </ng-container>
+
+          <!-- Admin için kullanıcı listesi checklist -->
+          <ng-container *ngIf="userChecklistMode()">
+            <p class="text-[11px] text-[rgb(163,154,137)]" *ngIf="loadingUsers">Kullanıcılar yükleniyor...</p>
+            <div class="max-h-44 overflow-y-auto space-y-1 pt-1" *ngIf="!loadingUsers">
+              <button type="button" *ngFor="let u of shareUsersList"
+                      (click)="toggleShareUser(u.id)"
+                      [class.bg-[rgb(var(--accent-primary))]/15]="isShareUserOn(u.id)"
+                      [class.border-[rgb(var(--accent-primary))]/50]="isShareUserOn(u.id)"
+                      class="w-full text-left p-2 rounded-xl border border-[rgb(82,74,90)]/50 bg-[rgb(31,27,38)] hover:bg-[rgb(45,39,55)] transition-all flex items-center justify-between cursor-pointer">
+                <div>
+                  <span class="text-xs font-semibold text-white">{{ u.displayName || u.username }}</span>
+                  <span class="text-[10px] text-[rgb(163,154,137)] ml-2 font-mono">&#64;{{ u.username }}</span>
+                </div>
+                <i class="fas fa-check text-xs text-[rgb(var(--accent-primary))]" *ngIf="isShareUserOn(u.id)"></i>
+              </button>
+            </div>
+          </ng-container>
+        </div>
+      </div>
+
+      <div class="px-6 py-4 border-t border-[rgb(82,74,90)] bg-[rgb(20,17,27)] flex justify-end space-x-3">
+        <button (click)="closeSharing()" class="px-4 py-2 rounded-xl border border-[rgb(82,74,90)] text-[rgb(201,196,186)] hover:bg-[rgb(82,74,90)] hover:text-white transition-all text-sm font-semibold cursor-pointer">
+          İptal
+        </button>
+        <button (click)="saveSharing()" [disabled]="shareSaving" class="px-5 py-2 rounded-xl bg-gradient-to-r from-[rgb(var(--accent-primary))] to-[rgb(var(--accent-soft))] text-white shadow-[0_0_15px_rgb(var(--accent-primary)/0.3)] hover:shadow-[0_0_25px_rgb(var(--accent-primary)/0.5)] transition-all text-sm font-bold cursor-pointer disabled:opacity-50">
+          <i class="fas fa-floppy-disk mr-1.5" *ngIf="!shareSaving"></i>
+          <i class="fas fa-circle-notch fa-spin mr-1.5" *ngIf="shareSaving"></i>
+          <span>{{ shareSaving ? 'Kaydediliyor...' : 'Kaydet' }}</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirm Dialog Modal -->
+  <div *ngIf="confirmDialog.show"
+       class="fixed inset-0 z-[120] flex items-center justify-center bg-black/75 backdrop-blur-md animate-modal-in">
+    <div class="relative w-full max-w-sm bg-[rgb(20,17,27)] rounded-3xl border border-rose-500/40 shadow-[0_20px_50px_rgba(0,0,0,0.9)] overflow-hidden p-6 space-y-4">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400">
+          <i class="fas fa-triangle-exclamation text-lg"></i>
+        </div>
+        <h3 class="text-white font-bold text-base">{{ confirmDialog.title }}</h3>
+      </div>
+      <p class="text-xs text-[rgb(201,196,186)] leading-relaxed">{{ confirmDialog.message }}</p>
+      <div class="flex justify-end space-x-2.5 pt-2">
+        <button (click)="confirmDialog.show = false"
+                class="px-4 py-2 rounded-xl border border-[rgb(82,74,90)] text-[rgb(201,196,186)] hover:bg-[rgb(82,74,90)] hover:text-white transition-all text-xs font-semibold cursor-pointer">
+          İptal
+        </button>
+        <button (click)="confirmDialog.action()"
+                class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-[0_0_15px_rgba(244,63,94,0.4)] transition-all cursor-pointer">
+          Evet, Sil
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Floating Toast Notification -->
+  <div *ngIf="notificationMsg"
+       class="fixed bottom-6 right-6 z-[200] px-5 py-3 bg-[rgb(20,17,27)]/95 border border-[rgb(var(--accent-primary))]/60 rounded-2xl shadow-[0_15px_35px_rgba(0,0,0,0.85)] text-white text-xs font-semibold flex items-center space-x-3 animate-slide-up backdrop-blur-xl">
+    <i class="fas fa-circle-check text-[rgb(var(--accent-primary))] text-base"></i>
+    <span>{{ notificationMsg }}</span>
   </div>
 </div>

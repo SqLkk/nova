@@ -6,10 +6,12 @@
   <!-- ===================== TOPBAR (tek satır) ===================== -->
   <header class="sm-topbar">
     <div class="sm-brand">
-      <div class="sm-brand-icon"><i class="fas fa-satellite"></i></div>
+      <div class="sm-brand-icon">
+        <i class="fas" [ngClass]="brandIcon"></i>
+      </div>
       <div class="sm-brand-text">
-        <h1>{{ 'NETWORK_MAP.TITLE' | translate }}</h1>
-        <p>{{ selectedPath?.name || ('NETWORK_MAP.SUBTITLE' | translate) }}</p>
+        <h1>{{ pageTitle }}</h1>
+        <p>{{ pageSubtitle }}</p>
       </div>
     </div>
 
@@ -47,6 +49,16 @@
         <option *ngFor="let p of filteredPaths" [ngValue]="p.id">{{ p.name }}</option>
       </select>
     </label>
+
+    <button class="sm-icon-btn" *ngIf="canManage && selectedPathId" (click)="openThemeModal()"
+            [title]="'NETWORK_MAP.CONFIGURE_THEME' | translate">
+      <i class="fas fa-palette"></i>
+    </button>
+
+    <button class="sm-icon-btn" *ngIf="canManage" (click)="goToPathDefiner()"
+            [title]="'NETWORK_MAP.GO_TO_PATH_DEFINER' | translate">
+      <i class="fas fa-route"></i>
+    </button>
 
     <button class="sm-icon-btn" (click)="refresh()" [disabled]="!selectedPathId || isLoading"
             [title]="'NETWORK_MAP.REFRESH' | translate">
@@ -100,6 +112,9 @@
       <i class="fas fa-network-wired"></i>
       <p *ngIf="!selectedDataSourceId">{{ 'NETWORK_MAP.SELECT_DATASOURCE_HINT' | translate }}</p>
       <p *ngIf="selectedDataSourceId">{{ 'NETWORK_MAP.NO_PATH_FOR_DB' | translate }}</p>
+      <button class="sm-btn primary mt-3" *ngIf="selectedDataSourceId && canManage" (click)="goToPathDefiner()">
+        <i class="fas fa-plus"></i> {{ 'NETWORK_MAP.CREATE_PATH_NOW' | translate }}
+      </button>
     </div>
   </main>
 
@@ -112,8 +127,8 @@
     <h2 class="sm-detail-title">{{ selectedNode.label }}</h2>
 
     <div class="sm-breadcrumb">
-      <ng-container *ngFor="let crumb of selectedBreadcrumb; let last = last">
-        <span [class.active]="last">{{ crumb }}</span>
+      <ng-container *ngFor="let crumb of selectedBreadcrumbNodes; let last = last">
+        <span [class.active]="last" [class.clickable]="!last" (click)="!last && focusBreadcrumb(crumb)">{{ crumb.label }}</span>
         <i class="fas fa-chevron-right sep" *ngIf="!last"></i>
       </ng-container>
     </div>
@@ -121,6 +136,17 @@
     <div class="sm-detail-meta">
       <div><span>{{ 'NETWORK_MAP.CHILDREN' | translate }}</span><strong>{{ selectedNode.children.length }}</strong></div>
       <div><span>{{ 'NETWORK_MAP.LEAVES' | translate }}</span><strong>{{ selectedNode.leafCount }}</strong></div>
+    </div>
+
+    <!-- Özellikler (Properties) Tablosu -->
+    <div class="sm-detail-props" *ngIf="selectedNodeProperties.length">
+      <h3 class="sm-props-title"><i class="fas fa-sliders-h"></i> {{ 'NETWORK_MAP.PROPERTIES' | translate }}</h3>
+      <div class="sm-props-list">
+        <div class="sm-prop-row" *ngFor="let prop of selectedNodeProperties">
+          <span class="sm-prop-key" [title]="prop.key">{{ prop.key }}</span>
+          <span class="sm-prop-val" [title]="prop.value">{{ prop.value }}</span>
+        </div>
+      </div>
     </div>
 
     <div class="sm-detail-actions">
@@ -135,6 +161,119 @@
       </button>
     </div>
   </aside>
+
+  <!-- ===================== TEMA AYAR MODALI ===================== -->
+  <div class="sm-modal-backdrop" *ngIf="showThemeModal" (click)="showThemeModal = false">
+    <div class="sm-modal sm-theme-modal-lg" (click)="$event.stopPropagation()">
+      <div class="sm-modal-head">
+        <h3><i class="fas fa-palette"></i> {{ 'NETWORK_MAP.THEME_MODAL_TITLE' | translate }}</h3>
+        <button class="sm-close" (click)="showThemeModal = false"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="sm-modal-body">
+        <!-- Preset Cards -->
+        <div class="sm-form-group">
+          <label>{{ 'NETWORK_MAP.PRESETS' | translate }}</label>
+          <div class="sm-presets-grid">
+            <button
+              type="button"
+              class="sm-preset-card"
+              *ngFor="let p of presetList"
+              [class.active]="themeConfig.theme === p.id"
+              (click)="applyThemePreset(p.id)">
+              <div class="sm-preset-icon">
+                <i class="fas" [ngClass]="p.icon"></i>
+              </div>
+              <div class="sm-preset-meta">
+                <span class="sm-preset-title">{{ p.nameKey | translate }}</span>
+                <span class="sm-preset-desc">{{ p.desc }}</span>
+              </div>
+              <i class="fas fa-check sm-preset-check" *ngIf="themeConfig.theme === p.id"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Customizations (2 Columns) -->
+        <div class="sm-theme-details-grid">
+          <!-- Sol Sütun: Düğüm Şekli & Renk Paleti -->
+          <div class="sm-theme-col">
+            <div class="sm-form-group">
+              <label>{{ 'NETWORK_MAP.NODE_SHAPE' | translate }}</label>
+              <select [(ngModel)]="themeConfig.nodeShape" (ngModelChange)="onThemeChange()">
+                <option *ngFor="let s of availableShapes" [value]="s.id">{{ s.labelKey | translate }}</option>
+              </select>
+            </div>
+
+            <div class="sm-form-group">
+              <label>{{ 'NETWORK_MAP.COLOR_PALETTE' | translate }}</label>
+              <div class="sm-colors-row">
+                <div class="sm-color-field" title="Level 1 / Kök Renk">
+                  <span>L1</span>
+                  <input type="color" [(ngModel)]="themeConfig.color1" (ngModelChange)="onThemeChange()" />
+                </div>
+                <div class="sm-color-field" title="Level 2 / Grup Renk">
+                  <span>L2</span>
+                  <input type="color" [(ngModel)]="themeConfig.color2" (ngModelChange)="onThemeChange()" />
+                </div>
+                <div class="sm-color-field" title="Level 3 / Varlık Renk">
+                  <span>L3</span>
+                  <input type="color" [(ngModel)]="themeConfig.color3" (ngModelChange)="onThemeChange()" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sağ Sütun: Seviye İkonları -->
+          <div class="sm-theme-col">
+            <div class="sm-form-group">
+              <label>{{ 'NETWORK_MAP.LEVEL_1_ICON' | translate }}</label>
+              <select [(ngModel)]="themeConfig.level1Icon" (ngModelChange)="onThemeChange()">
+                <option *ngFor="let ic of availableIcons" [value]="ic.id">
+                  {{ ic.glyph }} {{ ic.label }}
+                </option>
+              </select>
+            </div>
+
+            <div class="sm-form-group">
+              <label>{{ 'NETWORK_MAP.LEVEL_2_ICON' | translate }}</label>
+              <select [(ngModel)]="themeConfig.level2Icon" (ngModelChange)="onThemeChange()">
+                <option *ngFor="let ic of availableIcons" [value]="ic.id">
+                  {{ ic.glyph }} {{ ic.label }}
+                </option>
+              </select>
+            </div>
+
+            <div class="sm-form-group">
+              <label>{{ 'NETWORK_MAP.LEVEL_3_ICON' | translate }}</label>
+              <select [(ngModel)]="themeConfig.level3Icon" (ngModelChange)="onThemeChange()">
+                <option *ngFor="let ic of availableIcons" [value]="ic.id">
+                  {{ ic.glyph }} {{ ic.label }}
+                </option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Efekt & Rehber Toggles -->
+        <div class="sm-theme-toggles">
+          <label class="sm-toggle-label">
+            <input type="checkbox" [(ngModel)]="themeConfig.showOrbits" (ngModelChange)="onThemeChange()" />
+            <span><i class="fas fa-circle-notch"></i> {{ 'NETWORK_MAP.SHOW_ORBITS' | translate }}</span>
+          </label>
+          <label class="sm-toggle-label">
+            <input type="checkbox" [(ngModel)]="themeConfig.showGrid" (ngModelChange)="onThemeChange()" />
+            <span><i class="fas fa-border-all"></i> {{ 'NETWORK_MAP.SHOW_GRID' | translate }}</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="sm-modal-footer">
+        <button class="sm-btn" (click)="showThemeModal = false">{{ 'COMMON.CANCEL' | translate }}</button>
+        <button class="sm-btn primary" (click)="saveTheme()">
+          <i class="fas fa-save"></i> {{ 'COMMON.SAVE' | translate }}
+        </button>
+      </div>
+    </div>
+  </div>
 
   <!-- Toast -->
   <div class="sm-toast" *ngIf="toast" [class.err]="toastType === 'error'">{{ toast }}</div>

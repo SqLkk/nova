@@ -41,6 +41,7 @@
         <div class="pd-card-foot">
           <span class="pd-card-q"><i class="fas fa-database"></i> {{ queries.find(q=>q.id===p.queryId)?.name || p.queryId }}</span>
           <div class="pd-card-actions">
+            <button class="pd-act pd-act-map" (click)="openInMap(p)" title="Space Map'te Aç"><i class="fas fa-satellite"></i></button>
             <button class="pd-act" (click)="openSearch(p)" title="Search"><i class="fas fa-search"></i></button>
             <button *ngIf="canDefine" class="pd-act" (click)="editBuild(p)" title="Edit"><i class="fas fa-pen"></i></button>
             <button *ngIf="canDefine" class="pd-act pd-act-del" (click)="deletePath(p,$event)" title="Delete"><i class="fas fa-trash"></i></button>
@@ -104,6 +105,8 @@
             <select class="pd-sel" [(ngModel)]="form.config.label_col"><option value="">—</option><option *ngFor="let c of queryColumns" [value]="c">{{ c }}</option></select></div>
           <div class="pd-map-row"><span>Type (optional)</span>
             <select class="pd-sel" [(ngModel)]="form.config.type_col"><option value="">—</option><option *ngFor="let c of queryColumns" [value]="c">{{ c }}</option></select></div>
+          <div class="pd-map-row"><span>Root Value (optional)</span>
+            <input class="pd-sel !px-2" [(ngModel)]="form.config.root_value" placeholder="e.g. 0, ROOT (blank=NULL)" /></div>
         </ng-container>
 
         <ng-container *ngIf="form.structure==='sequence'">
@@ -125,6 +128,33 @@
           <div class="pd-map-row"><span>Order (optional)</span>
             <select class="pd-sel" [(ngModel)]="form.config.order_col"><option value="">—</option><option *ngFor="let c of queryColumns" [value]="c">{{ c }}</option></select></div>
         </ng-container>
+
+        <ng-container *ngIf="form.structure==='dag'">
+          <div class="pd-map-row"><span>Identity (id)</span>
+            <select class="pd-sel" [(ngModel)]="form.config.id_col"><option value="">—</option><option *ngFor="let c of queryColumns" [value]="c">{{ c }}</option></select></div>
+          <div class="pd-map-row"><span>Parents (comma/list)</span>
+            <select class="pd-sel" [(ngModel)]="form.config.parent_col"><option value="">—</option><option *ngFor="let c of queryColumns" [value]="c">{{ c }}</option></select></div>
+          <div class="pd-map-row"><span>Label</span>
+            <select class="pd-sel" [(ngModel)]="form.config.label_col"><option value="">—</option><option *ngFor="let c of queryColumns" [value]="c">{{ c }}</option></select></div>
+          <div class="pd-map-row"><span>Type (optional)</span>
+            <select class="pd-sel" [(ngModel)]="form.config.type_col"><option value="">—</option><option *ngFor="let c of queryColumns" [value]="c">{{ c }}</option></select></div>
+        </ng-container>
+
+        <!-- Live Health & Status Badges (Optional) -->
+        <div class="pd-map-row mt-1">
+          <span>Health Score</span>
+          <select class="pd-sel" [(ngModel)]="form.config.health_col">
+            <option value="">— (Auto detect) —</option>
+            <option *ngFor="let c of queryColumns" [value]="c">{{ c }}</option>
+          </select>
+        </div>
+        <div class="pd-map-row">
+          <span>Status / State</span>
+          <select class="pd-sel" [(ngModel)]="form.config.status_col">
+            <option value="">— (Auto detect) —</option>
+            <option *ngFor="let c of queryColumns" [value]="c">{{ c }}</option>
+          </select>
+        </div>
 
         <!-- Hedef Kolon (Ortak) -->
         <div class="pd-map-row mt-2 pt-2 border-t border-[rgb(58,52,64)]/50">
@@ -237,6 +267,12 @@
     <i class="fas pd-tree-i" [ngClass]="tn.children.length ? 'fa-caret-down' : 'fa-circle'"></i>
     <span class="pd-tree-label" [class.pd-tree-root]="tn.node.depth===0">{{ tn.node.label }}</span>
     <span *ngIf="tn.node.type" class="pd-tree-type">{{ tn.node.type }}</span>
+    <span *ngIf="tn.node.healthScore !== undefined" class="ml-2 px-1.5 py-0.5 rounded text-[10px] font-bold text-white shadow-sm" [style.backgroundColor]="tn.node.statusColor || '#10b981'">
+      {{ tn.node.healthScore }}%
+    </span>
+    <span *ngIf="tn.node.status" class="ml-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider text-white shadow-sm" [style.backgroundColor]="tn.node.statusColor || '#6b7280'">
+      {{ tn.node.status }}
+    </span>
   </div>
   <ng-container *ngFor="let child of tn.children">
     <ng-container *ngTemplateOutlet="treeNode; context: { $implicit: child }"></ng-container>

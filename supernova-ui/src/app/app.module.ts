@@ -44,6 +44,7 @@ import { TranslateHttpLoader } from '@ngx-translate/http-loader';
 // Import services for injection
 import { AuthService } from './services/auth.service';
 import { AuthInterceptor } from './services/auth.interceptor';
+import { DemoMockInterceptor } from './interceptors/demo-mock.interceptor';
 import { AuthGuard, LoginGuard } from './guards/auth.guard';
 import { AlarmsService } from './services/alarms.service';
 import { TableExplorerService } from './services/table-explorer.service';
@@ -96,7 +97,7 @@ export function HttpLoaderFactory(http: HttpClient) {
     DragDropModule,
     HttpClientModule,
     TranslateModule.forRoot({
-      defaultLanguage: 'en',
+      defaultLanguage: 'tr',
       loader: {
         provide: TranslateLoader,
         useFactory: HttpLoaderFactory,
@@ -109,6 +110,8 @@ export function HttpLoaderFactory(http: HttpClient) {
     AuthGuard,
     LoginGuard,
     AlarmsService,
+    // Demo mock interceptor (catches static/demo API requests)
+    { provide: HTTP_INTERCEPTORS, useClass: DemoMockInterceptor, multi: true },
     // Her giden HTTP isteğine Bearer token ekleyen interceptor.
     { provide: HTTP_INTERCEPTORS, useClass: AuthInterceptor, multi: true }
   ],

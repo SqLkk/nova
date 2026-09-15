@@ -1,0 +1,141 @@
+{
+  "dataset_name": "Apex Enterprise Smart Factory & Industrial SCADA Dataset",
+  "version": "2.4.0",
+  "created_at": "2026-09-14T11:38:16.639753+00:00",
+  "tables": {
+    "factory_assets_hierarchy": {
+      "record_count": 41,
+      "columns": [
+        "asset_id",
+        "parent_asset_id",
+        "asset_name",
+        "asset_level",
+        "level_depth",
+        "plant_area",
+        "criticality_tier",
+        "manufacturer",
+        "model_number",
+        "status",
+        "description",
+        "installation_date",
+        "last_inspection_date",
+        "health_score"
+      ]
+    },
+    "manufacturing_process_sequence": {
+      "record_count": 10,
+      "columns": [
+        "step_id",
+        "step_order",
+        "next_step_id",
+        "step_name",
+        "assigned_line_id",
+        "workstation_name",
+        "std_cycle_time_sec",
+        "quality_gate_required",
+        "target_tolerance_um",
+        "process_description"
+      ]
+    },
+    "production_batches": {
+      "record_count": 450,
+      "columns": [
+        "batch_id",
+        "work_order_id",
+        "product_code",
+        "product_name",
+        "product_family",
+        "line_id",
+        "shift_name",
+        "lead_operator_id",
+        "lead_operator_name",
+        "start_timestamp",
+        "end_timestamp",
+        "planned_qty",
+        "produced_qty",
+        "good_qty",
+        "scrap_qty",
+        "rework_qty",
+        "scrap_rate_pct",
+        "cycle_time_actual_sec",
+        "cycle_time_target_sec",
+        "availability_rate",
+        "performance_rate",
+        "quality_rate",
+        "oee_percentage",
+        "batch_status"
+      ]
+    },
+    "equipment_downtime_events": {
+      "record_count": 180,
+      "columns": [
+        "event_id",
+        "machine_id",
+        "machine_name",
+        "plant_area",
+        "start_timestamp",
+        "end_timestamp",
+        "downtime_minutes",
+        "category",
+        "failure_mode",
+        "root_cause",
+        "corrective_action",
+        "technician_id",
+        "repair_cost_usd",
+        "impacted_oee_factor",
+        "estimated_lost_units"
+      ]
+    },
+    "quality_inspections": {
+      "record_count": 800,
+      "columns": [
+        "inspection_id",
+        "batch_id",
+        "product_code",
+        "machine_id",
+        "timestamp",
+        "station_name",
+        "inspection_mode",
+        "status",
+        "measured_deviation_um",
+        "upper_tolerance_um",
+        "lower_tolerance_um",
+        "defect_code",
+        "defect_description",
+        "defect_severity",
+        "inspector_name"
+      ]
+    },
+    "facility_energy_esg": {
+      "record_count": 3600,
+      "columns": [
+        "log_id",
+        "timestamp",
+        "facility_id",
+        "plant_area",
+        "active_power_kwh",
+        "reactive_power_kvarh",
+        "power_factor",
+        "peak_demand_kw",
+        "compressed_air_m3",
+        "co2_emissions_kg"
+      ]
+    },
+    "machine_telemetry_timeseries": {
+      "record_count": 60000,
+      "columns": [
+        "reading_id",
+        "timestamp",
+        "machine_id",
+        "sensor_id",
+        "metric_name",
+        "value",
+        "unit",
+        "lsl",
+        "usl",
+        "warning_threshold",
+        "alarm_status"
+      ]
+    }
+  }
+}

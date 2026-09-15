@@ -97,7 +97,7 @@ export function HttpLoaderFactory(http: HttpClient) {
     DragDropModule,
     HttpClientModule,
     TranslateModule.forRoot({
-      defaultLanguage: 'en',
+      defaultLanguage: 'tr',
       loader: {
         provide: TranslateLoader,
         useFactory: HttpLoaderFactory,
@@ -110,7 +110,7 @@ export function HttpLoaderFactory(http: HttpClient) {
     AuthGuard,
     LoginGuard,
     AlarmsService,
-    // Add Demo mock interceptor first so it catches API calls
+    // Demo mock interceptor (catches static/demo API requests)
     { provide: HTTP_INTERCEPTORS, useClass: DemoMockInterceptor, multi: true },
     // Her giden HTTP isteğine Bearer token ekleyen interceptor.
     { provide: HTTP_INTERCEPTORS, useClass: AuthInterceptor, multi: true }

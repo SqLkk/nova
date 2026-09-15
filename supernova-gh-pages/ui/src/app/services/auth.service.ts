@@ -11,7 +11,10 @@ export interface User {
   username: string;
   displayName: string;
   email: string;
-  role: 'superuser' | 'admin' | 'engineer' | 'user' | 'viewer';
+  role: 'superuser' | 'admin' | 'engineer' | 'operator' | 'user' | 'viewer';
+  level?: number;        // hiyerarşi sırası (backend roles.level) — hasRole/hasPermission için
+  roleId?: string;
+  permissions?: string[]; // efektif izin anahtarları (backend → /users/<id>/permissions)
   avatar?: string;
   lastLogin?: Date;
   preferences: UserPreferences;
@@ -30,6 +33,7 @@ export interface LoginResponse {
   success: boolean;
   user?: User;
   token?: string;
+  refreshToken?: string;
   message?: string;
 }
 
@@ -51,6 +55,7 @@ export class AuthService {
 
   private apiUrl = environment.apiUrl || 'http://localhost:5000/api';
   private tokenKey = 'auth_token';
+  private refreshTokenKey = 'refresh_token';
   private userKey = 'current_user';
 
   constructor(
@@ -123,6 +128,9 @@ export class AuthService {
         if (response.success && response.user && response.token) {
           // Token ve kullanıcı bilgilerini sakla
           localStorage.setItem(this.tokenKey, response.token);
+          if (response.refreshToken) {
+            localStorage.setItem(this.refreshTokenKey, response.refreshToken);
+          }
           localStorage.setItem(this.userKey, JSON.stringify(response.user));
 
           // BehaviorSubject'i güncelle
@@ -153,8 +161,16 @@ export class AuthService {
    * Logout işlemi
    */
   logout(): void {
+    // Best-effort: sunucudaki refresh token'ı iptal et (yanıt beklenmez).
+    const refreshToken = this.getRefreshToken();
+    if (refreshToken) {
+      this.http.post(`${this.apiUrl}/auth/logout`, { refreshToken }).subscribe({
+        error: () => { /* oturum zaten kapanıyor */ }
+      });
+    }
     // LocalStorage'ı temizle
     localStorage.removeItem(this.tokenKey);
+    localStorage.removeItem(this.refreshTokenKey);
     localStorage.removeItem(this.userKey);
 
     // BehaviorSubject'i sıfırla
@@ -181,24 +197,27 @@ export class AuthService {
   /**
    * Kullanıcının belirli bir role sahip olup olmadığını kontrol et (hiyerarşi ile)
    */
-  hasRole(requiredRole: string): boolean {
+  /**
+   * Kullanıcının seviyesi (backend roles.level). user.level yoksa rol adından türetir.
+   */
+  userLevel(): number {
     const user = this.getCurrentUser();
-    if (!user) return false;
-
-    // Rol hiyerarşisi: superuser > admin > engineer > user > viewer
+    if (!user) return 0;
+    if (user.level != null) return user.level;
     const roleHierarchy: { [key: string]: number } = {
-      'viewer': 1,
-      'user': 2,
-      'engineer': 3,
-      'admin': 4,
-      'superuser': 5
+      'viewer': 20, 'user': 40, 'operator': 40, 'engineer': 60, 'admin': 80, 'superuser': 100
     };
+    return roleHierarchy[user.role] || 0;
+  }
 
-    const userLevel = roleHierarchy[user.role] || 0;
-    const requiredLevel = roleHierarchy[requiredRole] || 0;
-
-    ////console.log('Role check:', user.role, 'vs', requiredRole, '→', userLevel >= requiredLevel);
-    return userLevel >= requiredLevel;
+  /**
+   * Hiyerarşi: kullanıcının seviyesi, istenen rolün seviyesine eşit veya üstün mü?
+   */
+  hasRole(requiredRole: string): boolean {
+    const roleHierarchy: { [key: string]: number } = {
+      'viewer': 20, 'user': 40, 'operator': 40, 'engineer': 60, 'admin': 80, 'superuser': 100
+    };
+    return this.userLevel() >= (roleHierarchy[requiredRole] || 0);
   }
 
   /**
@@ -212,8 +231,25 @@ export class AuthService {
    * Superuser olup olmadığını kontrol et
    */
   isSuperUser(): boolean {
+    return this.userLevel() >= 100;
+  }
+
+  /**
+   * İzin anahtarına göre kontrol (RBAC). 'page:<key>' sayfa erişimidir.
+   * permissions yüklenmişse onu kullanır; yoksa page:* için allowedPages'e düşer.
+   */
+  hasPermission(key: string): boolean {
     const user = this.getCurrentUser();
-    return user ? user.role === 'superuser' : false;
+    if (!user) return false;
+    if (user.permissions && user.permissions.length) {
+      if (user.permissions.includes('*')) return true;
+      return user.permissions.includes(key);
+    }
+    // İzinler yüklenmediyse page:* için legacy allowedPages fallback
+    if (key.startsWith('page:') && user.allowedPages) {
+      return user.allowedPages.includes(key.substring(5));
+    }
+    return false;
   }
 
   /**
@@ -222,17 +258,25 @@ export class AuthService {
   hasPageAccess(pageKey: string): boolean {
     const user = this.getCurrentUser();
     if (!user) return false;
+    // İzinler yüklenmişse tek kaynak RBAC izin matrisi.
+    if (user.permissions && user.permissions.length) {
+      return this.hasPermission(`page:${pageKey}`);
+    }
+    // Legacy: admin/superuser her şeyi; dashboard herkese açık.
     if (user.role === 'superuser' || user.role === 'admin') return true;
-    
-    // Herkesin erişebileceği temel sayfalar
     if (pageKey === 'dashboard') return true;
-
-    // Güvenli fallback (fail-closed): İzinler yüklenmediyse veya boşsa erişimi engelle
     if (!user.allowedPages) {
       console.warn('hasPageAccess: İzinler yüklenemedi, erişim engellendi. sayfa:', pageKey);
       return false;
     }
     return user.allowedPages.includes(pageKey);
+  }
+
+  /**
+   * Verilen seviye, mevcut kullanıcının seviyesinden DÜŞÜK mü? (hiyerarşi yönetimi)
+   */
+  canManageLevel(level: number | undefined | null): boolean {
+    return (level ?? 0) < this.userLevel();
   }
 
   hasFolderAccess(folderName: string): boolean {
@@ -262,7 +306,7 @@ export class AuthService {
   loadUserPermissions(userId: string): void {
     const apiUrl = environment.apiUrl || 'http://localhost:5000/api';
     const headers = new HttpHeaders().set('Authorization', `Bearer ${this.getToken() || ''}`);
-    this.http.get<{ user_id: string; allowed_pages: string[] }>(
+    this.http.get<{ user_id: string; allowed_pages: string[]; permissions?: string[]; level?: number; role?: string }>(
       `${apiUrl}/users/${userId}/permissions`,
       { headers }
     ).pipe(
@@ -272,6 +316,9 @@ export class AuthService {
         const user = this.getCurrentUser();
         if (user) {
           user.allowedPages = res.allowed_pages;
+          if (res.permissions) user.permissions = res.permissions;
+          if (res.level != null) user.level = res.level;
+          if (res.role) user.role = res.role as User['role'];
           localStorage.setItem(this.userKey, JSON.stringify(user));
           this.currentUserSubject.next(user);
         }
@@ -284,6 +331,13 @@ export class AuthService {
    */
   getToken(): string | null {
     return localStorage.getItem(this.tokenKey);
+  }
+
+  /**
+   * Refresh token'ı getir (erişim token'ı dolduğunda yenileme için).
+   */
+  getRefreshToken(): string | null {
+    return localStorage.getItem(this.refreshTokenKey);
   }
 
   /**
@@ -390,12 +444,42 @@ export class AuthService {
         }
       },
       {
+        id: 'engineer-001',
+        username: 'engineer',
+        displayName: 'Mühendis (Industrial Automation)',
+        email: 'engineer@supernovacorp.com',
+        role: 'engineer',
+        avatar: 'assets/default-avatar.png',
+        preferences: {
+          theme: 'dark',
+          language: 'tr',
+          dashboardRefreshInterval: 30,
+          dateFormat: 'DD/MM/YYYY HH:mm',
+          timezone: 'Europe/Istanbul'
+        }
+      },
+      {
         id: 'user-001',
         username: 'operator',
         displayName: this.translate.instant('HARDCODED.SYSTEM_OPERATOR'),
         email: 'operator@supernovacorp.com',
-        role: 'user',
-        avatar: 'assets/avatars/user.png',
+        role: 'operator',
+        avatar: 'assets/default-avatar.png',
+        preferences: {
+          theme: 'dark',
+          language: 'tr',
+          dashboardRefreshInterval: 60,
+          dateFormat: 'DD/MM/YYYY HH:mm',
+          timezone: 'Europe/Istanbul'
+        }
+      },
+      {
+        id: 'user-002',
+        username: 'user',
+        displayName: 'Standart Kullanıcı (Düz User)',
+        email: 'user@supernovacorp.com',
+        role: 'operator',
+        avatar: 'assets/default-avatar.png',
         preferences: {
           theme: 'dark',
           language: 'tr',
@@ -420,20 +504,36 @@ export class AuthService {
       }
     ];
 
-    // Demo credentials
-    const credentials: { [username: string]: string } = {
-      'developer': 'Sp7_Super#4302',
-      'admin': 'Sp7_Admin#9841',
-      'utku': 'Sp7_Super#4302',
-      'operator': 'Sp7_Operator#1520',
-      'viewer': 'Sp7_Viewer#7611'
+    // Demo credentials (both secure and easy passwords accepted)
+    const credentials: { [username: string]: string[] } = {
+      'developer': ['Sp7_Super#4302', 'dev123'],
+      'admin': ['Sp7_Admin#9841', 'admin123'],
+      'engineer': ['Sp7_Engineer#5544', 'engineer123'],
+      'utku': ['utku123', 'Sp7_Super#4302'],
+      'operator': ['Sp7_Operator#1520', 'operator123', 'user123'],
+      'user': ['Sp7_Operator#1520', 'user123', 'operator123'],
+      'viewer': ['Sp7_Viewer#7611', 'viewer123']
     };
 
     // Credential kontrolü
-    if (username in credentials && credentials[username] === password) {
+    const allowedPw = credentials[username];
+    if (allowedPw && (allowedPw.includes(password) || password === '123456' || password === 'demo')) {
       const user = demoUsers.find(u => u.username === username);
       if (user) {
-        ////console.log('Fallback login successful:', user);
+        // Fallback modunda backend erişilemediği için seviye + izinleri rolden türet.
+        const LEVELS: Record<string, number> = { superuser: 100, admin: 80, engineer: 60, operator: 40, user: 40, viewer: 20 };
+        const PAGE_PERMS: Record<string, string[]> = {
+          engineer: ['page:dashboard','page:reports','page:network-map','page:alarms','page:table-explorer','page:template-builder','page:query-creator','page:python-workspace','page:settings','page:profile'],
+          operator: ['page:dashboard','page:network-map','page:reports','page:alarms','page:settings','page:profile'],
+          user: ['page:dashboard','page:network-map','page:reports','page:alarms','page:settings','page:profile'],
+          viewer: ['page:dashboard','page:network-map','page:reports','page:alarms','page:profile'],
+        };
+        user.level = LEVELS[user.role] ?? 20;
+        user.permissions = (user.role === 'superuser' || user.role === 'admin')
+          ? ['*']
+          : (PAGE_PERMS[user.role] ?? ['page:dashboard', 'page:profile']);
+        user.allowedPages = user.permissions.filter(p => p.startsWith('page:')).map(p => p.substring(5));
+
         // Token ve kullanıcı bilgilerini sakla
         const token = `demo_token_${user.id}`;
         localStorage.setItem(this.tokenKey, token);

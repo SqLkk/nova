@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter, OnInit, OnDestroy, OnChanges, SimpleChanges, ViewChild } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnInit, OnDestroy, OnChanges, SimpleChanges, ViewChild, ElementRef } from '@angular/core';
 import { ChartConfiguration, ChartOptions, ChartType, Chart } from 'chart.js';
 import { ChangeDetectorRef } from '@angular/core';
 import { BaseChartDirective } from 'ng2-charts';
@@ -10,6 +10,10 @@ import { TranslateService } from '@ngx-translate/core';
 import { evaluateFormulaOnArrays } from '../../utils/formula-engine';
 import { BRAND, STATUS, CHART_PALETTE } from '../../shared/theme/palette';
 import { ThemeColors } from '../../shared/theme/theme-colors';
+import { PathService } from '../../services/path.service';
+import { AuthService } from '../../services/auth.service';
+import { environment } from '../../../environments/environment';
+import { BuiltStructure, PathNode } from '../../models/path-def.model';
 
 @Component({
   standalone: false,
@@ -24,7 +28,8 @@ export class WidgetComponent implements OnInit, OnDestroy, OnChanges {
   @Input() type: 'success' | 'info' | 'danger' = 'info';
   @Input() widgetType: string = 'line-chart'; // Ekstra grafik tipi için
   @Input() dataSource: string = ''; // Veri kaynağı
-  @Input() dataSourceType: 'realtime' | 'historical' | 'app' | 'sql' | 'python' = 'realtime'; // Veri kaynağı tipi 
+  @Input() dataSourceType: 'realtime' | 'historical' | 'app' | 'sql' | 'python' | 'path' = 'realtime'; // Veri kaynağı tipi 
+  @Input() assignedPathId?: string; // Hiyerarşi veya DAG path tanımı
   @Input() startDate?: string; // Geçmiş veri başlangıç tarihi
   @Input() endDate?: string; // Geçmiş veri bitiş tarihi
   @Input() initialPaths: string[] = []; // İlk yüklemede hazır path listesi
@@ -65,6 +70,76 @@ export class WidgetComponent implements OnInit, OnDestroy, OnChanges {
   columnFilters: { [key: string]: string } = {};
   activeFilterColumn: string | null = null;
   isLoadingData: boolean = false;
+
+  // --- Specialized Visual Widget Engines ---
+  // 1. Timeline / Downtime Tracker State
+  timelineEvents: Array<{
+    id: string;
+    machine: string;
+    line: string;
+    reason: string;
+    category: 'mechanical' | 'electrical' | 'operational' | 'setup';
+    startTime: string;
+    durationMin: number;
+    rootCause: string;
+    severity: 'low' | 'medium' | 'high';
+  }> = [];
+  selectedTimelineEvent: any = null;
+
+  // 2. Status Board / SCADA Matrix State
+  scadaCells: Array<{
+    id: string;
+    code: string;
+    name: string;
+    line: string;
+    status: 'RUNNING' | 'WARNING' | 'ALARM' | 'STANDBY';
+    oee: number;
+    speedPercent: number;
+    currentJob: string;
+    value: number;
+    unit: string;
+    operator: string;
+    metricLabel: string;
+  }> = [];
+  selectedCell: any = null;
+
+  // 3. Live Stream / SSE Telemetry State
+  streamEventSource?: EventSource;
+  activeStreamSensor: 'vibration_rms' | 'cushion_pressure' | 'motor_torque' | 'spindle_speed' | 'laser_power' = 'vibration_rms';
+  streamReadout = { value: 0, unit: 'mm/s', min: 0, max: 0, rms: 0, peak: 0, fps: 2.0 };
+  streamDataPoints: Array<{ t: number; v: number }> = [];
+  streamConnected: boolean = false;
+  streamThreshold: number = 4.5;
+  @ViewChild('liveStreamCanvas') liveStreamCanvasRef?: ElementRef<HTMLCanvasElement>;
+  private streamAnimationId?: number;
+
+  // 4. Map View / Logistics Tracking State
+  leafletMap?: any;
+  @ViewChild('leafletMapContainer') leafletMapContainerRef?: ElementRef<HTMLElement>;
+  mapShipments: Array<{
+    id: string;
+    trackingNo: string;
+    origin: string;
+    destination: string;
+    originCoords: [number, number];
+    destCoords: [number, number];
+    currentCoords: [number, number];
+    status: 'IN_TRANSIT' | 'DELIVERED' | 'DELAYED';
+    carrier: string;
+    driver: string;
+    eta: string;
+    cargo: string;
+    progress: number;
+  }> = [];
+  selectedShipment: any = null;
+
+  // 5. Path View / Asset Topology & DAG State
+  pathStructure?: BuiltStructure;
+  pathNodesList: PathNode[] = [];
+  expandedPathNodes: Set<string> = new Set();
+  pathSearchTerm: string = '';
+  selectedPathNode?: PathNode;
+  pathViewMode: 'tree' | 'sequence' | 'dag' = 'tree';
 
   getFilteredSqlRows(): any[] {
     if (Object.keys(this.columnFilters).length === 0) {
@@ -234,6 +309,23 @@ export class WidgetComponent implements OnInit, OnDestroy, OnChanges {
             };
           }
           return { status: 'error', data: [], message: 'Failed to load SQL data' };
+        }),
+        catchError(err => of({ status: 'error' as string, data: null, message: err.message }))
+      );
+    } else if (path.startsWith('python://')) {
+      const scriptId = path.substring('python://'.length);
+      return this.apiService.runSavedPythonScript(scriptId).pipe(
+        map((res: any) => {
+          if (res && res.status === 'success' && res.data) {
+            const rows = res.data.rows || [];
+            const columns = Object.keys(rows[0] || {});
+            const isNum = (v: any): boolean => typeof v === 'number' ? !isNaN(v) : (typeof v === 'string' && /^-?\d+(\.\d+)?$/.test(v.trim()));
+            const numericCol = columns.find(c => rows.slice(0, 5).some(r => isNum(r[c]))) || columns[0];
+            const toNum = (v: any): number => typeof v === 'number' ? (isNaN(v) ? 0 : v) : (typeof v === 'string' ? (parseFloat(v) || 0) : 0);
+            const dataValues = rows.map((r: any) => toNum(r[numericCol]));
+            return { status: 'success', data: dataValues, message: `PYTHON ${rows.length} kayıt` };
+          }
+          return { status: 'error', data: [], message: 'No Python data' };
         }),
         catchError(err => of({ status: 'error' as string, data: null, message: err.message }))
       );
@@ -510,7 +602,14 @@ export class WidgetComponent implements OnInit, OnDestroy, OnChanges {
     }
   };
 
-  constructor(private cdr: ChangeDetectorRef, private apiService: ApiService, private translateService: TranslateService, private themeColors: ThemeColors) {}
+  constructor(
+    private cdr: ChangeDetectorRef,
+    private apiService: ApiService,
+    private translateService: TranslateService,
+    private themeColors: ThemeColors,
+    private pathService: PathService,
+    private authService: AuthService
+  ) {}
 
   ngOnChanges(changes: SimpleChanges): void {
     ////console.log('[WIDGET] ngOnChanges tetiklendi, değişiklikler:', changes);
@@ -549,6 +648,29 @@ export class WidgetComponent implements OnInit, OnDestroy, OnChanges {
     if (changes['dataSourceType'] && !changes['dataSourceType'].isFirstChange()) {
       ////console.log('[WIDGET] Veri kaynağı değişikliği algılandı:', changes['dataSourceType'].currentValue);
       this.updateChartWithActivePaths(); // Sadece veri çek, timer başlatma
+    }
+
+    // Assigned Path ID değiştiğinde
+    if (changes['assignedPathId'] && !changes['assignedPathId'].isFirstChange()) {
+      if (this.assignedPathId) {
+        this.fetchPathData(this.assignedPathId);
+      }
+    }
+
+    // Refresh rate değiştiğinde
+    if (changes['refreshRate'] && !changes['refreshRate'].isFirstChange()) {
+      if (this.refreshRate && this.refreshRate > 0) {
+        this.updateInterval = this.refreshRate;
+        this.startDataUpdates();
+      }
+    }
+
+    // Widget tipi değiştiğinde
+    if (changes['widgetType'] && !changes['widgetType'].isFirstChange()) {
+      this.setChartTypeFromWidgetType();
+      if (this.isVisualWidget()) {
+        this.initSpecializedWidget();
+      }
     }
     
     // Formula değiştiğinde veriyi yeniden yükle
@@ -600,6 +722,11 @@ export class WidgetComponent implements OnInit, OnDestroy, OnChanges {
     if (this.refreshRate && this.refreshRate > 0) {
       this.updateInterval = this.refreshRate;
       ////console.log('🔄 [WIDGET] Cache\'den refresh rate yüklendi:', this.refreshRate);
+    }
+    
+    // Specialized Visual Widgets initialization
+    if (this.isVisualWidget()) {
+      this.initSpecializedWidget();
     }
     
     // İlk path'leri ayarla (varsa)
@@ -703,6 +830,14 @@ export class WidgetComponent implements OnInit, OnDestroy, OnChanges {
       case 'data-table':
         console.log('📊 [WIDGET] Table widget type:', this.widgetType);
         break;
+      // Specialized Visual Engines
+      case 'timeline':
+      case 'status-board':
+      case 'live-stream':
+      case 'map-view':
+      case 'path-view':
+        // Custom visual renderers, not standard Chart.js
+        break;
       // Specialized widgets
       case 'phasor-chart':
       case 'power-quality':
@@ -732,6 +867,14 @@ export class WidgetComponent implements OnInit, OnDestroy, OnChanges {
   ngOnDestroy(): void {
     this.stopDataUpdates();
     this.stopRetryTimer();
+    this.stopLiveStream();
+    if (this.leafletMap) {
+      try {
+        this.leafletMap.remove();
+      } catch (e) {
+        // ignore
+      }
+    }
   }
 
   // Start automatic self-healing countdown
@@ -918,12 +1061,13 @@ export class WidgetComponent implements OnInit, OnDestroy, OnChanges {
     // Önce mevcut timer'ı durdur
     this.stopDataUpdates();
     
-    // Sadece LIVE path varsa timer başlat (SYS verisi değişmez)
+    // LIVE path veya periyodik yenileme gerektiren SQL/Python/Path kaynakları için timer başlat
     const hasRtPaths = this.currentDataPaths.some(p => this.isRealtimePath(p));
-    if (hasRtPaths) {
+    const isPeriodicSource = this.dataSourceType === 'sql' || this.dataSourceType === 'python' || this.dataSourceType === 'path';
+    if (hasRtPaths || isPeriodicSource) {
       this.dataUpdateSubscription = interval(this.updateInterval).subscribe(() => {
         this.updateDescription();
-        this.updateChartData();
+        this.updateChartWithActivePaths();
       });
     } else {
       console.warn('📅 [WIDGET] Historical path only - Automatic updates disabled');
@@ -1379,7 +1523,35 @@ export class WidgetComponent implements OnInit, OnDestroy, OnChanges {
         return;
       }
     }
-    
+
+    // Check if Python mode is active
+    if (this.dataSourceType === 'python' || (this.currentDataPaths.length > 0 && this.currentDataPaths[0]?.startsWith('python://'))) {
+      const scriptId = this.currentDataPaths[0]?.startsWith('python://')
+        ? this.currentDataPaths[0].substring('python://'.length)
+        : this.currentDataPaths[0];
+      if (scriptId) {
+        this.fetchPythonData(scriptId);
+        return;
+      }
+    }
+
+    // Check if Path mode is active
+    if (this.dataSourceType === 'path' || (this.currentDataPaths.length > 0 && this.currentDataPaths[0]?.startsWith('path://')) || this.assignedPathId) {
+      const pathId = this.assignedPathId || (this.currentDataPaths[0]?.startsWith('path://')
+        ? this.currentDataPaths[0].substring('path://'.length)
+        : this.currentDataPaths[0]);
+      if (pathId) {
+        this.fetchPathData(pathId);
+        return;
+      }
+    }
+
+    // If specialized visual widget and no data paths configured, initialize specialized visual engine
+    if (this.isVisualWidget() && this.currentDataPaths.length === 0) {
+      this.initSpecializedWidget();
+      return;
+    }
+
     // If formula is set, we must fetch ALL paths in currentDataPaths to evaluate the formula.
     // Otherwise, we only fetch active paths.
     const hasFormula = !!(this.formula && this.formula.trim());
@@ -1457,6 +1629,15 @@ export class WidgetComponent implements OnInit, OnDestroy, OnChanges {
           const columns = Object.keys(rows[0] || {});
           this.sqlTableRows = rows;
           this.sqlTableColumns = columns;
+
+          // Dispatch rows to specialized visual widgets if applicable
+          if (this.widgetType === 'timeline') {
+            this.mapSqlRowsToTimeline(rows);
+          } else if (this.widgetType === 'status-board') {
+            this.mapSqlRowsToScadaCells(rows);
+          } else if (this.widgetType === 'map-view') {
+            this.mapSqlRowsToShipments(rows);
+          }
           
           let numericCol = '';
           let labelCol = '';
@@ -1523,8 +1704,8 @@ export class WidgetComponent implements OnInit, OnDestroy, OnChanges {
 
           const validCount = dataValues.filter((v: any) => v !== null).length;
           
-          // If this is a numeric widget (not data-table) and has no valid numeric columns or values, reject strictly!
-          if (this.widgetType !== 'data-table' && (!numericCol || validCount === 0)) {
+          // If this is a numeric widget (not data-table and not specialized visual engines) and has no valid numeric columns or values, reject strictly!
+          if (this.widgetType !== 'data-table' && !this.isVisualWidget() && (!numericCol || validCount === 0)) {
             this.currentValue = null;
             this.description = `⚠️ Incompatible Output: Selected Saved SQL has no numeric columns for plotting on charts/gauges.`;
             this.chartData.labels = ['Incompatible Query'];
@@ -1583,6 +1764,79 @@ export class WidgetComponent implements OnInit, OnDestroy, OnChanges {
     });
   }
   
+  fetchPythonData(scriptId: string): void {
+    this.apiService.runSavedPythonScript(scriptId).subscribe({
+      next: res => {
+        if (res && res.status === 'success' && res.data) {
+          const rows = res.data.rows || [];
+          const name = res.data.name || 'Python Script';
+          this.description = `Python: "${name}" (${rows.length} rows)`;
+          this._renderRowsCompact(rows, name);
+        } else {
+          this.generateFallbackData(scriptId, 'PYTHON', 'python://' + scriptId);
+        }
+      },
+      error: err => {
+        console.error('Failed to load Python widget data:', err);
+        this.generateFallbackData(scriptId, 'PYTHON', 'python://' + scriptId);
+      }
+    });
+  }
+
+  /** Satır listesini (SQL/Python) widget grafiğine dönüştürür — kompakt, SQL
+   *  yoluna dokunmadan Python widget'ları için. Boş/sayısal-uyumsuz durumları
+   *  nazikçe ele alır. */
+  private _renderRowsCompact(rows: any[], label: string): void {
+    if (!rows || rows.length === 0) {
+      this.currentValue = 0;
+      this.chartData.labels = ['No Data'];
+      this.chartData.datasets = [{
+        data: [0], label: 'No Data', fill: false,
+        borderColor: '#9CA3AF', backgroundColor: 'rgba(156, 163, 175, 0.1)', pointRadius: 0
+      }];
+      this.chartData = { ...this.chartData };
+      this.cdr.detectChanges();
+      return;
+    }
+    const columns = Object.keys(rows[0] || {});
+    const isNum = (v: any): boolean => {
+      if (typeof v === 'number') return !isNaN(v);
+      if (typeof v === 'string') return /^-?\d+(\.\d+)?$/.test(v.trim());
+      return false;
+    };
+    const numericCol = columns.find(c => rows.slice(0, 5).some(r => isNum(r[c]))) || columns[0];
+    const labelCol = columns.find(c => c !== numericCol && /time|date|name|label|path/i.test(c)) || columns[0];
+    const toNum = (v: any): number => {
+      if (typeof v === 'number') return isNaN(v) ? 0 : v;
+      if (typeof v === 'string') { const n = parseFloat(v); return isNaN(n) ? 0 : n; }
+      return 0;
+    };
+    const dataValues = rows.map(r => toNum(r[numericCol]));
+    this.currentValue = dataValues[dataValues.length - 1];
+    if (this.currentValue !== null && this.currentValue !== undefined) {
+      this.checkThresholds(this.currentValue);
+    }
+    const colors = this.getColorsForDataType('sql', 0);
+    this.chartData.labels = rows.map(r => {
+      const v = r[labelCol];
+      return v !== null && v !== undefined ? String(v) : '';
+    });
+    this.chartData.datasets = [{
+      data: dataValues,
+      label: `${numericCol} (${label})`,
+      fill: this.widgetType === 'area-chart',
+      tension: 0.4,
+      borderColor: colors.border,
+      backgroundColor: colors.background,
+      pointRadius: this.chartData.labels.length > 20 ? 0 : 3,
+      pointHoverRadius: 6,
+      borderWidth: 3,
+      cubicInterpolationMode: 'monotone' as const
+    }];
+    this.chartData = { ...this.chartData };
+    this.cdr.detectChanges();
+  }
+
   // Tekli veri yolu için veri çekme
   fetchDataForPath(path: string): void {
     ////console.log('🟢 [WIDGET] Veri çekiliyor - Path:', path, 'Veri kaynağı:', this.dataSourceType);
@@ -3312,6 +3566,527 @@ export class WidgetComponent implements OnInit, OnDestroy, OnChanges {
       };
     }
     return { headers: [], rows: [] };
+  }
+
+  // --- Specialized Visual Widget Engine Helpers ---
+
+  isVisualWidget(): boolean {
+    return ['timeline', 'status-board', 'live-stream', 'map-view', 'path-view'].includes(this.widgetType);
+  }
+
+  initSpecializedWidget(): void {
+    if (this.widgetType === 'timeline') {
+      this.initTimelineData();
+    } else if (this.widgetType === 'status-board') {
+      this.initStatusBoardData();
+    } else if (this.widgetType === 'live-stream') {
+      this.initLiveTelemetryStream();
+    } else if (this.widgetType === 'map-view') {
+      this.initMapView();
+    } else if (this.widgetType === 'path-view') {
+      this.initPathView();
+    }
+  }
+
+  // --- 1. Timeline / Downtime Tracker ---
+  initTimelineData(): void {
+    if (this.timelineEvents.length > 0) return;
+    this.timelineEvents = [
+      { id: 'DT-101', machine: 'Press Line 1000T', line: 'Stamping Line 1', reason: 'Hydraulic Cushion Valve Jam', category: 'mechanical', startTime: '08:24', durationMin: 42, rootCause: 'Proportional valve seal degradation', severity: 'high' },
+      { id: 'DT-102', machine: 'Robotic Welder 02', line: 'Body Shop', reason: 'Optical Arc Sensor Contamination', category: 'electrical', startTime: '10:15', durationMin: 18, rootCause: 'Spatter buildup on protective lens', severity: 'medium' },
+      { id: 'DT-103', machine: 'CNC Milling Ctr 4', line: 'Machining Unit', reason: 'Spindle Temp Interlock Trigger', category: 'mechanical', startTime: '11:40', durationMin: 35, rootCause: 'Chiller coolant flow restriction', severity: 'high' },
+      { id: 'DT-104', machine: 'Laser Cutting 01', line: 'Fabrication', reason: 'Sheet Metal Feeder Misfeed', category: 'operational', startTime: '13:05', durationMin: 14, rootCause: 'Coil camber misalignment', severity: 'low' },
+      { id: 'DT-105', machine: 'Stamping Line B', line: 'Stamping Line 2', reason: 'Progressive Die Changeover', category: 'setup', startTime: '14:30', durationMin: 50, rootCause: 'Scheduled batch transition', severity: 'low' },
+      { id: 'DT-106', machine: 'Final Assembly 03', line: 'Assembly Line', reason: 'Torque Gun Calibration Alert', category: 'electrical', startTime: '15:50', durationMin: 22, rootCause: 'Resolver signal noise', severity: 'medium' }
+    ];
+  }
+
+  mapSqlRowsToTimeline(rows: any[]): void {
+    if (!rows || rows.length === 0) return;
+    this.timelineEvents = rows.map((r, i) => {
+      const duration = Number(r.duration_min || r.duration || r.Duration || r.downtime || 30);
+      const cat = (r.category || r.Category || r.type || 'mechanical').toString().toLowerCase();
+      const validCat = ['mechanical', 'electrical', 'operational', 'setup'].includes(cat) ? cat as any : 'mechanical';
+      return {
+        id: r.id || r.code || `DT-${100 + i}`,
+        machine: r.machine || r.asset || r.machine_name || r.name || `Machine #${i + 1}`,
+        line: r.line || r.section || 'Production Line',
+        reason: r.reason || r.fault || r.description || 'Downtime Stop',
+        category: validCat,
+        startTime: r.start_time || r.time || r.timestamp || '09:00',
+        durationMin: isNaN(duration) ? 30 : duration,
+        rootCause: r.root_cause || r.cause || 'Under investigation',
+        severity: duration > 30 ? 'high' : (duration > 15 ? 'medium' : 'low')
+      };
+    });
+  }
+
+  getTimelineTotalDowntime(): string {
+    const totalMin = this.timelineEvents.reduce((acc, e) => acc + (e.durationMin || 0), 0);
+    const hrs = Math.floor(totalMin / 60);
+    const mins = totalMin % 60;
+    return hrs > 0 ? `${hrs}h ${mins}m` : `${mins}m`;
+  }
+
+  getTimelineMTTR(): number {
+    if (!this.timelineEvents.length) return 0;
+    const totalMin = this.timelineEvents.reduce((acc, e) => acc + (e.durationMin || 0), 0);
+    return Math.round(totalMin / this.timelineEvents.length);
+  }
+
+  getTimelineAvailability(): string {
+    const totalMin = this.timelineEvents.reduce((acc, e) => acc + (e.durationMin || 0), 0);
+    const shiftMin = 480; // 8 saatlik vardiya
+    const avail = Math.max(0, Math.min(100, ((shiftMin - totalMin) / shiftMin) * 100));
+    return avail.toFixed(1) + '%';
+  }
+
+  getTimelineCategoryColor(category: string): { bg: string; text: string; border: string } {
+    switch (category) {
+      case 'mechanical': return { bg: 'bg-red-500/20', text: 'text-red-400', border: 'border-red-500/40' };
+      case 'electrical': return { bg: 'bg-amber-500/20', text: 'text-amber-400', border: 'border-amber-500/40' };
+      case 'operational': return { bg: 'bg-cyan-500/20', text: 'text-cyan-400', border: 'border-cyan-500/40' };
+      case 'setup': return { bg: 'bg-purple-500/20', text: 'text-purple-400', border: 'border-purple-500/40' };
+      default: return { bg: 'bg-slate-500/20', text: 'text-slate-400', border: 'border-slate-500/40' };
+    }
+  }
+
+  openTimelineDetail(event: any): void {
+    this.selectedTimelineEvent = event;
+  }
+
+  closeTimelineDetail(): void {
+    this.selectedTimelineEvent = null;
+  }
+
+  // --- 2. Status Board / SCADA Cell Matrix ---
+  initStatusBoardData(): void {
+    if (this.scadaCells.length > 0) return;
+    this.scadaCells = [
+      { id: '1', code: 'PRESS-01', name: 'Press Line 1000T', line: 'Line A', status: 'RUNNING', oee: 88, speedPercent: 94, currentJob: 'WO-8841 Hood-Outer', value: 185, unit: 'SPM', operator: 'A. Yılmaz', metricLabel: 'Stroke Rate' },
+      { id: '2', code: 'ROBOT-02', name: 'Spot Welding Cell 2', line: 'Body-in-White', status: 'RUNNING', oee: 92, speedPercent: 98, currentJob: 'WO-8842 Floor-Pan', value: 42, unit: 'W/m', operator: 'M. Demir', metricLabel: 'Weld Speed' },
+      { id: '3', code: 'CNC-03', name: '5-Axis Milling Center', line: 'Machining', status: 'WARNING', oee: 71, speedPercent: 76, currentJob: 'WO-8843 Crank-T3', value: 74, unit: '°C', operator: 'E. Kaya', metricLabel: 'Spindle Temp' },
+      { id: '4', code: 'STAMP-04', name: 'Progressive Stamping', line: 'Line B', status: 'RUNNING', oee: 95, speedPercent: 100, currentJob: 'WO-8844 Bracket-L', value: 320, unit: 'SPM', operator: 'S. Çelik', metricLabel: 'Output Rate' },
+      { id: '5', code: 'LASER-05', name: 'Fiber Laser Cutter', line: 'Fabrication', status: 'ALARM', oee: 42, speedPercent: 0, currentJob: 'WO-8845 Door-Inner', value: 0, unit: 'kW', operator: 'O. Şahin', metricLabel: 'Beam Power' },
+      { id: '6', code: 'PAINT-06', name: 'Robotic Primer Booth', line: 'Paint Shop', status: 'RUNNING', oee: 86, speedPercent: 90, currentJob: 'WO-8846 Primer-7', value: 14, unit: 'L/m', operator: 'H. Kurt', metricLabel: 'Flow Rate' },
+      { id: '7', code: 'ASSY-07', name: 'Final Drive Assembly', line: 'Assembly Line', status: 'RUNNING', oee: 90, speedPercent: 95, currentJob: 'WO-8847 EV-Motor-B', value: 18, unit: 'UPH', operator: 'T. Arslan', metricLabel: 'Throughput' },
+      { id: '8', code: 'QC-08', name: '3D Optical Scanner', line: 'Quality Gate', status: 'STANDBY', oee: 99, speedPercent: 0, currentJob: 'Batch 24 Pending', value: 0, unit: 'Scans', operator: 'B. Aydın', metricLabel: 'Inspections' }
+    ];
+  }
+
+  mapSqlRowsToScadaCells(rows: any[]): void {
+    if (!rows || rows.length === 0) return;
+    this.scadaCells = rows.map((r, i) => {
+      const rawStatus = (r.status || r.State || r.Status || 'RUNNING').toString().toUpperCase();
+      let status: 'RUNNING' | 'WARNING' | 'ALARM' | 'STANDBY' = 'RUNNING';
+      if (rawStatus.includes('WARN') || rawStatus.includes('SLOW')) status = 'WARNING';
+      else if (rawStatus.includes('ALARM') || rawStatus.includes('FAULT') || rawStatus.includes('STOP') || rawStatus.includes('ERR')) status = 'ALARM';
+      else if (rawStatus.includes('STANDBY') || rawStatus.includes('IDLE') || rawStatus.includes('OFF')) status = 'STANDBY';
+
+      const oee = Math.min(100, Math.max(0, Number(r.oee || r.OEE || r.health || (70 + (i * 5) % 28))));
+      const val = Number(r.value || r.speed || r.rate || 0);
+
+      return {
+        id: String(r.id || i + 1),
+        code: r.code || r.cell_id || `CEL-0${i + 1}`,
+        name: r.name || r.cell_name || r.machine || `Cell #${i + 1}`,
+        line: r.line || r.section || 'Production',
+        status,
+        oee: isNaN(oee) ? 85 : oee,
+        speedPercent: status === 'ALARM' ? 0 : (status === 'WARNING' ? 75 : 95),
+        currentJob: r.job || r.batch || r.work_order || 'Active Order',
+        value: isNaN(val) ? 0 : val,
+        unit: r.unit || '',
+        operator: r.operator || 'Operator',
+        metricLabel: r.metric || 'Speed'
+      };
+    });
+  }
+
+  scadaRunningCount(): number { return this.scadaCells.filter(c => c.status === 'RUNNING').length; }
+  scadaWarningCount(): number { return this.scadaCells.filter(c => c.status === 'WARNING').length; }
+  scadaAlarmCount(): number { return this.scadaCells.filter(c => c.status === 'ALARM').length; }
+  scadaStandbyCount(): number { return this.scadaCells.filter(c => c.status === 'STANDBY').length; }
+  scadaPlantHealth(): number {
+    if (!this.scadaCells.length) return 0;
+    const sum = this.scadaCells.reduce((acc, c) => acc + c.oee, 0);
+    return Math.round(sum / this.scadaCells.length);
+  }
+
+  selectScadaCell(cell: any): void { this.selectedCell = cell; }
+  closeScadaCellDetail(): void { this.selectedCell = null; }
+
+  // --- 3. Live Stream Telemetry ---
+  initLiveTelemetryStream(): void {
+    this.stopLiveStream();
+    const token = this.authService.getToken() || localStorage.getItem('auth_token') || '';
+    const streamUrl = `${environment.apiUrl}/telemetry/stream?token=${encodeURIComponent(token)}`;
+
+    try {
+      this.streamEventSource = new EventSource(streamUrl);
+      this.streamEventSource.onopen = () => {
+        this.streamConnected = true;
+        this.cdr.detectChanges();
+      };
+      this.streamEventSource.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data);
+          this.handleStreamMessage(payload);
+        } catch (e) {
+          // ignore parse
+        }
+      };
+      this.streamEventSource.onerror = () => {
+        this.streamConnected = false;
+        this.simulateStreamPoint();
+        this.cdr.detectChanges();
+      };
+    } catch (e) {
+      this.simulateStreamPoint();
+    }
+
+    this.startCanvasOscilloscopeLoop();
+  }
+
+  handleStreamMessage(payload: any): void {
+    const sensorKey = this.activeStreamSensor;
+    let val = payload[sensorKey];
+    let unit = 'mm/s';
+    let threshold = 4.5;
+
+    if (sensorKey === 'vibration_rms') { unit = 'mm/s'; threshold = 4.5; }
+    else if (sensorKey === 'cushion_pressure') { unit = 'bar'; threshold = 175; }
+    else if (sensorKey === 'motor_torque') { unit = 'Nm'; threshold = 480; }
+    else if (sensorKey === 'spindle_speed') { unit = 'RPM'; threshold = 7800; }
+    else if (sensorKey === 'laser_power') { unit = 'kW'; threshold = 3.8; }
+
+    if (val === undefined || val === null) {
+      val = Math.random() * 5;
+    }
+
+    this.streamThreshold = threshold;
+    this.streamDataPoints.push({ t: Date.now(), v: val });
+    if (this.streamDataPoints.length > 70) {
+      this.streamDataPoints.shift();
+    }
+
+    const values = this.streamDataPoints.map(p => p.v);
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const avg = values.reduce((a, b) => a + b, 0) / values.length;
+    const rms = Math.sqrt(values.reduce((a, b) => a + b * b, 0) / values.length);
+
+    this.streamReadout = {
+      value: Number(val.toFixed(2)),
+      unit,
+      min: Number(min.toFixed(2)),
+      max: Number(max.toFixed(2)),
+      rms: Number(rms.toFixed(2)),
+      peak: Number((max - min).toFixed(2)),
+      fps: 2.0
+    };
+
+    this.currentValue = this.streamReadout.value;
+    this.valueUnit = unit;
+    this.cdr.detectChanges();
+  }
+
+  simulateStreamPoint(): void {
+    const base = this.activeStreamSensor === 'cushion_pressure' ? 140 :
+                 (this.activeStreamSensor === 'spindle_speed' ? 6500 :
+                 (this.activeStreamSensor === 'motor_torque' ? 380 :
+                 (this.activeStreamSensor === 'laser_power' ? 3.0 : 2.5)));
+    const noise = (Math.random() - 0.5) * (base * 0.1);
+    this.handleStreamMessage({ [this.activeStreamSensor]: base + noise });
+  }
+
+  changeStreamSensor(sensor: 'vibration_rms' | 'cushion_pressure' | 'motor_torque' | 'spindle_speed' | 'laser_power'): void {
+    this.activeStreamSensor = sensor;
+    this.streamDataPoints = [];
+  }
+
+  stopLiveStream(): void {
+    if (this.streamEventSource) {
+      this.streamEventSource.close();
+      this.streamEventSource = undefined;
+    }
+    if (this.streamAnimationId) {
+      cancelAnimationFrame(this.streamAnimationId);
+      this.streamAnimationId = undefined;
+    }
+    this.streamConnected = false;
+  }
+
+  startCanvasOscilloscopeLoop(): void {
+    const draw = () => {
+      this.renderCanvasWaveform();
+      this.streamAnimationId = requestAnimationFrame(draw);
+    };
+    this.streamAnimationId = requestAnimationFrame(draw);
+  }
+
+  renderCanvasWaveform(): void {
+    if (!this.liveStreamCanvasRef?.nativeElement) return;
+    const canvas = this.liveStreamCanvasRef.nativeElement;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const w = canvas.width = canvas.offsetWidth;
+    const h = canvas.height = canvas.offsetHeight;
+    if (w <= 0 || h <= 0) return;
+
+    // Clear
+    ctx.clearRect(0, 0, w, h);
+
+    // Background Grid
+    ctx.strokeStyle = 'rgba(6, 182, 212, 0.08)';
+    ctx.lineWidth = 1;
+    const gridCols = 8;
+    const gridRows = 5;
+    for (let i = 0; i <= gridCols; i++) {
+      ctx.beginPath();
+      ctx.moveTo((w / gridCols) * i, 0);
+      ctx.lineTo((w / gridCols) * i, h);
+      ctx.stroke();
+    }
+    for (let j = 0; j <= gridRows; j++) {
+      ctx.beginPath();
+      ctx.moveTo(0, (h / gridRows) * j);
+      ctx.lineTo(w, (h / gridRows) * j);
+      ctx.stroke();
+    }
+
+    if (this.streamDataPoints.length < 2) return;
+
+    // Determine scale
+    const values = this.streamDataPoints.map(p => p.v);
+    const minVal = Math.min(...values, 0);
+    const maxVal = Math.max(...values, this.streamThreshold * 1.15, 1);
+    const range = maxVal - minVal || 1;
+
+    // Threshold Line
+    const threshY = h - ((this.streamThreshold - minVal) / range) * (h - 20) - 10;
+    ctx.strokeStyle = 'rgba(239, 68, 68, 0.6)';
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(0, threshY);
+    ctx.lineTo(w, threshY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#ef4444';
+    ctx.font = '10px monospace';
+    ctx.fillText(`ALARM: ${this.streamThreshold}`, w - 75, threshY - 4);
+
+    // Waveform Path
+    const step = w / (this.streamDataPoints.length - 1);
+    ctx.beginPath();
+    this.streamDataPoints.forEach((pt, idx) => {
+      const x = idx * step;
+      const y = h - ((pt.v - minVal) / range) * (h - 24) - 12;
+      if (idx === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    });
+
+    // Waveform gradient stroke
+    const grad = ctx.createLinearGradient(0, 0, w, 0);
+    grad.addColorStop(0, '#06b6d4');
+    grad.addColorStop(1, '#10b981');
+    ctx.strokeStyle = grad;
+    ctx.lineWidth = 2.5;
+    ctx.shadowColor = 'rgba(6, 182, 212, 0.5)';
+    ctx.shadowBlur = 10;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // Fill under curve
+    ctx.lineTo(w, h);
+    ctx.lineTo(0, h);
+    ctx.closePath();
+    const fillGrad = ctx.createLinearGradient(0, 0, 0, h);
+    fillGrad.addColorStop(0, 'rgba(6, 182, 212, 0.25)');
+    fillGrad.addColorStop(1, 'rgba(6, 182, 212, 0.01)');
+    ctx.fillStyle = fillGrad;
+    ctx.fill();
+
+    // Pulse dot at latest point
+    const lastX = w;
+    const lastY = h - ((values[values.length - 1] - minVal) / range) * (h - 24) - 12;
+    ctx.fillStyle = '#10b981';
+    ctx.beginPath();
+    ctx.arc(lastX, lastY, 4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // --- 4. Map View / Logistics ---
+  initMapView(): void {
+    if (this.mapShipments.length === 0) {
+      this.mapShipments = [
+        { id: 'SH-901', trackingNo: 'TR-88219-X', origin: 'Plant Istanbul', destination: 'DC Ankara', originCoords: [41.0082, 28.9784], destCoords: [39.9334, 32.8597], currentCoords: [40.75, 30.5], status: 'IN_TRANSIT', carrier: 'Apex Logistics', driver: 'Ahmet K.', eta: '17:30 Today', cargo: 'Press Stamping Dies (4.2T)', progress: 68 },
+        { id: 'SH-902', trackingNo: 'TR-77142-M', origin: 'Supplier Bursa', destination: 'Plant Istanbul', originCoords: [40.1885, 29.0610], destCoords: [41.0082, 28.9784], currentCoords: [40.6, 29.5], status: 'IN_TRANSIT', carrier: 'DHL Freight', driver: 'Serkan B.', eta: '18:45 Today', cargo: 'KUKA Servo Motors (12 pcs)', progress: 54 },
+        { id: 'SH-903', trackingNo: 'TR-66019-B', origin: 'Plant Istanbul', destination: 'Port Izmir', originCoords: [41.0082, 28.9784], destCoords: [38.4237, 27.1428], currentCoords: [39.1, 27.6], status: 'DELAYED', carrier: 'Ekol Global', driver: 'Murat V.', eta: 'Delayed (Customs)', cargo: 'Automotive Hood Assemblies', progress: 82 },
+        { id: 'SH-904', trackingNo: 'TR-55420-K', origin: 'DC Kocaeli', destination: 'Plant Istanbul', originCoords: [40.7654, 29.9408], destCoords: [41.0082, 28.9784], currentCoords: [41.0082, 28.9784], status: 'DELIVERED', carrier: 'Internal Fleet', driver: 'Kemal D.', eta: 'Completed 14:15', cargo: 'Hydraulic Oil ISO VG 46', progress: 100 }
+      ];
+    }
+
+    setTimeout(() => {
+      this.mountLeafletMapIfAvailable();
+    }, 200);
+  }
+
+  mountLeafletMapIfAvailable(): void {
+    const L = (window as any).L;
+    const container = this.leafletMapContainerRef?.nativeElement;
+    if (!L || !container) return;
+
+    if (this.leafletMap) {
+      try { this.leafletMap.remove(); } catch(e) {}
+    }
+
+    try {
+      this.leafletMap = L.map(container, { zoomControl: true, attributionControl: false }).setView([40.2, 30.5], 7);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 18,
+      }).addTo(this.leafletMap);
+
+      this.mapShipments.forEach(s => {
+        // Polyline route
+        L.polyline([s.originCoords, s.destCoords], {
+          color: s.status === 'DELAYED' ? '#ef4444' : (s.status === 'DELIVERED' ? '#10b981' : '#06b6d4'),
+          weight: 3,
+          dashArray: s.status === 'IN_TRANSIT' ? '6, 6' : undefined,
+          opacity: 0.8
+        }).addTo(this.leafletMap);
+
+        // Marker
+        const marker = L.circleMarker(s.currentCoords, {
+          radius: 7,
+          fillColor: s.status === 'DELAYED' ? '#ef4444' : (s.status === 'DELIVERED' ? '#10b981' : '#06b6d4'),
+          color: '#ffffff',
+          weight: 2,
+          opacity: 1,
+          fillOpacity: 0.9
+        }).addTo(this.leafletMap);
+
+        marker.bindPopup(`<b>${s.trackingNo}</b><br>${s.cargo}<br>ETA: ${s.eta}`);
+      });
+    } catch (e) {
+      console.warn('Leaflet map init error, SVG fallback is active:', e);
+    }
+  }
+
+  mapSqlRowsToShipments(rows: any[]): void {
+    if (!rows || rows.length === 0) return;
+    this.mapShipments = rows.map((r, i) => {
+      const lat = Number(r.lat || r.latitude || 40.0 + (i * 0.3));
+      const lng = Number(r.lng || r.longitude || 29.0 + (i * 0.6));
+      return {
+        id: String(r.id || i + 1),
+        trackingNo: r.tracking_no || r.code || `TR-${77000 + i}`,
+        origin: r.origin || 'Depot',
+        destination: r.destination || 'Plant',
+        originCoords: [lat - 0.5, lng - 0.5],
+        destCoords: [lat + 0.5, lng + 0.5],
+        currentCoords: [lat, lng],
+        status: (r.status || 'IN_TRANSIT').toString().toUpperCase() as any,
+        carrier: r.carrier || 'Logistics',
+        driver: r.driver || 'Driver',
+        eta: r.eta || '18:00',
+        cargo: r.cargo || 'Materials',
+        progress: Number(r.progress || 50)
+      };
+    });
+    this.mountLeafletMapIfAvailable();
+  }
+
+  selectShipment(s: any): void { this.selectedShipment = s; }
+  closeShipmentDetail(): void { this.selectedShipment = null; }
+  mapInTransitCount(): number { return this.mapShipments.filter(s => s.status === 'IN_TRANSIT').length; }
+  mapDeliveredCount(): number { return this.mapShipments.filter(s => s.status === 'DELIVERED').length; }
+  mapDelayedCount(): number { return this.mapShipments.filter(s => s.status === 'DELAYED').length; }
+
+  // --- 5. Path View / DAG & Asset Topology ---
+  initPathView(): void {
+    const pId = this.assignedPathId || (this.currentDataPaths[0]?.startsWith('path://') ? this.currentDataPaths[0].substring(7) : this.currentDataPaths[0]);
+    if (pId) {
+      this.fetchPathData(pId);
+    } else {
+      this.loadDefaultPathTopology();
+    }
+  }
+
+  fetchPathData(pathId: string): void {
+    this.isLoadingData = true;
+    this.pathService.build(pathId).subscribe({
+      next: (res) => {
+        this.isLoadingData = false;
+        if (res && res.success && res.data) {
+          this.pathStructure = res.data;
+          this.pathNodesList = res.data.nodes || [];
+          this.description = `Path: ${res.data.stats?.node_count || 0} nodes, depth ${res.data.stats?.max_depth || 0}`;
+          (res.data.roots || []).forEach(r => this.expandedPathNodes.add(r));
+          this.cdr.detectChanges();
+        } else {
+          this.loadDefaultPathTopology();
+        }
+      },
+      error: () => {
+        this.isLoadingData = false;
+        this.loadDefaultPathTopology();
+      }
+    });
+  }
+
+  loadDefaultPathTopology(): void {
+    this.pathNodesList = [
+      { id: 'FAC-01', label: 'APEX Smart Plant Gebze', parent: '', depth: 0, path: ['FAC-01'], type: 'factory', children: ['SH-01', 'SH-02', 'SH-03'], healthScore: 94, status: 'NORMAL', badge: 'Main Plant' },
+      { id: 'SH-01', label: 'Stamping & Press Shop', parent: 'FAC-01', depth: 1, path: ['FAC-01', 'SH-01'], type: 'line', children: ['M-101', 'M-102'], healthScore: 91, status: 'NORMAL', badge: 'Shop 01' },
+      { id: 'M-101', label: 'Schuler 1000T Servo Press', parent: 'SH-01', depth: 2, path: ['FAC-01', 'SH-01', 'M-101'], type: 'machine', children: ['S-101A', 'S-101B'], healthScore: 92, status: 'NORMAL', badge: 'Hydraulic' },
+      { id: 'S-101A', label: 'Cushion Pressure Transducer', parent: 'M-101', depth: 3, path: ['FAC-01', 'SH-01', 'M-101', 'S-101A'], type: 'sensor', children: [], healthScore: 95, status: 'NORMAL', badge: '142 bar' },
+      { id: 'S-101B', label: 'Flywheel Vibration Monitor', parent: 'M-101', depth: 3, path: ['FAC-01', 'SH-01', 'M-101', 'S-101B'], type: 'sensor', children: [], healthScore: 88, status: 'WARNING', badge: '3.4 mm/s' },
+      { id: 'M-102', label: 'Automatic Blanking Feeder', parent: 'SH-01', depth: 2, path: ['FAC-01', 'SH-01', 'M-102'], type: 'machine', children: [], healthScore: 96, status: 'NORMAL', badge: 'Feeder' },
+      { id: 'SH-02', label: 'Body-in-White Robotic Welding', parent: 'FAC-01', depth: 1, path: ['FAC-01', 'SH-02'], type: 'line', children: ['M-201', 'M-202'], healthScore: 89, status: 'NORMAL', badge: 'Shop 02' },
+      { id: 'M-201', label: 'KUKA KR-210 Spot Welder #1', parent: 'SH-02', depth: 2, path: ['FAC-01', 'SH-02', 'M-201'], type: 'machine', children: [], healthScore: 87, status: 'WARNING', badge: 'Electrode Tip' },
+      { id: 'M-202', label: 'KUKA KR-210 Spot Welder #2', parent: 'SH-02', depth: 2, path: ['FAC-01', 'SH-02', 'M-202'], type: 'machine', children: [], healthScore: 94, status: 'NORMAL', badge: 'Robotics' },
+      { id: 'SH-03', label: 'Final Axle & Drive Assembly', parent: 'FAC-01', depth: 1, path: ['FAC-01', 'SH-03'], type: 'line', children: ['M-301'], healthScore: 95, status: 'NORMAL', badge: 'Shop 03' },
+      { id: 'M-301', label: 'Automated Torque & Test Station', parent: 'SH-03', depth: 2, path: ['FAC-01', 'SH-03', 'M-301'], type: 'machine', children: [], healthScore: 98, status: 'NORMAL', badge: 'Calibrated' }
+    ];
+    this.expandedPathNodes.add('FAC-01');
+    this.expandedPathNodes.add('SH-01');
+    this.expandedPathNodes.add('SH-02');
+  }
+
+  togglePathNodeExpanded(nodeId: string): void {
+    if (this.expandedPathNodes.has(nodeId)) {
+      this.expandedPathNodes.delete(nodeId);
+    } else {
+      this.expandedPathNodes.add(nodeId);
+    }
+  }
+
+  isPathNodeExpanded(nodeId: string): boolean {
+    return this.expandedPathNodes.has(nodeId);
+  }
+
+  getRootPathNodes(): PathNode[] {
+    return this.pathNodesList.filter(n => !n.parent || n.depth === 0);
+  }
+
+  getNodeChildren(nodeId: string): PathNode[] {
+    return this.pathNodesList.filter(n => n.parent === nodeId);
+  }
+
+  selectPathNode(node: PathNode): void {
+    this.selectedPathNode = node;
+  }
+
+  getFilteredPathNodes(): PathNode[] {
+    if (!this.pathSearchTerm.trim()) return this.pathNodesList;
+    const term = this.pathSearchTerm.toLowerCase();
+    return this.pathNodesList.filter(n =>
+      n.label.toLowerCase().includes(term) ||
+      n.id.toLowerCase().includes(term) ||
+      (n.badge && n.badge.toLowerCase().includes(term))
+    );
   }
 }
 

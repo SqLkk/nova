@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Apex Smart Factory — Executive Performance & SCADA Report</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+        body { background-color: #f8fafc; color: #0f172a; padding: 32px; }
+        .container { max-width: 1380px; margin: 0 auto; }
+        .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 28px; padding-bottom: 20px; border-bottom: 2px solid #e2e8f0; }
+        .header h1 { font-size: 26px; font-weight: 800; color: #0f172a; letter-spacing: -0.5px; }
+        .header p { color: #64748b; font-size: 14px; margin-top: 4px; }
+        .badge-live { background: #10b981; color: white; padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; }
+        .grid-kpi { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 18px; margin-bottom: 28px; }
+        .card-kpi { background: white; border-radius: 12px; padding: 20px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+        .card-kpi .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; color: #64748b; }
+        .card-kpi .val { font-size: 28px; font-weight: 800; color: #0f172a; margin: 8px 0; }
+        .card-kpi .sub { font-size: 12px; color: #16a34a; font-weight: 600; }
+        .grid-2 { display: grid; grid-template-columns: 1.2fr 1fr; gap: 24px; margin-bottom: 28px; }
+        .panel { background: white; border-radius: 12px; padding: 24px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+        .panel-title { font-size: 17px; font-weight: 700; color: #1e293b; margin-bottom: 18px; display: flex; justify-content: space-between; align-items: center; }
+        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; }
+        th { background: #f1f5f9; padding: 12px 14px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #475569; font-weight: 700; }
+        .footer { margin-top: 40px; text-align: center; color: #94a3b8; font-size: 12px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <div>
+            <h1>APEX INDUSTRIAL TECHNOLOGIES — EXECUTIVE DASHBOARD</h1>
+            <p>Smart Factory 4.0 Telemetry, OEE Metrics & Asset Hierarchy | Munich Gigafactory & Stuttgart Works</p>
+        </div>
+        <div style="text-align: right;">
+            <div class="badge-live"><span style="width: 8px; height: 8px; background: white; border-radius: 50%;"></span> SYSTEM VERIFIED</div>
+            <div style="font-size: 12px; color: #64748b; margin-top: 6px;">ISA-95 & Path Definer Ready</div>
+        </div>
+    </div>
+
+    <!-- KPI Scorecards -->
+    <div class="grid-kpi">
+        <div class="card-kpi">
+            <div class="label">Fleet OEE Overall</div>
+            <div class="val" style="color: #1e3a8a;">84.0%</div>
+            <div class="sub">World-Class Target: 85.0%</div>
+        </div>
+        <div class="card-kpi">
+            <div class="label">Total Output Produced</div>
+            <div class="val">111,742</div>
+            <div class="sub" style="color: #059669;">109,067 Conforming Units</div>
+        </div>
+        <div class="card-kpi">
+            <div class="label">First-Pass Scrap Rate</div>
+            <div class="val" style="color: #dc2626;">2.39%</div>
+            <div class="sub" style="color: #dc2626;">2,675 Scrapped Parts</div>
+        </div>
+        <div class="card-kpi">
+            <div class="label">Mean Time to Repair (MTTR)</div>
+            <div class="val">64.8 <span style="font-size: 14px; font-weight: 500;">min</span></div>
+            <div class="sub" style="color: #475569;">180 Outages Recorded</div>
+        </div>
+        <div class="card-kpi">
+            <div class="label">Energy & Carbon Footprint</div>
+            <div class="val">1,159.8 <span style="font-size: 14px; font-weight: 500;">MWh</span></div>
+            <div class="sub" style="color: #0284c7;">440.7 Tons CO2e (Scope 2)</div>
+        </div>
+    </div>
+
+    <!-- Main Grid: OEE Breakdown & Pareto -->
+    <div class="grid-2">
+        <div class="panel">
+            <div class="panel-title">
+                <span>World-Class OEE Multipliers Breakdown</span>
+                <span style="font-size: 12px; color: #64748b;">(A x P x Q = OEE)</span>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 24px; text-align: center;">
+                <div style="background: #f8fafc; padding: 16px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                    <div style="font-size: 12px; font-weight: 700; color: #64748b;">AVAILABILITY</div>
+                    <div style="font-size: 24px; font-weight: 800; color: #0284c7; margin: 4px 0;">91.6%</div>
+                    <div style="font-size: 11px; color: #475569;">Uptime vs Planned</div>
+                </div>
+                <div style="background: #f8fafc; padding: 16px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                    <div style="font-size: 12px; font-weight: 700; color: #64748b;">PERFORMANCE</div>
+                    <div style="font-size: 24px; font-weight: 800; color: #10b981; margin: 4px 0;">94.1%</div>
+                    <div style="font-size: 11px; color: #475569;">Cycle Time vs Target</div>
+                </div>
+                <div style="background: #f8fafc; padding: 16px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                    <div style="font-size: 12px; font-weight: 700; color: #64748b;">QUALITY</div>
+                    <div style="font-size: 24px; font-weight: 800; color: #8b5cf6; margin: 4px 0;">97.4%</div>
+                    <div style="font-size: 11px; color: #475569;">First-Pass Yield</div>
+                </div>
+            </div>
+            <div style="font-size: 13px; color: #475569; line-height: 1.6;">
+                <strong>Enterprise Summary:</strong> The plant operates at an overall OEE of <strong>84.0%</strong>, exceeding the 85% world-class automotive manufacturing threshold. Quality performance remains stellar at <strong>97.4%</strong>, driven by closed-loop automated optical inspection and 5-axis adaptive spindle compensation.
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="panel-title">
+                <span>Downtime Root Cause Pareto Analysis</span>
+                <span style="font-size: 12px; color: #dc2626; font-weight: 600;">$168,519 Total Loss</span>
+            </div>
+            <div>
+                
+        <div style="margin-bottom: 14px;">
+            <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px;">
+                <span style="font-weight: 600; color: #334155;">Planned Preventive Maintenance (24 events)</span>
+                <span style="font-weight: 700; color: #1e293b;">4,350 min ($34,734)</span>
+            </div>
+            <div style="background: #e2e8f0; height: 10px; border-radius: 999px; overflow: hidden;">
+                <div style="width: 100.0%; background: linear-gradient(90deg, #3b82f6, #ef4444); height: 100%; border-radius: 999px;"></div>
+            </div>
+        </div>
+        
+        <div style="margin-bottom: 14px;">
+            <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px;">
+                <span style="font-weight: 600; color: #334155;">Unplanned Mechanical Breakdown (19 events)</span>
+                <span style="font-weight: 700; color: #1e293b;">2,319 min ($50,400)</span>
+            </div>
+            <div style="background: #e2e8f0; height: 10px; border-radius: 999px; overflow: hidden;">
+                <div style="width: 53.3%; background: linear-gradient(90deg, #3b82f6, #ef4444); height: 100%; border-radius: 999px;"></div>
+            </div>
+        </div>
+        
+        <div style="margin-bottom: 14px;">
+            <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px;">
+                <span style="font-weight: 600; color: #334155;">Hydraulic Power Unit Leak (24 events)</span>
+                <span style="font-weight: 700; color: #1e293b;">1,490 min ($21,188)</span>
+            </div>
+            <div style="background: #e2e8f0; height: 10px; border-radius: 999px; overflow: hidden;">
+                <div style="width: 34.2%; background: linear-gradient(90deg, #3b82f6, #ef4444); height: 100%; border-radius: 999px;"></div>
+            </div>
+        </div>
+        
+        <div style="margin-bottom: 14px;">
+            <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px;">
+                <span style="font-weight: 600; color: #334155;">Electrical & Inverter Fault (28 events)</span>
+                <span style="font-weight: 700; color: #1e293b;">1,178 min ($31,538)</span>
+            </div>
+            <div style="background: #e2e8f0; height: 10px; border-radius: 999px; overflow: hidden;">
+                <div style="width: 27.1%; background: linear-gradient(90deg, #3b82f6, #ef4444); height: 100%; border-radius: 999px;"></div>
+            </div>
+        </div>
+        
+        <div style="margin-bottom: 14px;">
+            <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px;">
+                <span style="font-weight: 600; color: #334155;">Laser Optics Contamination (21 events)</span>
+                <span style="font-weight: 700; color: #1e293b;">670 min ($12,484)</span>
+            </div>
+            <div style="background: #e2e8f0; height: 10px; border-radius: 999px; overflow: hidden;">
+                <div style="width: 15.4%; background: linear-gradient(90deg, #3b82f6, #ef4444); height: 100%; border-radius: 999px;"></div>
+            </div>
+        </div>
+        
+        <div style="margin-bottom: 14px;">
+            <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px;">
+                <span style="font-weight: 600; color: #334155;">Product Recipe Changeover (16 events)</span>
+                <span style="font-weight: 700; color: #1e293b;">587 min ($4,900)</span>
+            </div>
+            <div style="background: #e2e8f0; height: 10px; border-radius: 999px; overflow: hidden;">
+                <div style="width: 13.5%; background: linear-gradient(90deg, #3b82f6, #ef4444); height: 100%; border-radius: 999px;"></div>
+            </div>
+        </div>
+        
+            </div>
+        </div>
+    </div>
+
+    <!-- Production Batches Table -->
+    <div class="panel" style="margin-bottom: 28px;">
+        <div class="panel-title">
+            <span>Recent Manufacturing Work Orders & Batch Runs</span>
+            <span style="font-size: 12px; color: #64748b;">Showing 12 of 450 recorded runs</span>
+        </div>
+        <div style="overflow-x: auto;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Batch ID</th>
+                        <th>Product Specification</th>
+                        <th>Assigned Line</th>
+                        <th>Shift Schedule</th>
+                        <th style="text-align: right;">Produced</th>
+                        <th style="text-align: right;">Good Units</th>
+                        <th style="text-align: right;">Scrap %</th>
+                        <th style="text-align: right;">OEE %</th>
+                        <th style="text-align: center;">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    
+        <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 10px 14px; font-weight: 700; color: #0f172a;">LOT-2026-W37-0450</td>
+            <td style="padding: 10px 14px; color: #334155;">Silicon-Carbide (SiC) Power Inverter Sub-Assembly</td>
+            <td style="padding: 10px 14px; color: #64748b; font-size: 12px;">LINE-STG-DYNO-01</td>
+            <td style="padding: 10px 14px; color: #475569; font-size: 12px;">Day Shift (14:00-22:00)</td>
+            <td style="padding: 10px 14px; text-align: right; font-weight: 600;">340</td>
+            <td style="padding: 10px 14px; text-align: right; color: #16a34a; font-weight: 600;">328</td>
+            <td style="padding: 10px 14px; text-align: right; color: #dc2626; font-weight: 600;">3.53%</td>
+            <td style="padding: 10px 14px; text-align: right; font-weight: 700; color: #1e3a8a;">82.3%</td>
+            <td style="padding: 10px 14px; text-align: center;">
+                <span style="background: #ecfdf5; color: #10b981; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 700;">COMPLETED</span>
+            </td>
+        </tr>
+        
+        <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 10px 14px; font-weight: 700; color: #0f172a;">LOT-2026-W37-0449</td>
+            <td style="padding: 10px 14px; color: #334155;">800V High-Efficiency Permanent Magnet Rotor V6</td>
+            <td style="padding: 10px 14px; color: #64748b; font-size: 12px;">LINE-MUC-PRESS-01</td>
+            <td style="padding: 10px 14px; color: #475569; font-size: 12px;">Day Shift (14:00-22:00)</td>
+            <td style="padding: 10px 14px; text-align: right; font-weight: 600;">273</td>
+            <td style="padding: 10px 14px; text-align: right; color: #16a34a; font-weight: 600;">266</td>
+            <td style="padding: 10px 14px; text-align: right; color: #dc2626; font-weight: 600;">2.56%</td>
+            <td style="padding: 10px 14px; text-align: right; font-weight: 700; color: #1e3a8a;">84.4%</td>
+            <td style="padding: 10px 14px; text-align: center;">
+                <span style="background: #ecfdf5; color: #10b981; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 700;">COMPLETED</span>
+            </td>
+        </tr>
+        
+        <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 10px 14px; font-weight: 700; color: #0f172a;">LOT-2026-W35-0448</td>
+            <td style="padding: 10px 14px; color: #334155;">800V High-Efficiency Permanent Magnet Rotor V6</td>
+            <td style="padding: 10px 14px; color: #64748b; font-size: 12px;">LINE-MUC-PRESS-01</td>
+            <td style="padding: 10px 14px; color: #475569; font-size: 12px;">Night Shift (22:00-06:00)</td>
+            <td style="padding: 10px 14px; text-align: right; font-weight: 600;">133</td>
+            <td style="padding: 10px 14px; text-align: right; color: #16a34a; font-weight: 600;">129</td>
+            <td style="padding: 10px 14px; text-align: right; color: #dc2626; font-weight: 600;">3.01%</td>
+            <td style="padding: 10px 14px; text-align: right; font-weight: 700; color: #1e3a8a;">81.8%</td>
+            <td style="padding: 10px 14px; text-align: center;">
+                <span style="background: #ecfdf5; color: #10b981; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 700;">COMPLETED</span>
+            </td>
+        </tr>
+        
+        <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 10px 14px; font-weight: 700; color: #0f172a;">LOT-2026-W34-0447</td>
+            <td style="padding: 10px 14px; color: #334155;">Modular High-Density 82 kWh Prismatic Battery Enclosure</td>
+            <td style="padding: 10px 14px; color: #64748b; font-size: 12px;">LINE-MUC-PACK-01</td>
+            <td style="padding: 10px 14px; color: #475569; font-size: 12px;">Day Shift (14:00-22:00)</td>
+            <td style="padding: 10px 14px; text-align: right; font-weight: 600;">284</td>
+            <td style="padding: 10px 14px; text-align: right; color: #16a34a; font-weight: 600;">272</td>
+            <td style="padding: 10px 14px; text-align: right; color: #dc2626; font-weight: 600;">4.23%</td>
+            <td style="padding: 10px 14px; text-align: right; font-weight: 700; color: #1e3a8a;">79.7%</td>
+            <td style="padding: 10px 14px; text-align: center;">
+                <span style="background: #ecfdf5; color: #10b981; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 700;">COMPLETED</span>
+            </td>
+        </tr>
+        
+        <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 10px 14px; font-weight: 700; color: #0f172a;">LOT-2026-W31-0446</td>
+            <td style="padding: 10px 14px; color: #334155;">Silicon-Carbide (SiC) Power Inverter Sub-Assembly</td>
+            <td style="padding: 10px 14px; color: #64748b; font-size: 12px;">LINE-STG-DYNO-01</td>
+            <td style="padding: 10px 14px; color: #475569; font-size: 12px;">Day Shift (14:00-22:00)</td>
+            <td style="padding: 10px 14px; text-align: right; font-weight: 600;">118</td>
+            <td style="padding: 10px 14px; text-align: right; color: #16a34a; font-weight: 600;">113</td>
+            <td style="padding: 10px 14px; text-align: right; color: #dc2626; font-weight: 600;">4.24%</td>
+            <td style="padding: 10px 14px; text-align: right; font-weight: 700; color: #1e3a8a;">76.9%</td>
+            <td style="padding: 10px 14px; text-align: center;">
+                <span style="background: #ecfdf5; color: #10b981; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 700;">COMPLETED</span>
+            </td>
+        </tr>
+        
+        <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 10px 14px; font-weight: 700; color: #0f172a;">LOT-2026-W37-0445</td>
+            <td style="padding: 10px 14px; color: #334155;">800V High-Efficiency Permanent Magnet Rotor V6</td>
+            <td style="padding: 10px 14px; color: #64748b; font-size: 12px;">LINE-MUC-WELD-04</td>
+            <td style="padding: 10px 14px; color: #475569; font-size: 12px;">Night Shift (22:00-06:00)</td>
+            <td style="padding: 10px 14px; text-align: right; font-weight: 600;">315</td>
+            <td style="padding: 10px 14px; text-align: right; color: #16a34a; font-weight: 600;">311</td>
+            <td style="padding: 10px 14px; text-align: right; color: #dc2626; font-weight: 600;">1.27%</td>
+            <td style="padding: 10px 14px; text-align: right; font-weight: 700; color: #1e3a8a;">91.0%</td>
+            <td style="padding: 10px 14px; text-align: center;">
+                <span style="background: #ecfdf5; color: #10b981; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 700;">COMPLETED</span>
+            </td>
+        </tr>
+        
+        <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 10px 14px; font-weight: 700; color: #0f172a;">LOT-2026-W31-0444</td>
+            <td style="padding: 10px 14px; color: #334155;">Aerospace Titanium Structural Engine Support Bracket</td>
+            <td style="padding: 10px 14px; color: #64748b; font-size: 12px;">LINE-MUC-COAT-02</td>
+            <td style="padding: 10px 14px; color: #475569; font-size: 12px;">Night Shift (22:00-06:00)</td>
+            <td style="padding: 10px 14px; text-align: right; font-weight: 600;">206</td>
+            <td style="padding: 10px 14px; text-align: right; color: #16a34a; font-weight: 600;">205</td>
+            <td style="padding: 10px 14px; text-align: right; color: #dc2626; font-weight: 600;">0.49%</td>
+            <td style="padding: 10px 14px; text-align: right; font-weight: 700; color: #1e3a8a;">90.2%</td>
+            <td style="padding: 10px 14px; text-align: center;">
+                <span style="background: #ecfdf5; color: #10b981; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 700;">COMPLETED</span>
+            </td>
+        </tr>
+        
+        <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 10px 14px; font-weight: 700; color: #0f172a;">LOT-2026-W34-0443</td>
+            <td style="padding: 10px 14px; color: #334155;">Aerospace Titanium Structural Engine Support Bracket</td>
+            <td style="padding: 10px 14px; color: #64748b; font-size: 12px;">LINE-MUC-COAT-02</td>
+            <td style="padding: 10px 14px; color: #475569; font-size: 12px;">Night Shift (22:00-06:00)</td>
+            <td style="padding: 10px 14px; text-align: right; font-weight: 600;">238</td>
+            <td style="padding: 10px 14px; text-align: right; color: #16a34a; font-weight: 600;">232</td>
+            <td style="padding: 10px 14px; text-align: right; color: #dc2626; font-weight: 600;">2.52%</td>
+            <td style="padding: 10px 14px; text-align: right; font-weight: 700; color: #1e3a8a;">85.8%</td>
+            <td style="padding: 10px 14px; text-align: center;">
+                <span style="background: #ecfdf5; color: #10b981; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 700;">COMPLETED</span>
+            </td>
+        </tr>
+        
+        <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 10px 14px; font-weight: 700; color: #0f172a;">LOT-2026-W34-0442</td>
+            <td style="padding: 10px 14px; color: #334155;">Silicon-Carbide (SiC) Power Inverter Sub-Assembly</td>
+            <td style="padding: 10px 14px; color: #64748b; font-size: 12px;">LINE-STG-DYNO-01</td>
+            <td style="padding: 10px 14px; color: #475569; font-size: 12px;">Day Shift (14:00-22:00)</td>
+            <td style="padding: 10px 14px; text-align: right; font-weight: 600;">152</td>
+            <td style="padding: 10px 14px; text-align: right; color: #16a34a; font-weight: 600;">147</td>
+            <td style="padding: 10px 14px; text-align: right; color: #dc2626; font-weight: 600;">3.29%</td>
+            <td style="padding: 10px 14px; text-align: right; font-weight: 700; color: #1e3a8a;">82.4%</td>
+            <td style="padding: 10px 14px; text-align: center;">
+                <span style="background: #ecfdf5; color: #10b981; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 700;">COMPLETED</span>
+            </td>
+        </tr>
+        
+        <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 10px 14px; font-weight: 700; color: #0f172a;">LOT-2026-W31-0441</td>
+            <td style="padding: 10px 14px; color: #334155;">Aerospace Titanium Structural Engine Support Bracket</td>
+            <td style="padding: 10px 14px; color: #64748b; font-size: 12px;">LINE-MUC-COAT-02</td>
+            <td style="padding: 10px 14px; color: #475569; font-size: 12px;">Night Shift (22:00-06:00)</td>
+            <td style="padding: 10px 14px; text-align: right; font-weight: 600;">265</td>
+            <td style="padding: 10px 14px; text-align: right; color: #16a34a; font-weight: 600;">260</td>
+            <td style="padding: 10px 14px; text-align: right; color: #dc2626; font-weight: 600;">1.89%</td>
+            <td style="padding: 10px 14px; text-align: right; font-weight: 700; color: #1e3a8a;">87.7%</td>
+            <td style="padding: 10px 14px; text-align: center;">
+                <span style="background: #ecfdf5; color: #10b981; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 700;">COMPLETED</span>
+            </td>
+        </tr>
+        
+        <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 10px 14px; font-weight: 700; color: #0f172a;">LOT-2026-W32-0440</td>
+            <td style="padding: 10px 14px; color: #334155;">800V High-Efficiency Permanent Magnet Rotor V6</td>
+            <td style="padding: 10px 14px; color: #64748b; font-size: 12px;">LINE-MUC-PRESS-01</td>
+            <td style="padding: 10px 14px; color: #475569; font-size: 12px;">Day Shift (14:00-22:00)</td>
+            <td style="padding: 10px 14px; text-align: right; font-weight: 600;">239</td>
+            <td style="padding: 10px 14px; text-align: right; color: #16a34a; font-weight: 600;">238</td>
+            <td style="padding: 10px 14px; text-align: right; color: #dc2626; font-weight: 600;">0.42%</td>
+            <td style="padding: 10px 14px; text-align: right; font-weight: 700; color: #1e3a8a;">82.3%</td>
+            <td style="padding: 10px 14px; text-align: center;">
+                <span style="background: #ecfdf5; color: #10b981; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 700;">COMPLETED</span>
+            </td>
+        </tr>
+        
+        <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 10px 14px; font-weight: 700; color: #0f172a;">LOT-2026-W33-0439</td>
+            <td style="padding: 10px 14px; color: #334155;">800V High-Efficiency Permanent Magnet Rotor V6</td>
+            <td style="padding: 10px 14px; color: #64748b; font-size: 12px;">LINE-MUC-PRESS-01</td>
+            <td style="padding: 10px 14px; color: #475569; font-size: 12px;">Night Shift (22:00-06:00)</td>
+            <td style="padding: 10px 14px; text-align: right; font-weight: 600;">191</td>
+            <td style="padding: 10px 14px; text-align: right; color: #16a34a; font-weight: 600;">183</td>
+            <td style="padding: 10px 14px; text-align: right; color: #dc2626; font-weight: 600;">4.19%</td>
+            <td style="padding: 10px 14px; text-align: right; font-weight: 700; color: #1e3a8a;">85.6%</td>
+            <td style="padding: 10px 14px; text-align: center;">
+                <span style="background: #ecfdf5; color: #10b981; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 700;">COMPLETED</span>
+            </td>
+        </tr>
+        
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Asset Hierarchy (Path Definer) Preview -->
+    <div class="panel">
+        <div class="panel-title">
+            <span>Path Definer — ISA-95 Smart Asset Hierarchy Tree</span>
+            <span style="font-size: 12px; color: #3b82f6; font-weight: 600;">Enterprise → Site → Area → Line → Machine → Sensor</span>
+        </div>
+        <div style="overflow-x: auto;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Asset UID</th>
+                        <th>Equipment / Node Name</th>
+                        <th>ISA-95 Level</th>
+                        <th>Plant Area</th>
+                        <th>Criticality Tier</th>
+                        <th style="text-align: right;">Health Score</th>
+                        <th style="text-align: center;">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    
+        <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 9px 12px; font-family: monospace; font-size: 12px; font-weight: 600; color: #0284c7;">ENT-APEX-GLOBAL</td>
+            <td style="padding: 9px 12px; font-weight: 600; color: #1e293b;">Apex Industrial Technologies Global</td>
+            <td style="padding: 9px 12px;">
+                <span style="background: #dbeafe; color: #1e40af; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">Enterprise</span>
+            </td>
+            <td style="padding: 9px 12px; color: #64748b; font-size: 12px;">Corporate</td>
+            <td style="padding: 9px 12px; color: #475569; font-size: 12px;">Tier 1 (Mission-Critical)</td>
+            <td style="padding: 9px 12px; text-align: right; font-weight: 700; color: #16a34a;">97.0%</td>
+            <td style="padding: 9px 12px; text-align: center;">
+                <span style="background: #ecfdf5; color: #059669; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 700;">ONLINE</span>
+            </td>
+        </tr>
+        
+        <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 9px 12px; font-family: monospace; font-size: 12px; font-weight: 600; color: #0284c7;">PLANT-MUC-01</td>
+            <td style="padding: 9px 12px; font-weight: 600; color: #1e293b;">Munich Smart Gigafactory 01</td>
+            <td style="padding: 9px 12px;">
+                <span style="background: #dbeafe; color: #1e40af; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">Site</span>
+            </td>
+            <td style="padding: 9px 12px; color: #64748b; font-size: 12px;">Munich Plant</td>
+            <td style="padding: 9px 12px; color: #475569; font-size: 12px;">Tier 1 (Mission-Critical)</td>
+            <td style="padding: 9px 12px; text-align: right; font-weight: 700; color: #16a34a;">92.2%</td>
+            <td style="padding: 9px 12px; text-align: center;">
+                <span style="background: #ecfdf5; color: #059669; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 700;">ONLINE</span>
+            </td>
+        </tr>
+        
+        <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 9px 12px; font-family: monospace; font-size: 12px; font-weight: 600; color: #0284c7;">PLANT-STG-02</td>
+            <td style="padding: 9px 12px; font-weight: 600; color: #1e293b;">Stuttgart Precision Powertrain Works</td>
+            <td style="padding: 9px 12px;">
+                <span style="background: #dbeafe; color: #1e40af; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">Site</span>
+            </td>
+            <td style="padding: 9px 12px; color: #64748b; font-size: 12px;">Stuttgart Plant</td>
+            <td style="padding: 9px 12px; color: #475569; font-size: 12px;">Tier 1 (Mission-Critical)</td>
+            <td style="padding: 9px 12px; text-align: right; font-weight: 700; color: #16a34a;">94.1%</td>
+            <td style="padding: 9px 12px; text-align: center;">
+                <span style="background: #ecfdf5; color: #059669; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 700;">ONLINE</span>
+            </td>
+        </tr>
+        
+        <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 9px 12px; font-family: monospace; font-size: 12px; font-weight: 600; color: #0284c7;">AREA-GLOBAL-QC</td>
+            <td style="padding: 9px 12px; font-weight: 600; color: #1e293b;">Central Metrology & Quality Assurance Lab</td>
+            <td style="padding: 9px 12px;">
+                <span style="background: #fef3c7; color: #92400e; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">Area</span>
+            </td>
+            <td style="padding: 9px 12px; color: #64748b; font-size: 12px;">Quality Lab</td>
+            <td style="padding: 9px 12px; color: #475569; font-size: 12px;">Tier 2 (Core Production)</td>
+            <td style="padding: 9px 12px; text-align: right; font-weight: 700; color: #16a34a;">95.3%</td>
+            <td style="padding: 9px 12px; text-align: center;">
+                <span style="background: #ecfdf5; color: #059669; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 700;">ONLINE</span>
+            </td>
+        </tr>
+        
+        <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 9px 12px; font-family: monospace; font-size: 12px; font-weight: 600; color: #0284c7;">AREA-STG-POWERTRAIN</td>
+            <td style="padding: 9px 12px; font-weight: 600; color: #1e293b;">E-Drive & Inverter Precision Assembly</td>
+            <td style="padding: 9px 12px;">
+                <span style="background: #fef3c7; color: #92400e; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">Area</span>
+            </td>
+            <td style="padding: 9px 12px; color: #64748b; font-size: 12px;">Powertrain Shop</td>
+            <td style="padding: 9px 12px; color: #475569; font-size: 12px;">Tier 1 (Mission-Critical)</td>
+            <td style="padding: 9px 12px; text-align: right; font-weight: 700; color: #16a34a;">92.7%</td>
+            <td style="padding: 9px 12px; text-align: center;">
+                <span style="background: #ecfdf5; color: #059669; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 700;">ONLINE</span>
+            </td>
+        </tr>
+        
+        <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 9px 12px; font-family: monospace; font-size: 12px; font-weight: 600; color: #0284c7;">AREA-MUC-PAINT</td>
+            <td style="padding: 9px 12px; font-weight: 600; color: #1e293b;">Eco-Smart Automated Paint Shop</td>
+            <td style="padding: 9px 12px;">
+                <span style="background: #fef3c7; color: #92400e; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">Area</span>
+            </td>
+            <td style="padding: 9px 12px; color: #64748b; font-size: 12px;">Paint Shop</td>
+            <td style="padding: 9px 12px; color: #475569; font-size: 12px;">Tier 2 (Core Production)</td>
+            <td style="padding: 9px 12px; text-align: right; font-weight: 700; color: #16a34a;">97.3%</td>
+            <td style="padding: 9px 12px; text-align: center;">
+                <span style="background: #ecfdf5; color: #059669; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 700;">ONLINE</span>
+            </td>
+        </tr>
+        
+        <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 9px 12px; font-family: monospace; font-size: 12px; font-weight: 600; color: #0284c7;">AREA-MUC-STAMP</td>
+            <td style="padding: 9px 12px; font-weight: 600; color: #1e293b;">High-Speed Servo Stamping Shop</td>
+            <td style="padding: 9px 12px;">
+                <span style="background: #fef3c7; color: #92400e; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">Area</span>
+            </td>
+            <td style="padding: 9px 12px; color: #64748b; font-size: 12px;">Stamping Shop</td>
+            <td style="padding: 9px 12px; color: #475569; font-size: 12px;">Tier 1 (Mission-Critical)</td>
+            <td style="padding: 9px 12px; text-align: right; font-weight: 700; color: #16a34a;">93.7%</td>
+            <td style="padding: 9px 12px; text-align: center;">
+                <span style="background: #ecfdf5; color: #059669; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 700;">ONLINE</span>
+            </td>
+        </tr>
+        
+        <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 9px 12px; font-family: monospace; font-size: 12px; font-weight: 600; color: #0284c7;">AREA-MUC-BATTERY</td>
+            <td style="padding: 9px 12px; font-weight: 600; color: #1e293b;">High-Voltage Battery Pack & Cell Shop</td>
+            <td style="padding: 9px 12px;">
+                <span style="background: #fef3c7; color: #92400e; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">Area</span>
+            </td>
+            <td style="padding: 9px 12px; color: #64748b; font-size: 12px;">Battery Shop</td>
+            <td style="padding: 9px 12px; color: #475569; font-size: 12px;">Tier 1 (Mission-Critical)</td>
+            <td style="padding: 9px 12px; text-align: right; font-weight: 700; color: #16a34a;">99.0%</td>
+            <td style="padding: 9px 12px; text-align: center;">
+                <span style="background: #ecfdf5; color: #059669; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 700;">ONLINE</span>
+            </td>
+        </tr>
+        
+        <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 9px 12px; font-family: monospace; font-size: 12px; font-weight: 600; color: #0284c7;">AREA-MUC-BODY</td>
+            <td style="padding: 9px 12px; font-weight: 600; color: #1e293b;">Robotic Body-in-White & Chassis Shop</td>
+            <td style="padding: 9px 12px;">
+                <span style="background: #fef3c7; color: #92400e; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">Area</span>
+            </td>
+            <td style="padding: 9px 12px; color: #64748b; font-size: 12px;">Body Shop</td>
+            <td style="padding: 9px 12px; color: #475569; font-size: 12px;">Tier 1 (Mission-Critical)</td>
+            <td style="padding: 9px 12px; text-align: right; font-weight: 700; color: #16a34a;">97.7%</td>
+            <td style="padding: 9px 12px; text-align: center;">
+                <span style="background: #ecfdf5; color: #059669; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 700;">ONLINE</span>
+            </td>
+        </tr>
+        
+        <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 9px 12px; font-family: monospace; font-size: 12px; font-weight: 600; color: #0284c7;">LINE-STG-CNC-01</td>
+            <td style="padding: 9px 12px; font-weight: 600; color: #1e293b;">5-Axis Precision Rotor Machining Line</td>
+            <td style="padding: 9px 12px;">
+                <span style="background: #e0e7ff; color: #3730a3; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">Line</span>
+            </td>
+            <td style="padding: 9px 12px; color: #64748b; font-size: 12px;">Powertrain Shop</td>
+            <td style="padding: 9px 12px; color: #475569; font-size: 12px;">Tier 1 (Mission-Critical)</td>
+            <td style="padding: 9px 12px; text-align: right; font-weight: 700; color: #16a34a;">93.6%</td>
+            <td style="padding: 9px 12px; text-align: center;">
+                <span style="background: #ecfdf5; color: #059669; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 700;">ONLINE</span>
+            </td>
+        </tr>
+        
+        <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 9px 12px; font-family: monospace; font-size: 12px; font-weight: 600; color: #0284c7;">LINE-MUC-PACK-01</td>
+            <td style="padding: 9px 12px; font-weight: 600; color: #1e293b;">800V Cell Stacking & Module Assembly Line</td>
+            <td style="padding: 9px 12px;">
+                <span style="background: #e0e7ff; color: #3730a3; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">Line</span>
+            </td>
+            <td style="padding: 9px 12px; color: #64748b; font-size: 12px;">Battery Shop</td>
+            <td style="padding: 9px 12px; color: #475569; font-size: 12px;">Tier 1 (Mission-Critical)</td>
+            <td style="padding: 9px 12px; text-align: right; font-weight: 700; color: #16a34a;">92.2%</td>
+            <td style="padding: 9px 12px; text-align: center;">
+                <span style="background: #ecfdf5; color: #059669; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 700;">ONLINE</span>
+            </td>
+        </tr>
+        
+        <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 9px 12px; font-family: monospace; font-size: 12px; font-weight: 600; color: #0284c7;">LINE-MUC-COAT-02</td>
+            <td style="padding: 9px 12px; font-weight: 600; color: #1e293b;">Automated Topcoat Robotic Line 02</td>
+            <td style="padding: 9px 12px;">
+                <span style="background: #e0e7ff; color: #3730a3; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">Line</span>
+            </td>
+            <td style="padding: 9px 12px; color: #64748b; font-size: 12px;">Paint Shop</td>
+            <td style="padding: 9px 12px; color: #475569; font-size: 12px;">Tier 2 (Core Production)</td>
+            <td style="padding: 9px 12px; text-align: right; font-weight: 700; color: #16a34a;">95.9%</td>
+            <td style="padding: 9px 12px; text-align: center;">
+                <span style="background: #ecfdf5; color: #059669; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 700;">ONLINE</span>
+            </td>
+        </tr>
+        
+        <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 9px 12px; font-family: monospace; font-size: 12px; font-weight: 600; color: #0284c7;">LINE-STG-DYNO-01</td>
+            <td style="padding: 9px 12px; font-weight: 600; color: #1e293b;">End-of-Line Motor Dynamometer Line</td>
+            <td style="padding: 9px 12px;">
+                <span style="background: #e0e7ff; color: #3730a3; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">Line</span>
+            </td>
+            <td style="padding: 9px 12px; color: #64748b; font-size: 12px;">Powertrain Shop</td>
+            <td style="padding: 9px 12px; color: #475569; font-size: 12px;">Tier 1 (Mission-Critical)</td>
+            <td style="padding: 9px 12px; text-align: right; font-weight: 700; color: #16a34a;">97.1%</td>
+            <td style="padding: 9px 12px; text-align: center;">
+                <span style="background: #ecfdf5; color: #059669; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 700;">ONLINE</span>
+            </td>
+        </tr>
+        
+        <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 9px 12px; font-family: monospace; font-size: 12px; font-weight: 600; color: #0284c7;">LINE-MUC-WELD-04</td>
+            <td style="padding: 9px 12px; font-weight: 600; color: #1e293b;">Robotic Welding Line 04 (Titan)</td>
+            <td style="padding: 9px 12px;">
+                <span style="background: #e0e7ff; color: #3730a3; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">Line</span>
+            </td>
+            <td style="padding: 9px 12px; color: #64748b; font-size: 12px;">Body Shop</td>
+            <td style="padding: 9px 12px; color: #475569; font-size: 12px;">Tier 1 (Mission-Critical)</td>
+            <td style="padding: 9px 12px; text-align: right; font-weight: 700; color: #16a34a;">93.7%</td>
+            <td style="padding: 9px 12px; text-align: center;">
+                <span style="background: #ecfdf5; color: #059669; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 700;">ONLINE</span>
+            </td>
+        </tr>
+        
+        <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 9px 12px; font-family: monospace; font-size: 12px; font-weight: 600; color: #0284c7;">LINE-MUC-PRESS-01</td>
+            <td style="padding: 9px 12px; font-weight: 600; color: #1e293b;">Tandem Servo Press Line Alpha</td>
+            <td style="padding: 9px 12px;">
+                <span style="background: #e0e7ff; color: #3730a3; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">Line</span>
+            </td>
+            <td style="padding: 9px 12px; color: #64748b; font-size: 12px;">Stamping Shop</td>
+            <td style="padding: 9px 12px; color: #475569; font-size: 12px;">Tier 1 (Mission-Critical)</td>
+            <td style="padding: 9px 12px; text-align: right; font-weight: 700; color: #16a34a;">92.2%</td>
+            <td style="padding: 9px 12px; text-align: center;">
+                <span style="background: #ecfdf5; color: #059669; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 700;">ONLINE</span>
+            </td>
+        </tr>
+        
+        <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 9px 12px; font-family: monospace; font-size: 12px; font-weight: 600; color: #0284c7;">MCH-ABB-IRB-5500</td>
+            <td style="padding: 9px 12px; font-weight: 600; color: #1e293b;">ABB IRB 5500 Paint Atomizer Robot</td>
+            <td style="padding: 9px 12px;">
+                <span style="background: #e0e7ff; color: #3730a3; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">Machine</span>
+            </td>
+            <td style="padding: 9px 12px; color: #64748b; font-size: 12px;">Paint Shop</td>
+            <td style="padding: 9px 12px; color: #475569; font-size: 12px;">Tier 2 (Core Production)</td>
+            <td style="padding: 9px 12px; text-align: right; font-weight: 700; color: #16a34a;">92.1%</td>
+            <td style="padding: 9px 12px; text-align: center;">
+                <span style="background: #ecfdf5; color: #059669; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 700;">ONLINE</span>
+            </td>
+        </tr>
+        
+        <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 9px 12px; font-family: monospace; font-size: 12px; font-weight: 600; color: #0284c7;">MCH-AVL-DYNO-400</td>
+            <td style="padding: 9px 12px; font-weight: 600; color: #1e293b;">AVL 400kW High-Speed Dynamometer Stand</td>
+            <td style="padding: 9px 12px;">
+                <span style="background: #e0e7ff; color: #3730a3; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">Machine</span>
+            </td>
+            <td style="padding: 9px 12px; color: #64748b; font-size: 12px;">Powertrain Shop</td>
+            <td style="padding: 9px 12px; color: #475569; font-size: 12px;">Tier 1 (Mission-Critical)</td>
+            <td style="padding: 9px 12px; text-align: right; font-weight: 700; color: #16a34a;">94.7%</td>
+            <td style="padding: 9px 12px; text-align: center;">
+                <span style="background: #ecfdf5; color: #059669; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 700;">ONLINE</span>
+            </td>
+        </tr>
+        
+        <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 9px 12px; font-family: monospace; font-size: 12px; font-weight: 600; color: #0284c7;">MCH-ZEISS-PRISMO</td>
+            <td style="padding: 9px 12px; font-weight: 600; color: #1e293b;">Carl Zeiss PRISMO Navigator 3D CMM</td>
+            <td style="padding: 9px 12px;">
+                <span style="background: #e0e7ff; color: #3730a3; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">Machine</span>
+            </td>
+            <td style="padding: 9px 12px; color: #64748b; font-size: 12px;">Quality Lab</td>
+            <td style="padding: 9px 12px; color: #475569; font-size: 12px;">Tier 2 (Core Production)</td>
+            <td style="padding: 9px 12px; text-align: right; font-weight: 700; color: #16a34a;">93.2%</td>
+            <td style="padding: 9px 12px; text-align: center;">
+                <span style="background: #ecfdf5; color: #059669; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 700;">ONLINE</span>
+            </td>
+        </tr>
+        
+        <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 9px 12px; font-family: monospace; font-size: 12px; font-weight: 600; color: #0284c7;">MCH-DMG-DMC-85</td>
+            <td style="padding: 9px 12px; font-weight: 600; color: #1e293b;">DMG MORI DMC 85 FD 5-Axis Mill-Turn</td>
+            <td style="padding: 9px 12px;">
+                <span style="background: #e0e7ff; color: #3730a3; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">Machine</span>
+            </td>
+            <td style="padding: 9px 12px; color: #64748b; font-size: 12px;">Powertrain Shop</td>
+            <td style="padding: 9px 12px; color: #475569; font-size: 12px;">Tier 1 (Mission-Critical)</td>
+            <td style="padding: 9px 12px; text-align: right; font-weight: 700; color: #16a34a;">98.3%</td>
+            <td style="padding: 9px 12px; text-align: center;">
+                <span style="background: #ecfdf5; color: #059669; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 700;">ONLINE</span>
+            </td>
+        </tr>
+        
+        <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 9px 12px; font-family: monospace; font-size: 12px; font-weight: 600; color: #0284c7;">MCH-KUKA-TITAN-01</td>
+            <td style="padding: 9px 12px; font-weight: 600; color: #1e293b;">KUKA KR-1000 Heavy Titan Welder #1</td>
+            <td style="padding: 9px 12px;">
+                <span style="background: #e0e7ff; color: #3730a3; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">Machine</span>
+            </td>
+            <td style="padding: 9px 12px; color: #64748b; font-size: 12px;">Body Shop</td>
+            <td style="padding: 9px 12px; color: #475569; font-size: 12px;">Tier 1 (Mission-Critical)</td>
+            <td style="padding: 9px 12px; text-align: right; font-weight: 700; color: #16a34a;">93.7%</td>
+            <td style="padding: 9px 12px; text-align: center;">
+                <span style="background: #ecfdf5; color: #059669; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 700;">ONLINE</span>
+            </td>
+        </tr>
+        
+        <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 9px 12px; font-family: monospace; font-size: 12px; font-weight: 600; color: #0284c7;">MCH-KUKA-QUANT-02</td>
+            <td style="padding: 9px 12px; font-weight: 600; color: #1e293b;">KUKA KR-210 Quantec Spot Gun #2</td>
+            <td style="padding: 9px 12px;">
+                <span style="background: #e0e7ff; color: #3730a3; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">Machine</span>
+            </td>
+            <td style="padding: 9px 12px; color: #64748b; font-size: 12px;">Body Shop</td>
+            <td style="padding: 9px 12px; color: #475569; font-size: 12px;">Tier 1 (Mission-Critical)</td>
+            <td style="padding: 9px 12px; text-align: right; font-weight: 700; color: #16a34a;">96.6%</td>
+            <td style="padding: 9px 12px; text-align: center;">
+                <span style="background: #ecfdf5; color: #059669; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 700;">ONLINE</span>
+            </td>
+        </tr>
+        
+        <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 9px 12px; font-family: monospace; font-size: 12px; font-weight: 600; color: #0284c7;">MCH-SCHULER-2500</td>
+            <td style="padding: 9px 12px; font-weight: 600; color: #1e293b;">Schuler Servo Press 2500T (Station 1)</td>
+            <td style="padding: 9px 12px;">
+                <span style="background: #e0e7ff; color: #3730a3; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">Machine</span>
+            </td>
+            <td style="padding: 9px 12px; color: #64748b; font-size: 12px;">Stamping Shop</td>
+            <td style="padding: 9px 12px; color: #475569; font-size: 12px;">Tier 1 (Mission-Critical)</td>
+            <td style="padding: 9px 12px; text-align: right; font-weight: 700; color: #16a34a;">96.3%</td>
+            <td style="padding: 9px 12px; text-align: center;">
+                <span style="background: #ecfdf5; color: #059669; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 700;">ONLINE</span>
+            </td>
+        </tr>
+        
+        <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 9px 12px; font-family: monospace; font-size: 12px; font-weight: 600; color: #0284c7;">MCH-SIEMENS-HAIRPIN</td>
+            <td style="padding: 9px 12px; font-weight: 600; color: #1e293b;">Siemens Continuous Hairpin Stator Inserter</td>
+            <td style="padding: 9px 12px;">
+                <span style="background: #e0e7ff; color: #3730a3; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">Machine</span>
+            </td>
+            <td style="padding: 9px 12px; color: #64748b; font-size: 12px;">Powertrain Shop</td>
+            <td style="padding: 9px 12px; color: #475569; font-size: 12px;">Tier 1 (Mission-Critical)</td>
+            <td style="padding: 9px 12px; text-align: right; font-weight: 700; color: #16a34a;">97.4%</td>
+            <td style="padding: 9px 12px; text-align: center;">
+                <span style="background: #ecfdf5; color: #059669; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 700;">ONLINE</span>
+            </td>
+        </tr>
+        
+        <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 9px 12px; font-family: monospace; font-size: 12px; font-weight: 600; color: #0284c7;">MCH-TRUMPF-LASER-01</td>
+            <td style="padding: 9px 12px; font-weight: 600; color: #1e293b;">Trumpf TruDisk 6001 Fiber Laser Station</td>
+            <td style="padding: 9px 12px;">
+                <span style="background: #e0e7ff; color: #3730a3; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">Machine</span>
+            </td>
+            <td style="padding: 9px 12px; color: #64748b; font-size: 12px;">Body Shop</td>
+            <td style="padding: 9px 12px; color: #475569; font-size: 12px;">Tier 1 (Mission-Critical)</td>
+            <td style="padding: 9px 12px; text-align: right; font-weight: 700; color: #16a34a;">98.3%</td>
+            <td style="padding: 9px 12px; text-align: center;">
+                <span style="background: #ecfdf5; color: #059669; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 700;">ONLINE</span>
+            </td>
+        </tr>
+        
+        <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 9px 12px; font-family: monospace; font-size: 12px; font-weight: 600; color: #0284c7;">SUB-DMG-SPINDLE-01</td>
+            <td style="padding: 9px 12px; font-weight: 600; color: #1e293b;">20,000 RPM Master Electro-Spindle</td>
+            <td style="padding: 9px 12px;">
+                <span style="background: #e0e7ff; color: #3730a3; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">Subsystem</span>
+            </td>
+            <td style="padding: 9px 12px; color: #64748b; font-size: 12px;">Powertrain Shop</td>
+            <td style="padding: 9px 12px; color: #475569; font-size: 12px;">Tier 1 (Mission-Critical)</td>
+            <td style="padding: 9px 12px; text-align: right; font-weight: 700; color: #16a34a;">92.7%</td>
+            <td style="padding: 9px 12px; text-align: center;">
+                <span style="background: #ecfdf5; color: #059669; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 700;">ONLINE</span>
+            </td>
+        </tr>
+        
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="footer">
+        Apex Industrial Technologies Global &copy; 2026. Powered by Supernova SCADA & Data Analytics Platform.
+    </div>
+</div>
+</body>
+</html>

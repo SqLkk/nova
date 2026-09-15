@@ -1,112 +1,326 @@
-<div class="p-6 space-y-6">
-  <!-- Header -->
-  <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+<div class="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto">
+  
+  <!-- Page Header -->
+  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-white/10">
     <div>
-      <h1 class="text-3xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
-        System Logs & Machine Alarms
+      <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-md text-[11px] font-mono font-medium bg-[#F5B301]/10 text-[#F5B301] border border-[#F5B301]/25 mb-2">
+        <i class="fas fa-bell text-xs"></i>
+        <span>CANLI TELEMETRİ ALARMLARI</span>
+      </div>
+      <h1 class="text-2xl sm:text-3xl font-black font-display text-white tracking-tight flex items-center gap-3">
+        <span>Alarmlar & Olaylar</span>
+        <span class="text-xs px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/30 font-mono font-normal">
+          {{ activeCount }} Aktif Olay
+        </span>
       </h1>
-      <p class="text-slate-600 dark:text-slate-400 text-sm mt-1">
-        Monitor real-time machine exceptions, PLC alarms, and background services activity.
+      <p class="text-xs sm:text-sm text-slate-400 mt-1">
+        Üretim hatları, KUKA robotları, CNC üniteleri ve PLC sensörlerinden gelen gerçek zamanlı arıza ve sapma bildirimleri.
       </p>
     </div>
-  </div>
 
-  <!-- Filters -->
-  <div class="flex flex-col md:flex-row items-center gap-4 bg-white/80 dark:bg-slate-800/80 backdrop-blur-md p-4 rounded-2xl border border-slate-200 dark:border-slate-700/50 shadow-sm">
-    <div class="relative w-full md:w-80">
-      <input 
-        type="text" 
-        [(ngModel)]="searchTerm" 
-        (input)="applyFilters()"
-        placeholder="Search source or message..."
-        class="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 dark:text-slate-100"
-      />
-      <i class="fas fa-search absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
-    </div>
+    <!-- Actions -->
+    <div class="flex items-center gap-2.5 shrink-0">
+      <button
+        type="button"
+        (click)="triggerSimulatedAlarm()"
+        class="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold text-[#08060B] bg-gradient-to-r from-[#F5B301] to-[#FF7A1A] hover:brightness-110 shadow-md shadow-[#F5B301]/20 transition-all cursor-pointer active:scale-95">
+        <i class="fas fa-bolt"></i>
+        <span>Alarm Simüle Et</span>
+      </button>
 
-    <div class="flex items-center gap-2 w-full md:w-auto">
-      <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Severity:</span>
-      <select 
-        [(ngModel)]="severityFilter" 
-        (change)="applyFilters()"
-        class="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 py-1.5 px-3 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
-      >
-        <option value="All">All Levels</option>
-        <option value="Critical">🔴 Critical</option>
-        <option value="Warning">🟡 Warning</option>
-        <option value="Info">🔵 Info</option>
-      </select>
+      <button
+        type="button"
+        (click)="loadAlarms()"
+        class="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-mono font-medium text-slate-300 bg-[#15111D] border border-white/10 hover:border-white/20 hover:text-white transition-all cursor-pointer">
+        <i class="fas fa-sync-alt"></i>
+        <span class="hidden sm:inline">Yenile</span>
+      </button>
     </div>
   </div>
 
-  <!-- Table Container -->
-  <div class="bg-white/85 dark:bg-slate-800/85 backdrop-blur-md rounded-2xl border border-slate-200 dark:border-slate-700/50 overflow-hidden shadow-md">
-    <div class="overflow-x-auto">
-      <table class="w-full border-collapse text-left">
-        <thead>
-          <tr class="bg-slate-50/50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700/50">
-            <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Severity</th>
-            <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Machine Source</th>
-            <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider w-1/2">Log Message</th>
-            <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Timestamp</th>
-            <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
-            <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Actions</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-100 dark:divide-slate-700/50">
-          <tr *ngFor="let log of filteredLogs" class="hover:bg-slate-50/50 dark:hover:bg-slate-900/30 transition-colors">
-            <td class="px-6 py-4 whitespace-nowrap">
-              <span [class]="'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ' + 
-                (log.severity === 'Critical' ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400' : 
-                 log.severity === 'Warning' ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400' : 
-                 'bg-blue-500/10 text-blue-600 dark:text-blue-400')">
-                <span class="w-1.5 h-1.5 rounded-full" [class]="
-                  log.severity === 'Critical' ? 'bg-rose-500' : 
-                  log.severity === 'Warning' ? 'bg-amber-500' : 'bg-blue-500'"></span>
-                {{ log.severity }}
-              </span>
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-slate-800 dark:text-slate-200">
-              {{ log.source }}
-            </td>
-            <td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">
-              {{ log.message }}
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap text-xs text-slate-500">
-              {{ log.timestamp | date:'dd.MM.yyyy HH:mm:ss' }}
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap">
-              <span [class]="'inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold ' + 
-                (log.status === 'Active' ? 'bg-rose-500/10 text-rose-500' : 
-                 log.status === 'Acknowledged' ? 'bg-amber-500/10 text-amber-500' : 
-                 'bg-emerald-500/10 text-emerald-500')">
-                {{ log.status }}
-              </span>
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-right space-x-2">
-              <button 
-                *ngIf="log.status === 'Active'" 
-                (click)="acknowledgeLog(log)"
-                class="px-2.5 py-1 text-xs font-medium text-amber-600 bg-amber-500/10 rounded-lg hover:bg-amber-500/20 transition-colors"
-              >
-                Acknowledge
-              </button>
-              <button 
-                *ngIf="log.status !== 'Resolved'" 
-                (click)="resolveLog(log)"
-                class="px-2.5 py-1 text-xs font-medium text-emerald-600 bg-emerald-500/10 rounded-lg hover:bg-emerald-500/20 transition-colors"
-              >
-                Resolve
-              </button>
-            </td>
-          </tr>
-          <tr *ngIf="filteredLogs.length === 0">
-            <td colspan="6" class="px-6 py-12 text-center text-slate-500">
-              No matching system logs or alarms found.
-            </td>
-          </tr>
-        </tbody>
-      </table>
+  <!-- KPI Overview Cards -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+    <!-- Total -->
+    <div class="p-4 rounded-2xl bg-[#15111D] border border-white/10 shadow-lg">
+      <div class="flex items-center justify-between text-slate-400 mb-2">
+        <span class="text-xs font-mono uppercase tracking-wider">Toplam Kayıt</span>
+        <i class="fas fa-list-ul text-slate-500"></i>
+      </div>
+      <div class="text-2xl sm:text-3xl font-black font-display text-white">{{ totalCount }}</div>
+      <div class="text-[11px] text-slate-500 font-mono mt-1">Tüm hatlar & tesisler</div>
+    </div>
+
+    <!-- Critical -->
+    <div 
+      (click)="setSeverityFilter(selectedSeverity === 'critical' ? 'all' : 'critical')"
+      class="p-4 rounded-2xl bg-[#15111D] border border-rose-500/30 hover:border-rose-500 shadow-lg transition-all cursor-pointer relative overflow-hidden group">
+      <div class="flex items-center justify-between text-rose-400 mb-2">
+        <span class="text-xs font-mono uppercase tracking-wider flex items-center gap-1.5">
+          <span class="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span>
+          Kritik Alarm
+        </span>
+        <i class="fas fa-exclamation-triangle text-rose-500"></i>
+      </div>
+      <div class="text-2xl sm:text-3xl font-black font-display text-rose-400">{{ criticalCount }}</div>
+      <div class="text-[11px] text-rose-400/70 font-mono mt-1">Acil müdahale gereken</div>
+    </div>
+
+    <!-- Warning -->
+    <div 
+      (click)="setSeverityFilter(selectedSeverity === 'warning' ? 'all' : 'warning')"
+      class="p-4 rounded-2xl bg-[#15111D] border border-amber-500/30 hover:border-amber-500 shadow-lg transition-all cursor-pointer group">
+      <div class="flex items-center justify-between text-amber-400 mb-2">
+        <span class="text-xs font-mono uppercase tracking-wider">Uyarı / Sapma</span>
+        <i class="fas fa-exclamation-circle text-amber-500"></i>
+      </div>
+      <div class="text-2xl sm:text-3xl font-black font-display text-amber-400">{{ warningCount }}</div>
+      <div class="text-[11px] text-amber-400/70 font-mono mt-1">Tolerans yaklaşımı</div>
+    </div>
+
+    <!-- Resolved / Normal -->
+    <div 
+      (click)="setStatusFilter(selectedStatus === 'resolved' ? 'all' : 'resolved')"
+      class="p-4 rounded-2xl bg-[#15111D] border border-emerald-500/30 hover:border-emerald-500 shadow-lg transition-all cursor-pointer group">
+      <div class="flex items-center justify-between text-emerald-400 mb-2">
+        <span class="text-xs font-mono uppercase tracking-wider">Çözülen Olaylar</span>
+        <i class="fas fa-check-circle text-emerald-500"></i>
+      </div>
+      <div class="text-2xl sm:text-3xl font-black font-display text-emerald-400">{{ resolvedCount }}</div>
+      <div class="text-[11px] text-emerald-400/70 font-mono mt-1">Normal duruma dönen</div>
     </div>
   </div>
+
+  <!-- Search & Filter Controls -->
+  <div class="p-3.5 sm:p-4 rounded-2xl bg-[#15111D] border border-white/10 space-y-3 shadow-lg">
+    <div class="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+      
+      <!-- Search Input -->
+      <div class="relative flex-1">
+        <i class="fas fa-search absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
+        <input
+          type="text"
+          [(ngModel)]="searchTerm"
+          (ngModelChange)="applyFilters()"
+          placeholder="Makine, istasyon veya alarm açıklaması ile ara (örn: CNC, robot, sıcaklık)..."
+          class="w-full pl-9 pr-4 py-2 rounded-xl bg-[#0E0B14] border border-white/10 text-white placeholder:text-slate-600 text-xs focus:outline-none focus:border-[#F5B301] transition-colors font-sans" />
+      </div>
+
+      <!-- Location Dropdown -->
+      <div class="flex items-center gap-2">
+        <span class="text-[11px] font-mono text-slate-400 shrink-0">Tesis:</span>
+        <select
+          [(ngModel)]="selectedLocation"
+          (ngModelChange)="applyFilters()"
+          class="px-3 py-2 rounded-xl bg-[#0E0B14] border border-white/10 text-slate-300 text-xs font-mono focus:outline-none focus:border-[#F5B301] transition-colors cursor-pointer">
+          <option value="all">Tüm Tesisler (Alpha, Beta, Gamma)</option>
+          <option value="Alpha">Tesis Alpha (Motor & Şasi)</option>
+          <option value="Beta">Tesis Beta (Plastik & Basınç)</option>
+          <option value="Gamma">Tesis Gamma (Boya & Elektronik)</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Filter Pills -->
+    <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-white/5 text-xs font-mono">
+      <!-- Severity Pills -->
+      <div class="flex items-center gap-1.5 flex-wrap">
+        <span class="text-slate-500 text-[11px] mr-1">Seviye:</span>
+        <button
+          type="button"
+          (click)="setSeverityFilter('all')"
+          [class]="'px-2.5 py-1 rounded-lg transition-all ' + (selectedSeverity === 'all' ? 'bg-[#F5B301] text-[#08060B] font-bold' : 'bg-[#1F192A] text-slate-400 hover:text-white')">
+          Tümü ({{ totalCount }})
+        </button>
+        <button
+          type="button"
+          (click)="setSeverityFilter('critical')"
+          [class]="'px-2.5 py-1 rounded-lg transition-all ' + (selectedSeverity === 'critical' ? 'bg-rose-500 text-white font-bold' : 'bg-[#1F192A] text-rose-400 hover:bg-rose-500/10')">
+          Kritik ({{ criticalCount }})
+        </button>
+        <button
+          type="button"
+          (click)="setSeverityFilter('warning')"
+          [class]="'px-2.5 py-1 rounded-lg transition-all ' + (selectedSeverity === 'warning' ? 'bg-amber-500 text-[#08060B] font-bold' : 'bg-[#1F192A] text-amber-400 hover:bg-amber-500/10')">
+          Uyarı ({{ warningCount }})
+        </button>
+        <button
+          type="button"
+          (click)="setSeverityFilter('info')"
+          [class]="'px-2.5 py-1 rounded-lg transition-all ' + (selectedSeverity === 'info' ? 'bg-sky-500 text-white font-bold' : 'bg-[#1F192A] text-sky-400 hover:bg-sky-500/10')">
+          Bilgi ({{ infoCount }})
+        </button>
+      </div>
+
+      <!-- Status Pills -->
+      <div class="flex items-center gap-1.5 flex-wrap">
+        <span class="text-slate-500 text-[11px] mr-1">Durum:</span>
+        <button
+          type="button"
+          (click)="setStatusFilter('all')"
+          [class]="'px-2.5 py-1 rounded-lg transition-all ' + (selectedStatus === 'all' ? 'bg-white/15 text-white font-bold' : 'text-slate-400 hover:text-white')">
+          Tümü
+        </button>
+        <button
+          type="button"
+          (click)="setStatusFilter('active')"
+          [class]="'px-2.5 py-1 rounded-lg transition-all ' + (selectedStatus === 'active' ? 'bg-rose-500/30 text-rose-300 border border-rose-500/50 font-bold' : 'text-slate-400 hover:text-white')">
+          Aktif
+        </button>
+        <button
+          type="button"
+          (click)="setStatusFilter('acknowledged')"
+          [class]="'px-2.5 py-1 rounded-lg transition-all ' + (selectedStatus === 'acknowledged' ? 'bg-amber-500/30 text-amber-300 border border-amber-500/50 font-bold' : 'text-slate-400 hover:text-white')">
+          Onaylandı
+        </button>
+        <button
+          type="button"
+          (click)="setStatusFilter('resolved')"
+          [class]="'px-2.5 py-1 rounded-lg transition-all ' + (selectedStatus === 'resolved' ? 'bg-emerald-500/30 text-emerald-300 border border-emerald-500/50 font-bold' : 'text-slate-400 hover:text-white')">
+          Çözüldü
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Alarms List / Table Container -->
+  <div class="rounded-2xl border border-white/10 bg-[#15111D] overflow-hidden shadow-2xl">
+    
+    <!-- Table Header (Desktop) -->
+    <div class="hidden md:grid grid-cols-12 gap-3 px-5 py-3 bg-[#0E0B14] border-b border-white/10 text-[11px] font-mono uppercase tracking-wider text-slate-400 select-none">
+      <div class="col-span-2">Seviye & Durum</div>
+      <div class="col-span-3">Cihaz & Hat Konumu</div>
+      <div class="col-span-4">Alarm & Telemetri Açıklaması</div>
+      <div class="col-span-1 text-center">Zaman</div>
+      <div class="col-span-2 text-right">Müdahale</div>
+    </div>
+
+    <!-- Empty State -->
+    <div *ngIf="filteredAlarms.length === 0" class="py-16 text-center text-slate-500">
+      <i class="fas fa-check-double text-4xl text-emerald-500/40 mb-3"></i>
+      <h3 class="text-base font-bold font-display text-white">Eşleşen Alarm Bulunamadı</h3>
+      <p class="text-xs text-slate-400 max-w-sm mx-auto mt-1">
+        Filtrelerinize uyan aktif veya çözülmüş alarm kaydı bulunmuyor. Yeni bir alarm tetiklemek için üstteki "Alarm Simüle Et" butonunu kullanabilirsiniz.
+      </p>
+    </div>
+
+    <!-- Rows -->
+    <div class="divide-y divide-white/5">
+      <div
+        *ngFor="let alm of filteredAlarms"
+        class="p-4 sm:px-5 sm:py-3.5 transition-colors hover:bg-white/[0.02] flex flex-col md:grid md:grid-cols-12 md:items-center gap-3">
+        
+        <!-- Col 1: Seviye & Durum -->
+        <div class="col-span-2 flex items-center gap-2">
+          <!-- Severity Badge -->
+          <span 
+            *ngIf="alm.severity === 'critical'"
+            class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-mono font-bold bg-rose-500/15 text-rose-400 border border-rose-500/40 shrink-0">
+            <span class="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span>
+            KRİTİK
+          </span>
+
+          <span 
+            *ngIf="alm.severity === 'warning'"
+            class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-mono font-bold bg-amber-500/15 text-amber-400 border border-amber-500/40 shrink-0">
+            <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+            UYARI
+          </span>
+
+          <span 
+            *ngIf="alm.severity === 'info'"
+            class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-mono font-bold bg-sky-500/15 text-sky-400 border border-sky-500/40 shrink-0">
+            <span class="w-1.5 h-1.5 rounded-full bg-sky-400"></span>
+            BİLGİ
+          </span>
+
+          <!-- Status badge -->
+          <span 
+            *ngIf="alm.status === 'active'"
+            class="text-[10px] font-mono px-2 py-0.5 rounded bg-white/5 text-slate-300 border border-white/10 shrink-0">
+            Aktif
+          </span>
+          <span 
+            *ngIf="alm.status === 'acknowledged'"
+            class="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20 shrink-0">
+            Onaylı
+          </span>
+          <span 
+            *ngIf="alm.status === 'resolved'"
+            class="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 shrink-0">
+            Çözüldü
+          </span>
+        </div>
+
+        <!-- Col 2: Cihaz & Konum -->
+        <div class="col-span-3">
+          <div class="text-xs sm:text-sm font-bold text-white flex items-center gap-1.5">
+            <i class="fas fa-microchip text-[11px] text-[#F5B301]"></i>
+            <span>{{ alm.source }}</span>
+          </div>
+          <div class="text-[11px] text-slate-400 font-mono truncate mt-0.5">
+            {{ alm.location }}
+          </div>
+        </div>
+
+        <!-- Col 3: Mesaj & Telemetri -->
+        <div class="col-span-4">
+          <p class="text-xs text-slate-200 leading-snug">
+            {{ alm.message }}
+          </p>
+          <div *ngIf="alm.value" class="mt-1 flex items-center gap-2 text-[10px] font-mono text-slate-400">
+            <span class="text-amber-400 font-bold">Okunan: {{ alm.value }}</span>
+            <span class="text-slate-600">|</span>
+            <span>Limit: {{ alm.threshold }}</span>
+            <span *ngIf="alm.acknowledgedBy" class="text-slate-500 italic">({{ alm.acknowledgedBy }})</span>
+          </div>
+        </div>
+
+        <!-- Col 4: Zaman -->
+        <div class="col-span-1 md:text-center text-[11px] font-mono text-slate-400">
+          <i class="far fa-clock mr-1 md:hidden"></i>
+          <span>{{ getTimeAgo(alm.timestamp) }}</span>
+        </div>
+
+        <!-- Col 5: Aksiyon Butonları -->
+        <div class="col-span-2 flex items-center md:justify-end gap-2 pt-2 md:pt-0 border-t md:border-t-0 border-white/5">
+          <button
+            *ngIf="alm.status === 'active'"
+            type="button"
+            (click)="acknowledge(alm)"
+            class="px-2.5 py-1 rounded-lg text-xs font-mono font-medium text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 transition-all cursor-pointer active:scale-95">
+            <i class="fas fa-check mr-1 text-[10px]"></i>
+            <span>Onayla</span>
+          </button>
+
+          <button
+            *ngIf="alm.status !== 'resolved'"
+            type="button"
+            (click)="resolve(alm)"
+            class="px-2.5 py-1 rounded-lg text-xs font-mono font-medium text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 transition-all cursor-pointer active:scale-95">
+            <i class="fas fa-check-double mr-1 text-[10px]"></i>
+            <span>Çözüldü</span>
+          </button>
+
+          <span *ngIf="alm.status === 'resolved'" class="text-[11px] font-mono text-emerald-400 flex items-center gap-1">
+            <i class="fas fa-check-circle"></i>
+            <span>Giderildi</span>
+          </span>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Footer Stats Bar -->
+    <div class="px-5 py-3 bg-[#0E0B14] border-t border-white/10 flex flex-wrap items-center justify-between text-xs font-mono text-slate-400 gap-2">
+      <div class="flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+        <span>Nov4 Gerçek Zamanlı Alarm Motoru Aktif</span>
+      </div>
+      <div>
+        <span>Görüntülenen: <strong>{{ filteredAlarms.length }}</strong> / {{ totalCount }} Kayıt</span>
+      </div>
+    </div>
+
+  </div>
+
 </div>

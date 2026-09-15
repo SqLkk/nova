@@ -74,49 +74,7 @@ export class ApiService {
   }
 
   // --- REPORT STUBS TO FIX COMPILATION ---
-  getReports(): Observable<any[]> {
-    return of([
-      {
-        id: 'rep_oee_1',
-        name: 'Weekly Factory OEE Analysis',
-        description: 'Analysis of Overall Equipment Effectiveness across all production lines.',
-        type: 'custom',
-        createdAt: new Date(Date.now() - 3600000 * 24).toISOString(),
-        createdBy: 'admin',
-        startDate: '2026-07-13T00:00:00Z',
-        endDate: '2026-07-20T00:00:00Z',
-        status: 'ready',
-        fileType: 'excel',
-        fileSize: '2.4 MB'
-      },
-      {
-        id: 'rep_energy_1',
-        name: 'Hourly Energy Consumption Log',
-        description: 'Power usage log for Plant Alpha, Plant Beta, and Plant Gamma.',
-        type: 'energy',
-        createdAt: new Date(Date.now() - 3600000 * 5).toISOString(),
-        createdBy: 'admin',
-        startDate: '2026-07-19T00:00:00Z',
-        endDate: '2026-07-20T00:00:00Z',
-        status: 'ready',
-        fileType: 'pdf',
-        fileSize: '1.1 MB'
-      },
-      {
-        id: 'rep_alarms_1',
-        name: 'Active Machine Alarms Log',
-        description: 'Downtime and alarm timeline log compiled from PLCs.',
-        type: 'messages',
-        createdAt: new Date(Date.now() - 1800000).toISOString(),
-        createdBy: 'admin',
-        startDate: '2026-07-20T00:00:00Z',
-        endDate: '2026-07-20T23:59:59Z',
-        status: 'ready',
-        fileType: 'csv',
-        fileSize: '450 KB'
-      }
-    ]);
-  }
+  getReports(): Observable<any[]> { return of([]); }
   startReport(id: string): Observable<any> { return of({}); }
   pollReportCompletion(id: string): Observable<any> { return of({}); }
   getReportOutput(id: string): Observable<any> { return of({}); }
@@ -125,16 +83,7 @@ export class ApiService {
   deleteUserTemplate(id: string, userId: string): Observable<any> { return of({}); }
   updateReportSharing(id: string, isShared: boolean, sharedWith: any): Observable<any> { return of({}); }
   createReport(data: any): Observable<any> { return of({}); }
-  getGeneratedReports(): Observable<any> {
-    return of({
-      success: true,
-      data: [
-        { name: 'Weekly_Factory_OEE_Analysis_20260720.xlsx', url: '#', size: '2.4 MB', date: new Date().toISOString() },
-        { name: 'Hourly_Energy_Consumption_Log_20260720.pdf', url: '#', size: '1.1 MB', date: new Date().toISOString() },
-        { name: 'Active_Machine_Alarms_Log_20260720.csv', url: '#', size: '450 KB', date: new Date().toISOString() }
-      ]
-    });
-  }
+  getGeneratedReports(): Observable<any> { return of([]); }
   deleteGeneratedReports(files: any[]): Observable<any> { return of({}); }
   updateReport(id: string, data: any): Observable<any> { return of({}); }
   addWidgetToDashboard(userId: string, data: any): Observable<any> { return of({}); }
@@ -158,23 +107,44 @@ export class ApiService {
   getRealTimeHierarchyStructure(): Observable<any> { return of({data: []}); }
   getRealTimeElementsStructure(): Observable<any> { return of({data: []}); }
   getSavedExplorationData(id: any): Observable<any> {
-    const rows = [];
-    const now = new Date();
-    for (let i = 20; i >= 0; i--) {
-      const t = new Date(now.getTime() - i * 60000);
-      const val = 50 + Math.sin(i * 0.5) * 15 + Math.random() * 5;
-      rows.push({
-        TIMESTAMP: t.toISOString(),
-        VALUE_CUR: parseFloat(val.toFixed(2))
-      });
+    // Kayıtlı SQL sorgusunu preview endpoint'i üzerinden çalıştırır ve widget'ın
+    // beklediği {status, data:{rows, source, name}} zarfına reshape eder.
+    // Backend: POST /api/queries/<id>/preview → {success, data:{columns, rows, ...}}.
+    if (!id) {
+      return of({ status: 'error', data: null, message: 'No query id provided.' });
     }
-    return of({
-      status: 'success',
-      data: {
-        name: 'Factory OEE SQL Exploration',
-        rows: rows
-      }
-    });
+    return this.post<any>(`queries/${id}/preview`, { limit: 100 }).pipe(
+      map((result: any) => ({
+        status: 'success',
+        data: {
+          rows: result?.rows || [],
+          columns: result?.columns || [],
+          source: 'sql',
+          name: 'Saved SQL Query'
+        }
+      })),
+      catchError(() => of({ status: 'error', data: null, message: 'SQL preview failed.' }))
+    );
+  }
+
+  runSavedPythonScript(id: any): Observable<any> {
+    // Kayıtlı Python script'ini sandbox'ta çalıştırır (backend: POST /api/python/scripts/<id>/run)
+    // ve widget'ın beklediği {status, data:{rows, source, name}} zarfına reshape eder.
+    if (!id) {
+      return of({ status: 'error', data: null, message: 'No script id provided.' });
+    }
+    return this.post<any>(`python/scripts/${id}/run`, {}).pipe(
+      map((result: any) => ({
+        status: 'success',
+        data: {
+          rows: result?.rows || [],
+          columns: result?.columns || [],
+          source: 'python',
+          name: result?.name || 'Python Script'
+        }
+      })),
+      catchError(() => of({ status: 'error', data: null, message: 'Python run failed.' }))
+    );
   }
 
   // --- MORE STUBS ---
@@ -183,64 +153,20 @@ export class ApiService {
   updateRawReport(reportId: any, options: any): Observable<any> { return of({}); }
   getReportSchedule(reportId: any): Observable<any> { return of({}); }
   saveReportSchedule(reportId: any, payload: any): Observable<any> { return of({}); }
-
+  // SCADA/historian entegrasyonu bu kod tabanında yok — nazik hata zarfı döner
+  // (widget çökmez; canlı veri SQL/Python modundan gelir). Historian ileride.
   readRawDataHIS(path: any, mins: any): Observable<any> {
-    const data = [];
-    const now = new Date();
-    const count = 30; // 30 data points
-    const step = (mins * 60 * 1000) / count;
-    
-    let baseVal = 70;
-    if (String(path).toLowerCase().includes('oee')) baseVal = 82;
-    else if (String(path).toLowerCase().includes('energy') || String(path).toLowerCase().includes('power')) baseVal = 320;
-    else if (String(path).toLowerCase().includes('temp')) baseVal = 68;
-    else if (String(path).toLowerCase().includes('carbon')) baseVal = 14;
-
-    for (let i = count; i >= 0; i--) {
-      const t = new Date(now.getTime() - i * step);
-      // Generate realistic sine wave + noise curve
-      const factor = baseVal === 14 ? 2 : (baseVal > 100 ? 50 : 10);
-      const val = baseVal + Math.sin(i * 0.4) * factor + (Math.random() - 0.5) * (factor * 0.3);
-      data.push({
-        TIMESTAMP: t.toISOString(),
-        VALUE_CUR: parseFloat(val.toFixed(2))
-      });
-    }
-
-    return of({
-      status: 'success',
-      data: data
-    });
+    return of({ status: 'error', data: null, message: 'SCADA historian not configured.' });
   }
-
   readRawDataWithSatz(path: any, satz: any): Observable<any> {
-    const now = new Date();
-    const val = 50 + Math.random() * 20;
-    return of({
-      status: 'success',
-      data: {
-        TIMESTAMP: now.toISOString(),
-        VALUE_CUR: parseFloat(val.toFixed(2))
-      }
-    });
+    return of({ status: 'error', data: null, message: 'SCADA historian not configured.' });
   }
-
   readRawData(path: any): Observable<any> {
-    const now = new Date();
-    const val = 50 + Math.random() * 20;
-    return of({
-      status: 'success',
-      data: {
-        TIMESTAMP: now.toISOString(),
-        VALUE_CUR: parseFloat(val.toFixed(2))
-      }
-    });
+    return of({ status: 'error', data: null, message: 'SCADA historian not configured.' });
   }
-
   getHistoricalData(params: any): Observable<any> {
-    return this.readRawDataHIS(params?.path || 'generic', 10);
+    return of({ status: 'error', data: null, message: 'Historical source not configured.' });
   }
-
   analyzeReport(id: any): Observable<any> { return of({}); }
   getUserTemplate(id: any, userId: any): Observable<any> { return of({}); }
 }

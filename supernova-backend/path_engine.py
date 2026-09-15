@@ -22,6 +22,7 @@ Hata yok, exception fırlatmaz — sorunları warnings içine yazar (UI gösteri
 """
 from __future__ import annotations
 
+import re
 from typing import Any, Dict, List, Optional
 
 __all__ = ["build_structure"]
@@ -30,13 +31,15 @@ __all__ = ["build_structure"]
 def build_structure(structure: str, rows: List[Dict[str, Any]],
                     config: Dict[str, Any]) -> Dict[str, Any]:
     """Yapı tipine göre ilgili kurucuya yönlendir."""
-    structure = (structure or "").strip()
+    structure = (structure or "").strip().lower()
     if structure in ("tree", "binary_tree"):
         return _build_tree(rows, config, binary=(structure == "binary_tree"))
     if structure == "sequence":
         return _build_sequence(rows, config)
     if structure == "grouped":
         return _build_grouped(rows, config)
+    if structure in ("dag", "graph", "network"):
+        return _build_dag(rows, config)
     # Bilinmeyen tip — boş sonuç + uyarı (exception yok).
     return _empty_result([f"Bilinmeyen yapı tipi: {structure}"])
 
@@ -86,6 +89,94 @@ def _sort_numeric_then_str(items, key):
     return sorted(items, key=k)
 
 
+def _extract_decorations(r: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
+    """Sağlık puanı, durum, rozet ve renk dekorasyonlarını satırdan çeker."""
+    health_col = config.get("health_col") or config.get("health_score_col")
+    status_col = config.get("status_col") or config.get("state_col")
+    badge_col = config.get("badge_col")
+    color_col = config.get("color_col")
+
+    # 1. Health Score
+    health_score = None
+    if health_col and health_col in r and r[health_col] is not None:
+        try:
+            health_score = round(float(r[health_col]), 2)
+        except (ValueError, TypeError):
+            pass
+    elif "health_score" in r and r["health_score"] is not None:
+        try:
+            health_score = round(float(r["health_score"]), 2)
+        except (ValueError, TypeError):
+            pass
+    elif "oee_percent" in r and r["oee_percent"] is not None:
+        try:
+            health_score = round(float(r["oee_percent"]), 2)
+        except (ValueError, TypeError):
+            pass
+
+    # 2. Status
+    status = None
+    if status_col and status_col in r and r[status_col] is not None:
+        status = str(r[status_col]).strip()
+    elif "status" in r and r["status"] is not None:
+        status = str(r["status"]).strip()
+    elif "state" in r and r["state"] is not None:
+        status = str(r["state"]).strip()
+    elif health_score is not None:
+        if health_score >= 85:
+            status = "HEALTHY"
+        elif health_score >= 65:
+            status = "WARNING"
+        else:
+            status = "CRITICAL"
+
+    # 3. Status Color
+    status_color = None
+    if color_col and color_col in r and r[color_col]:
+        status_color = str(r[color_col]).strip()
+    elif "status_color" in r and r["status_color"]:
+        status_color = str(r["status_color"]).strip()
+    elif status:
+        st_upper = status.upper()
+        if any(x in st_upper for x in ("HEALTHY", "OPERATIONAL", "RUNNING", "ACTIVE", "OPTIMAL", "UP", "PASS")):
+            status_color = "#10b981"  # green
+        elif any(x in st_upper for x in ("WARNING", "DEGRADED", "STANDBY", "MAINTENANCE", "CAUTION")):
+            status_color = "#f59e0b"  # amber
+        elif any(x in st_upper for x in ("CRITICAL", "DOWN", "ERROR", "FAILURE", "STOPPED", "FAIL", "ALARM")):
+            status_color = "#ef4444"  # red
+        else:
+            status_color = "#6b7280"  # gray
+    elif health_score is not None:
+        if health_score >= 85:
+            status_color = "#10b981"
+        elif health_score >= 65:
+            status_color = "#f59e0b"
+        else:
+            status_color = "#ef4444"
+
+    # 4. Badge
+    badge = None
+    if badge_col and badge_col in r and r[badge_col] is not None:
+        badge = str(r[badge_col])
+    elif "badge" in r and r["badge"] is not None:
+        badge = str(r["badge"])
+    elif health_score is not None:
+        badge = f"{health_score}%"
+    elif status:
+        badge = status
+
+    decorations = {}
+    if health_score is not None:
+        decorations["healthScore"] = health_score
+    if status is not None:
+        decorations["status"] = status
+    if status_color is not None:
+        decorations["statusColor"] = status_color
+    if badge is not None:
+        decorations["badge"] = badge
+    return decorations
+
+
 # ---------------------------------------------------------------------------
 # Tree / Binary Tree
 # ---------------------------------------------------------------------------
@@ -111,7 +202,7 @@ def _build_tree(rows, config, binary=False) -> Dict[str, Any]:
             dup += 1
             continue
         label_val = _cell(r, label_col)
-        by_id[nid] = {
+        node_data = {
             "id": nid,
             "label": str(label_val) if label_val is not None else nid,
             "parent": _norm_id(_cell(r, parent_col)),
@@ -120,7 +211,9 @@ def _build_tree(rows, config, binary=False) -> Dict[str, Any]:
         }
         if type_col:
             tv = _cell(r, type_col)
-            by_id[nid]["type"] = str(tv) if tv is not None else ""
+            node_data["type"] = str(tv) if tv is not None else ""
+        node_data.update(_extract_decorations(r, config))
+        by_id[nid] = node_data
     if dup:
         warnings.append(f"{dup} tekrarlı id atlandı.")
 
@@ -200,13 +293,15 @@ def _build_sequence(rows, config) -> Dict[str, Any]:
         if not nid or nid in by_id:
             continue
         label_val = _cell(r, label_col)
-        by_id[nid] = {
+        node_data = {
             "id": nid,
             "label": str(label_val) if label_val is not None else nid,
             "parent": "", "depth": 0, "path": [], "type": "", "children": [],
             "next": _norm_id(_cell(r, next_col)) if next_col else "",
             "row": r,
         }
+        node_data.update(_extract_decorations(r, config))
+        by_id[nid] = node_data
 
     # order tabanlı: tek sıralı zincir.
     if order_col and not next_col:
@@ -305,10 +400,12 @@ def _build_grouped(rows, config) -> Dict[str, Any]:
             label_val = _cell(r, label_col) if label_col else None
             if label_val is None:
                 label_val = raw_id if raw_id is not None else mid
-            nodes.append({
+            member_node = {
                 "id": mid, "label": str(label_val), "parent": gid, "depth": 1,
                 "path": [gid, mid], "type": gkey, "children": [], "row": r,
-            })
+            }
+            member_node.update(_extract_decorations(r, config))
+            nodes.append(member_node)
             member_ids.append(mid)
             paths.append([gid, mid])  # grup → üye (her üye bir yol)
         nodes.append({
@@ -322,5 +419,149 @@ def _build_grouped(rows, config) -> Dict[str, Any]:
         "stats": {
             "node_count": len(nodes), "path_count": len(paths),
             "max_depth": 1 if nodes else 0, "warnings": warnings,
+        },
+    }
+
+
+# ---------------------------------------------------------------------------
+# DAG (Directed Acyclic Graph / Multi-parent Graph)
+# ---------------------------------------------------------------------------
+
+def _build_dag(rows: List[Dict[str, Any]], config: Dict[str, Any]) -> Dict[str, Any]:
+    """Çoklu ebeveynli (multi-parent) yönlendirilmiş çizge (DAG) yapısı kurar."""
+    id_col = config.get("id_col")
+    parent_col = config.get("parents_col") or config.get("parent_col") or config.get("prereqs_col")
+    label_col = config.get("label_col") or id_col
+    type_col = config.get("type_col")
+    root_value = config.get("root_value")
+    warnings: List[str] = []
+
+    if not id_col or not parent_col:
+        return _empty_result(["DAG için id_col ve parent_col (veya parents_col) gerekli."])
+
+    by_id: Dict[str, Dict[str, Any]] = {}
+    dup = 0
+    for r in rows:
+        nid = _norm_id(_cell(r, id_col))
+        if not nid:
+            continue
+        if nid in by_id:
+            dup += 1
+            continue
+
+        raw_parents = _cell(r, parent_col)
+        p_list: List[str] = []
+        if isinstance(raw_parents, str):
+            p_list = [p.strip() for p in re.split(r'[,;|]', raw_parents) if p.strip()]
+        elif isinstance(raw_parents, (list, tuple)):
+            p_list = [str(p).strip() for p in raw_parents if p is not None and str(p).strip()]
+        elif raw_parents not in (None, ""):
+            p_list = [str(raw_parents).strip()]
+
+        label_val = _cell(r, label_col)
+        node_data = {
+            "id": nid,
+            "label": str(label_val) if label_val is not None else nid,
+            "parents": p_list,
+            "parent": p_list[0] if p_list else "",
+            "depth": 0,
+            "path": [],
+            "type": str(_cell(r, type_col)) if type_col and _cell(r, type_col) is not None else "",
+            "children": [],
+            "row": r,
+        }
+        node_data.update(_extract_decorations(r, config))
+        by_id[nid] = node_data
+
+    if dup:
+        warnings.append(f"{dup} tekrarlı id atlandı.")
+
+    # Ebeveynleri doğrula & çocuk haritası kur
+    children: Dict[str, List[str]] = {nid: [] for nid in by_id}
+    in_degrees: Dict[str, int] = {nid: 0 for nid in by_id}
+
+    for nid, node in by_id.items():
+        valid_parents: List[str] = []
+        for p in node["parents"]:
+            if _is_root(p, root_value) or p == nid:
+                continue
+            if p not in by_id:
+                warnings.append(f"'{nid}'nin parent'ı '{p}' bulunamadı.")
+                continue
+            valid_parents.append(p)
+            children[p].append(nid)
+
+        node["parents"] = valid_parents
+        node["parent"] = valid_parents[0] if valid_parents else ""
+        in_degrees[nid] = len(valid_parents)
+
+    roots = [nid for nid, deg in in_degrees.items() if deg == 0]
+    if not roots and by_id:
+        warnings.append("DAG içinde döngü tespit edildi; 0 in-degree kök bulunamadı. İlk düğüm kök seçildi.")
+        first_id = next(iter(by_id))
+        roots = [first_id]
+        in_degrees[first_id] = 0
+
+    # Topolojik seviye (derinlik) ve yolları belirle
+    queue = list(roots)
+    depths: Dict[str, int] = {nid: 0 for nid in by_id}
+    paths_to_node: Dict[str, List[List[str]]] = {r: [[r]] for r in roots}
+    visited_topo = set()
+
+    while queue:
+        u = queue.pop(0)
+        visited_topo.add(u)
+        for v in children.get(u, []):
+            depths[v] = max(depths[v], depths[u] + 1)
+            if v not in paths_to_node:
+                paths_to_node[v] = []
+            if len(paths_to_node[v]) < 100:
+                for p in paths_to_node.get(u, []):
+                    if len(paths_to_node[v]) >= 100:
+                        break
+                    if v not in p:
+                        paths_to_node[v].append(p + [v])
+            in_degrees[v] -= 1
+            if in_degrees[v] == 0:
+                queue.append(v)
+
+    unvisited = set(by_id.keys()) - visited_topo
+    if unvisited:
+        warnings.append(f"DAG döngüsü nedeniyle {len(unvisited)} düğüm topolojik sıraya tam yerleştirilemedi.")
+        for u in unvisited:
+            depths[u] = max(depths.values(), default=0) + 1
+            paths_to_node.setdefault(u, [[u]])
+
+    for nid, node in by_id.items():
+        node["depth"] = depths.get(nid, 0)
+        node["children"] = children.get(nid, [])
+        node_paths = paths_to_node.get(nid, [[nid]])
+        node["path"] = node_paths[0] if node_paths else [nid]
+
+    # Yaprak yolları: köklerden çocuksuz düğümlere olan tam yollar
+    leaf_paths: List[List[str]] = []
+    for nid, node in by_id.items():
+        if not node["children"]:
+            leaf_paths.extend(paths_to_node.get(nid, []))
+
+    if not leaf_paths and roots:
+        leaf_paths = [[r] for r in roots]
+
+    max_return_paths = 500
+    if len(leaf_paths) > max_return_paths:
+        warnings.append(f"Toplam yol sayısı {len(leaf_paths)}; ilk {max_return_paths} yol döndürülüyor.")
+        leaf_paths = leaf_paths[:max_return_paths]
+
+    max_depth = max(depths.values(), default=0)
+
+    return {
+        "nodes": list(by_id.values()),
+        "roots": roots,
+        "paths": leaf_paths,
+        "stats": {
+            "node_count": len(by_id),
+            "path_count": len(leaf_paths),
+            "max_depth": max_depth,
+            "warnings": warnings,
         },
     }

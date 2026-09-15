@@ -18,6 +18,8 @@ import re
 import time
 import logging
 import sqlite3
+import datetime
+import decimal
 import sqlparse
 from typing import Any, Dict, List, Tuple
 
@@ -147,13 +149,77 @@ def _open_oracle(ds: Dict[str, Any]):
         raise QueryExecutionError(f"Oracle connection error: {err_msg}")
 
 
+def _open_postgres(ds: Dict[str, Any]):
+    try:
+        import psycopg2
+        import psycopg2.extras
+    except ImportError as exc:
+        raise QueryExecutionError(
+            "PostgreSQL driver (psycopg2) is not installed. Run `pip install psycopg2-binary`."
+        ) from exc
+
+    kwargs: Dict[str, Any] = {}
+    db_name = ds.get("database_name")
+    if db_name:
+        kwargs["dbname"] = db_name
+    host = ds.get("host")
+    if host:
+        kwargs["host"] = host
+    port = ds.get("port")
+    if port:
+        try:
+            kwargs["port"] = int(port)
+        except (ValueError, TypeError):
+            kwargs["port"] = port
+    user = ds.get("username")
+    if user:
+        kwargs["user"] = user
+    password = ds.get("password")
+    if password:
+        kwargs["password"] = password
+
+    try:
+        conn = psycopg2.connect(**kwargs)
+        conn.set_session(readonly=True, autocommit=True)
+        return conn
+    except Exception as e:
+        raise QueryExecutionError(f"PostgreSQL connection error: {str(e)}")
+
+
+def _convert_named_params_for_pg(sql: str, params: Dict[str, Any]) -> str:
+    """PostgreSQL için :param sözdizimini %(param)s biçimine dönüştürür."""
+    if not params:
+        return sql
+    def _repl(m):
+        key = m.group(1)
+        if key in params:
+            return f"%({key})s"
+        return m.group(0)
+    return re.sub(r'(?<!:):([A-Za-z_][A-Za-z0-9_]*)', _repl, sql)
+
+
+def _sanitize_val(v: Any) -> Any:
+    """Veritabanından dönen nesneleri JSON-safe tiplere çevirir."""
+    if v is None:
+        return None
+    if isinstance(v, (datetime.date, datetime.datetime)):
+        return v.isoformat()
+    if isinstance(v, decimal.Decimal):
+        return float(v) if (v % 1 != 0) else int(v)
+    if isinstance(v, bytes):
+        return v.decode("utf-8", errors="replace")
+    return v
+
+
 def _open_connection(ds: Dict[str, Any]):
     db_type = (ds.get("db_type") or "").lower()
     if db_type == "sqlite":
         return _open_sqlite(ds)
     if db_type == "oracle":
         return _open_oracle(ds)
-    if db_type in ("sqlserver", "postgres"):
+    if db_type in ("postgres", "postgresql"):
+        return _open_postgres(ds)
+    if db_type in ("sqlserver",):
         raise QueryExecutionError(f"{db_type} driver is not added yet (coming soon).")
     raise QueryExecutionError(f"Unknown data source type: {db_type}")
 
@@ -182,12 +248,17 @@ def execute_query(
     limit = max(1, min(int(limit or DEFAULT_LIMIT), MAX_LIMIT))
     _guard_readonly(sql)
     params = params or {}
+    db_type = (data_source.get("db_type") or "").lower()
 
     started = time.time()
     conn = _open_connection(data_source)
     try:
         cur = conn.cursor()
-        cur.execute(sql, params)
+        if db_type in ("postgres", "postgresql") and params:
+            sql_exec = _convert_named_params_for_pg(sql, params)
+        else:
+            sql_exec = sql
+        cur.execute(sql_exec, params)
         # fetchmany ile kes — SQL'i değiştirmeden evrensel limit.
         fetched = cur.fetchmany(limit + 1)
         truncated = len(fetched) > limit
@@ -203,11 +274,11 @@ def execute_query(
         rows: List[Dict[str, Any]] = []
         for r in rows_raw:
             if isinstance(r, dict):
-                rows.append(r)
+                rows.append({k: _sanitize_val(v) for k, v in r.items()})
             elif isinstance(r, sqlite3.Row):
-                rows.append({k: r[k] for k in r.keys()})
+                rows.append({k: _sanitize_val(r[k]) for k in r.keys()})
             else:
-                rows.append({columns[i]["name"]: v for i, v in enumerate(r)})
+                rows.append({columns[i]["name"]: _sanitize_val(v) for i, v in enumerate(r)})
 
         return {
             "columns": columns,
@@ -360,7 +431,7 @@ def get_tables(data_source: Dict[str, Any]) -> List[str]:
         sql = "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
     elif db_type == "oracle":
         sql = "SELECT table_name FROM user_tables ORDER BY table_name"
-    elif db_type == "postgres":
+    elif db_type in ("postgres", "postgresql"):
         sql = "SELECT tablename FROM pg_catalog.pg_tables WHERE schemaname != 'pg_catalog' AND schemaname != 'information_schema'"
     elif db_type == "mysql":
         sql = "SHOW TABLES"
@@ -672,7 +743,7 @@ def get_functions(data_source: Dict[str, Any]) -> List[Dict[str, Any]]:
               "packageName": pkg
           })
 
-    elif db_type == "postgres":
+    elif db_type in ("postgres", "postgresql"):
       cur.execute(
           "SELECT p.proname, 'FUNCTION' FROM pg_proc p "
           "JOIN pg_namespace n ON p.pronamespace = n.oid "

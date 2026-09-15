@@ -219,6 +219,11 @@
   }
 }
 
+.pd-act-map:hover {
+  background: rgb(var(--accent-tertiary, 96 165 250) / 0.2);
+  color: rgb(var(--accent-tertiary, 96 165 250));
+}
+
 .pd-act-del:hover {
   background: rgb(var(--danger, 240 70 70) / 0.15);
   color: rgb(var(--danger, 240 70 70));

@@ -66,6 +66,31 @@
         <i *ngIf="!loading" class="fas fa-sign-in-alt"></i>
         {{ loading ? ('LOGIN.LOGGING_IN' | translate) : ('LOGIN.LOGIN_BUTTON' | translate) }}
       </button>
+
+      <!-- Hızlı Test / Demo Hesapları -->
+      <div class="mt-5 pt-4 border-t border-edge/15">
+        <div class="flex items-center justify-between mb-2.5">
+          <span class="text-xs font-mono font-medium text-ink-secondary flex items-center gap-1.5">
+            <i class="fas fa-key text-brand text-[10px]"></i>
+            {{ 'LOGIN.DEMO_ACCOUNTS' | translate }}
+          </span>
+          <span class="text-[10px] text-ink-muted">Tek tıkla giriş</span>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <button
+            *ngFor="let cred of demoCredentials"
+            type="button"
+            (click)="loginAs(cred)"
+            [class]="'text-left p-2 rounded-lg border text-xs transition-all hover:scale-[1.02] cursor-pointer ' + cred.color"
+            [title]="cred.desc">
+            <div class="font-bold flex items-center justify-between gap-1.5 min-w-0">
+              <span class="truncate">{{ cred.role | translate }}</span>
+              <span class="text-[10px] opacity-75 font-mono shrink-0">{{ cred.username }}</span>
+            </div>
+            <div class="text-[10px] opacity-75 truncate mt-0.5">{{ cred.desc }}</div>
+          </button>
+        </div>
+      </div>
     </form>
 
     <!-- Footer -->

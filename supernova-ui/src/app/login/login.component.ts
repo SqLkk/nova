@@ -16,15 +16,16 @@ export class LoginComponent implements OnInit {
   loading = false;
   errorMessage = '';
   returnUrl = '';
-  selectedLanguage = 'en';
+  selectedLanguage = 'tr';
   currentYear = new Date().getFullYear();
 
   // Demo credentials gösterimi için
   demoCredentials = [
-    { username: 'admin', password: 'Sp7_Admin#9841', role: 'HARDCODED.ADMIN' },
-    { username: 'utku', password: 'Sp7_Super#4302', role: 'HARDCODED.DEVELOPER' },
-    { username: 'operator', password: 'Sp7_Operator#1520', role: 'HARDCODED.OPERATOR' },
-    { username: 'viewer', password: 'Sp7_Viewer#7611', role: 'HARDCODED.VIEWER' }
+    { username: 'admin', password: 'Sp7_Admin#9841', role: 'HARDCODED.ROLE_ADMIN', desc: 'Yönetici (ACL & Roller)', color: 'border-emerald-500/40 text-emerald-400 bg-emerald-500/10' },
+    { username: 'engineer', password: 'Sp7_Engineer#5544', role: 'HARDCODED.ROLE_ENGINEER', desc: 'Mühendis (Space Map & Araçlar)', color: 'border-cyan-500/40 text-cyan-400 bg-cyan-500/10' },
+    { username: 'operator', password: 'Sp7_Operator#1520', role: 'HARDCODED.ROLE_OPERATOR', desc: 'Düz User (İzleme & Alarmlar)', color: 'border-amber-500/40 text-amber-400 bg-amber-500/10' },
+    { username: 'utku', password: 'utku123', role: 'HARDCODED.ROLE_SUPERUSER', desc: 'Geliştirici (Full Yetki)', color: 'border-brand/40 text-brand bg-brand/10' },
+    { username: 'viewer', password: 'Sp7_Viewer#7611', role: 'HARDCODED.ROLE_VIEWER', desc: 'İzleyici (Salt Okunur)', color: 'border-slate-500/40 text-slate-400 bg-slate-500/10' }
   ];
 
   constructor(
@@ -34,8 +35,9 @@ export class LoginComponent implements OnInit {
     private route: ActivatedRoute,
     public translate: TranslateService
   ) {
-    // Dil ayarını localStorage'dan al veya varsayılan olarak en kullan
-    this.selectedLanguage = localStorage.getItem('selectedLanguage') || 'en';
+    // Dil ayarını localStorage'dan al veya varsayılan olarak tr kullan
+    this.selectedLanguage = localStorage.getItem('selectedLanguage') || 'tr';
+    translate.setDefaultLang('tr');
     translate.use(this.selectedLanguage);
     this.loginForm = this.formBuilder.group({
       username: ['', [Validators.required, Validators.minLength(3)]],
@@ -105,6 +107,14 @@ export class LoginComponent implements OnInit {
       username: credential.username,
       password: credential.password
     });
+  }
+
+  /**
+   * Demo credential ile anında giriş yap
+   */
+  loginAs(credential: any): void {
+    this.selectDemoCredential(credential);
+    setTimeout(() => this.onSubmit(), 50);
   }
 
   /**

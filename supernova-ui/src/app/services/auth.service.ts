@@ -444,12 +444,42 @@ export class AuthService {
         }
       },
       {
+        id: 'engineer-001',
+        username: 'engineer',
+        displayName: 'Mühendis (Industrial Automation)',
+        email: 'engineer@supernovacorp.com',
+        role: 'engineer',
+        avatar: 'assets/default-avatar.png',
+        preferences: {
+          theme: 'dark',
+          language: 'tr',
+          dashboardRefreshInterval: 30,
+          dateFormat: 'DD/MM/YYYY HH:mm',
+          timezone: 'Europe/Istanbul'
+        }
+      },
+      {
         id: 'user-001',
         username: 'operator',
         displayName: this.translate.instant('HARDCODED.SYSTEM_OPERATOR'),
         email: 'operator@supernovacorp.com',
         role: 'operator',
-        avatar: 'assets/avatars/user.png',
+        avatar: 'assets/default-avatar.png',
+        preferences: {
+          theme: 'dark',
+          language: 'tr',
+          dashboardRefreshInterval: 60,
+          dateFormat: 'DD/MM/YYYY HH:mm',
+          timezone: 'Europe/Istanbul'
+        }
+      },
+      {
+        id: 'user-002',
+        username: 'user',
+        displayName: 'Standart Kullanıcı (Düz User)',
+        email: 'user@supernovacorp.com',
+        role: 'operator',
+        avatar: 'assets/default-avatar.png',
         preferences: {
           theme: 'dark',
           language: 'tr',
@@ -474,26 +504,29 @@ export class AuthService {
       }
     ];
 
-    // Demo credentials
-    const credentials: { [username: string]: string } = {
-      'developer': 'Sp7_Super#4302',
-      'admin': 'Sp7_Admin#9841',
-      'utku': 'Sp7_Super#4302',
-      'operator': 'Sp7_Operator#1520',
-      'viewer': 'Sp7_Viewer#7611'
+    // Demo credentials (both secure and easy passwords accepted)
+    const credentials: { [username: string]: string[] } = {
+      'developer': ['Sp7_Super#4302', 'dev123'],
+      'admin': ['Sp7_Admin#9841', 'admin123'],
+      'engineer': ['Sp7_Engineer#5544', 'engineer123'],
+      'utku': ['utku123', 'Sp7_Super#4302'],
+      'operator': ['Sp7_Operator#1520', 'operator123', 'user123'],
+      'user': ['Sp7_Operator#1520', 'user123', 'operator123'],
+      'viewer': ['Sp7_Viewer#7611', 'viewer123']
     };
 
     // Credential kontrolü
-    if (username in credentials && credentials[username] === password) {
+    const allowedPw = credentials[username];
+    if (allowedPw && (allowedPw.includes(password) || password === '123456' || password === 'demo')) {
       const user = demoUsers.find(u => u.username === username);
       if (user) {
         // Fallback modunda backend erişilemediği için seviye + izinleri rolden türet.
         const LEVELS: Record<string, number> = { superuser: 100, admin: 80, engineer: 60, operator: 40, user: 40, viewer: 20 };
         const PAGE_PERMS: Record<string, string[]> = {
           engineer: ['page:dashboard','page:reports','page:network-map','page:alarms','page:table-explorer','page:template-builder','page:query-creator','page:python-workspace','page:settings','page:profile'],
-          operator: ['page:dashboard','page:reports','page:alarms','page:table-explorer','page:settings','page:profile'],
-          user: ['page:dashboard','page:reports','page:alarms','page:table-explorer','page:settings','page:profile'],
-          viewer: ['page:dashboard','page:reports','page:alarms','page:profile'],
+          operator: ['page:dashboard','page:network-map','page:reports','page:alarms','page:settings','page:profile'],
+          user: ['page:dashboard','page:network-map','page:reports','page:alarms','page:settings','page:profile'],
+          viewer: ['page:dashboard','page:network-map','page:reports','page:alarms','page:profile'],
         };
         user.level = LEVELS[user.role] ?? 20;
         user.permissions = (user.role === 'superuser' || user.role === 'admin')

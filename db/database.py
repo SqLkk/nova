@@ -39,6 +39,7 @@ PERMISSION_CATALOG = [
         ('page:template-builder', 'Template Builder'),
         ('page:query-creator', 'Query Creator'),
         ('page:python-workspace', 'Python Workspace'),
+        ('page:schedules', 'Zamanlayıcı (Schedules)'),
         ('page:admin', 'Admin Panel'),
         ('page:settings', 'Ayarlar'),
         ('page:profile', 'Profil'),
@@ -63,6 +64,7 @@ PERMISSION_CATALOG = [
         ('share:queries', 'Sorgu paylaşımı'),
         ('share:scripts', 'Python script paylaşımı'),
         ('share:dashboards', 'Dashboard paylaşımı'),
+        ('share:schedules', 'Schedule paylaşımı'),
     ]},
     {'group': 'datasources', 'permissions': [
         ('datasource:view', 'Veri kaynaklarını görüntüle'),
@@ -296,6 +298,51 @@ CREATE TABLE IF NOT EXISTS audit_log (
 CREATE INDEX IF NOT EXISTS idx_audit_ts    ON audit_log(ts);
 CREATE INDEX IF NOT EXISTS idx_audit_actor ON audit_log(actor_uid);
 CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_log(action);
+
+-- Evrensel Dinamik Rapor Zamanlayıcı (Universal Dynamic Report Scheduler)
+CREATE TABLE IF NOT EXISTS report_schedules (
+    id                   TEXT PRIMARY KEY,
+    name                 TEXT NOT NULL,
+    description          TEXT NOT NULL DEFAULT '',
+    template_id          TEXT NOT NULL REFERENCES report_templates(id) ON DELETE CASCADE,
+    frequency            TEXT NOT NULL DEFAULT 'daily',  -- hourly | daily | weekly | monthly | cron | manual
+    cron_expression      TEXT NOT NULL DEFAULT '',       -- e.g. '0 6 * * *'
+    window_type          TEXT NOT NULL DEFAULT 'yesterday', -- yesterday | today | last_24h | last_7d | last_30d | this_week | last_week | this_month | last_month | custom
+    custom_window_config TEXT DEFAULT '{}',              -- JSON: { offset_days, duration_days, offset_hours, duration_hours }
+    params_override      TEXT DEFAULT '{}',              -- JSON: fixed extra params or query overrides
+    output_format        TEXT NOT NULL DEFAULT 'xlsx',   -- xlsx | pdf
+    recipients           TEXT DEFAULT '[]',              -- JSON: array of email or webhook targets
+    is_active            INTEGER NOT NULL DEFAULT 1,
+    last_run_at          TEXT DEFAULT '',
+    last_run_status      TEXT DEFAULT '',                -- success | failed | running
+    next_run_at          TEXT DEFAULT '',
+    owner_id             TEXT DEFAULT '',
+    allowed_roles        TEXT DEFAULT '[]',
+    allowed_users        TEXT DEFAULT '[]',
+    created_at           TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at           TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS report_schedule_runs (
+    id               TEXT PRIMARY KEY,
+    schedule_id      TEXT NOT NULL REFERENCES report_schedules(id) ON DELETE CASCADE,
+    template_id      TEXT NOT NULL,
+    reference_date   TEXT NOT NULL,                  -- Hesaplama referans tarihi (YYYY-MM-DD HH:MM:SS)
+    window_type      TEXT NOT NULL,
+    start_time       TEXT NOT NULL,                  -- Çözümlenen pencere başlangıcı
+    end_time         TEXT NOT NULL,                  -- Çözümlenen pencere bitişi
+    resolved_params  TEXT DEFAULT '{}',              -- JSON: query'lere enjekte edilen parametreler
+    output_format    TEXT NOT NULL,
+    output_file_path TEXT DEFAULT '',
+    output_file_size INTEGER DEFAULT 0,
+    status           TEXT NOT NULL DEFAULT 'running', -- running | success | failed
+    duration_ms      INTEGER DEFAULT 0,
+    error_message    TEXT DEFAULT '',
+    executed_by      TEXT DEFAULT 'scheduler',
+    created_at       TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_sched_runs_sched  ON report_schedule_runs(schedule_id);
+CREATE INDEX IF NOT EXISTS idx_sched_runs_status ON report_schedule_runs(status);
 """
 
 def _generate_salt() -> str:
@@ -405,7 +452,7 @@ class Database:
         demo_users = [
             ('u_developer', 'developer', 'Geliştirici (Superuser)', 'developer@supernovacorp.com', 'superuser', 'Sp7_Super#4302'),
             ('u_admin',     'admin',     'System Admin',            'admin@supernovacorp.com',     'admin',     'Sp7_Admin#9841'),
-            ('u_utku',      'utku',      'Geliştirici',             'utku@supernovacorp.com',      'superuser', 'Sp7_Super#4302'),
+            ('u_utku',      'utku',      'Geliştirici',             'utku@supernovacorp.com',      'superuser', 'utku123'),
             ('u_operator',  'operator',  'System Operator',         'operator@supernovacorp.com',  'operator',  'Sp7_Operator#1520'),
             ('u_viewer',    'viewer',    'Viewer',                  'viewer@supernovacorp.com',    'viewer',    'Sp7_Viewer#7611'),
         ]

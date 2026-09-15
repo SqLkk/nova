@@ -1,2975 +1,2036 @@
-import { Component, OnInit, OnDestroy, ChangeDetectionStrategy, ChangeDetectorRef, ViewChild, ElementRef, AfterViewInit, HostListener } from '@angular/core';
-import { Router } from '@angular/router';
-import { NetworkMapService, NetworkNode, NetworkMapData, ElementNode } from '../../services/network-map.service';
-import { ApiService } from '../../services/api.service';
-import { AuthService } from '../../services/auth.service';
-import { AlarmsService } from '../../services/alarms.service';
+import {
+  Component, OnInit, OnDestroy, AfterViewInit, ChangeDetectionStrategy,
+  ChangeDetectorRef, ViewChild, ElementRef, HostListener,
+} from '@angular/core';
+import { Router, ActivatedRoute } from '@angular/router';
+import { forkJoin, Subscription, fromEvent } from 'rxjs';
+import { throttleTime } from 'rxjs/operators';
+import { TranslateService } from '@ngx-translate/core';
 import { DataSourceSelectionService } from '../../services/data-source-selection.service';
 import { PathService } from '../../services/path.service';
-import { PathDef } from '../../models/path-def.model';
 import { QueryService } from '../../services/query.service';
-import { Report } from '../../models/report.model';
-import { Subscription, fromEvent, forkJoin } from 'rxjs';
-import { debounceTime, throttleTime } from 'rxjs/operators';
-import { TranslateService } from '@ngx-translate/core';
-import { CHART_PALETTE, BRAND, STATUS } from '../../shared/theme/palette';
-import { ThemeColors } from '../../shared/theme/theme-colors';
+import { ApiService } from '../../services/api.service';
+import { AuthService } from '../../services/auth.service';
+import { DashboardEditService, Widget } from '../../services/dashboard-edit.service';
+import { BuiltStructure, PathDef } from '../../models/path-def.model';
+import { SavedQuery } from '../../models/query.model';
 
 // ============================================================================
-// INTERFACES
+// Space Map — Çok temalı, interaktif hiyerarşi görselleştirme motoru.
+// 5 farklı endüstriyel ve görsel tema: Kozmik, Fabrika, Siber Ağ, Blueprint, Kristal.
+// Canvas 2D + leaf-ağırlıklı radial layout + drill-down + FontAwesome canvas glyphs.
 // ============================================================================
 
-interface ViewMode {
-  mode: 'overview' | 'station' | 'voltage' | 'equipment';
-  selectedNode: NetworkNode | null;
-  zoomLevel: number;
-  targetZoom: number;
-  panOffset: { x: number; y: number };
-  minZoom: number;
-  maxZoom: number;
+export type SpaceMapTheme = 'cosmic' | 'factory' | 'cyber' | 'blueprint' | 'crystal';
+export type SpaceMapShape = 'auto' | 'planet' | 'hexagon' | 'cyber' | 'blueprint' | 'diamond' | 'circle';
+
+export interface SpaceMapConfig {
+  theme: SpaceMapTheme;
+  nodeShape: SpaceMapShape;
+  color1: string;
+  color2: string;
+  color3: string;
+  level1Icon: string;
+  level2Icon: string;
+  level3Icon: string;
+  showOrbits: boolean;
+  showGrid: boolean;
+  layout?: 'radial' | 'spiral';
 }
 
-interface InteractionState {
-  isDragging: boolean;
-  dragStart: { x: number; y: number };
-  lastDragPos: { x: number; y: number };
-  mousePos: { x: number; y: number };
-  hoveredNode: NetworkNode | null;
-  hoveredElement: ElementNode | null;
-  selectedElements: Set<string>;
+export interface AvailableIcon {
+  id: string;
+  label: string;
+  glyph: string;
 }
 
-interface NodeStatus {
-  online: number;
-  offline: number;
-  alarm: number;
-  warning: number;
-}
+export const AVAILABLE_ICONS: AvailableIcon[] = [
+  // Genel & Uzay
+  { id: 'fa-sun', label: 'Güneş / Yıldız', glyph: '\uf185' },
+  { id: 'fa-globe', label: 'Gezegen / Dünya', glyph: '\uf0ac' },
+  { id: 'fa-satellite', label: 'Uydu', glyph: '\uf7bf' },
+  { id: 'fa-rocket', label: 'Roket', glyph: '\uf135' },
+  { id: 'fa-meteor', label: 'Meteor / Asteroit', glyph: '\uf753' },
+  { id: 'fa-atom', label: 'Atom / Çekirdek', glyph: '\uf5d2' },
+  // Endüstriyel
+  { id: 'fa-industry', label: 'Fabrika / Tesis', glyph: '\uf275' },
+  { id: 'fa-cogs', label: 'Dişliler / Mekanizma', glyph: '\uf085' },
+  { id: 'fa-wrench', label: 'Bakım / Alet', glyph: '\uf0ad' },
+  { id: 'fa-robot', label: 'Robot / Otomasyon', glyph: '\uf544' },
+  { id: 'fa-bolt', label: 'Güç / Elektrik', glyph: '\uf0e7' },
+  { id: 'fa-warehouse', label: 'Depo / Ambar', glyph: '\uf494' },
+  // Siber & IT
+  { id: 'fa-server', label: 'Sunucu / Host', glyph: '\uf233' },
+  { id: 'fa-database', label: 'Veritabanı', glyph: '\uf1c0' },
+  { id: 'fa-network-wired', label: 'Ağ / Network', glyph: '\uf6ff' },
+  { id: 'fa-microchip', label: 'Mikroçip / CPU', glyph: '\uf2db' },
+  { id: 'fa-wifi', label: 'Kablosuz / IoT', glyph: '\uf1eb' },
+  { id: 'fa-shield-alt', label: 'Güvenlik / Koruma', glyph: '\uf3ed' },
+  { id: 'fa-terminal', label: 'Terminal / Kod', glyph: '\uf120' },
+  // Mimari & Blueprint
+  { id: 'fa-layer-group', label: 'Katman / Modül', glyph: '\uf5fd' },
+  { id: 'fa-sitemap', label: 'Hiyerarşi Şeması', glyph: '\uf0e8' },
+  { id: 'fa-drafting-compass', label: 'Tasarım / Pergel', glyph: '\uf568' },
+  { id: 'fa-cubes', label: 'Bileşenler / Küpler', glyph: '\uf1b3' },
+  { id: 'fa-project-diagram', label: 'Proje Şeması', glyph: '\uf542' },
+  // Kristal & Değer
+  { id: 'fa-gem', label: 'Mücevher / Kristal', glyph: '\uf3a5' },
+  { id: 'fa-cube', label: 'Blok / Matris', glyph: '\uf1b2' },
+  { id: 'fa-dice-d20', label: 'Prizma (D20)', glyph: '\uf6cf' },
+  { id: 'fa-certificate', label: 'Rozet / Sertifika', glyph: '\uf0a3' },
+];
 
-interface VisibleBounds {
-  minX: number;
-  maxX: number;
-  minY: number;
-  maxY: number;
-}
+export const THEME_PRESETS: Record<SpaceMapTheme, Omit<SpaceMapConfig, 'theme'>> = {
+  cosmic: {
+    nodeShape: 'planet',
+    color1: '#60A5FA',
+    color2: '#22D3EE',
+    color3: '#A78BFA',
+    level1Icon: 'fa-sun',
+    level2Icon: 'fa-globe',
+    level3Icon: 'fa-satellite',
+    showOrbits: true,
+    showGrid: true,
+  },
+  factory: {
+    nodeShape: 'hexagon',
+    color1: '#F59E0B',
+    color2: '#10B981',
+    color3: '#06B6D4',
+    level1Icon: 'fa-industry',
+    level2Icon: 'fa-cogs',
+    level3Icon: 'fa-microchip',
+    showOrbits: true,
+    showGrid: true,
+  },
+  cyber: {
+    nodeShape: 'cyber',
+    color1: '#00FF9D',
+    color2: '#00F0FF',
+    color3: '#FF007F',
+    level1Icon: 'fa-server',
+    level2Icon: 'fa-network-wired',
+    level3Icon: 'fa-microchip',
+    showOrbits: true,
+    showGrid: true,
+  },
+  blueprint: {
+    nodeShape: 'blueprint',
+    color1: '#38BDF8',
+    color2: '#818CF8',
+    color3: '#F472B6',
+    level1Icon: 'fa-layer-group',
+    level2Icon: 'fa-sitemap',
+    level3Icon: 'fa-drafting-compass',
+    showOrbits: true,
+    showGrid: true,
+  },
+  crystal: {
+    nodeShape: 'diamond',
+    color1: '#EC4899',
+    color2: '#8B5CF6',
+    color3: '#06B6D4',
+    level1Icon: 'fa-gem',
+    level2Icon: 'fa-atom',
+    level3Icon: 'fa-certificate',
+    showOrbits: true,
+    showGrid: true,
+  },
+};
 
-interface ActionPath {
-  path: string;
-  b1: string;
-  b2: string;
-  b3: string;
-  element: string;
-  info: string;
-  nimSatz?: number;
-}
+const FA_GLYPHS: Record<string, string> = {};
+AVAILABLE_ICONS.forEach(item => {
+  FA_GLYPHS[item.id] = item.glyph;
+  FA_GLYPHS[item.id.replace('fa-', '')] = item.glyph;
+});
+FA_GLYPHS['gear'] = '\uf013';
+FA_GLYPHS['gears'] = '\uf085';
+FA_GLYPHS['cpu'] = '\uf2db';
+FA_GLYPHS['shield'] = '\uf3ed';
+FA_GLYPHS['circle'] = '\uf111';
 
-// ============================================================================
-// COMPONENT
-// ============================================================================
+/** Render için iç düğüm modeli (PathNode'dan türetilir, layout koordinatları eklenir). */
+interface RNode {
+  id: string;
+  label: string;
+  depth: number;          // orijinal ağaç derinliği (data)
+  parentId: string | null;
+  children: RNode[];
+  leafCount: number;      // alt ağacındaki yaprak sayısı (layout ağırlığı)
+  x: number;
+  y: number;
+  ring: number;           // focus'a göre ring offseti (layout sırasında set)
+  row?: Record<string, unknown>;
+}
 
 @Component({
   standalone: false,
   selector: 'app-network-map-optimized',
   templateUrl: './network-map.component.html',
   styleUrls: ['./network-map.component.scss'],
-  changeDetection: ChangeDetectionStrategy.OnPush
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDestroy {
-  
-  // ============================================================================
-  // VIEW CHILDREN
-  // ============================================================================
-  
   @ViewChild('networkCanvas', { static: false }) canvasRef!: ElementRef<HTMLCanvasElement>;
   @ViewChild('mapContainer', { static: false }) containerRef!: ElementRef<HTMLDivElement>;
-  
-  // ============================================================================
-  // STATE MANAGEMENT
-  // ============================================================================
-  
-  networkData: NetworkMapData | null = null;
-  isLoading = true;
-  error: string | null = null;
-  
-  viewMode: ViewMode = {
-    mode: 'overview',
-    selectedNode: null,
-    zoomLevel: 1.0,
-    targetZoom: 1.0,
-    panOffset: { x: 0, y: 0 },
-    minZoom: 0.3,
-    maxZoom: 4.0
-  };
-  
-  interaction: InteractionState = {
-    isDragging: false,
-    dragStart: { x: 0, y: 0 },
-    lastDragPos: { x: 0, y: 0 },
-    mousePos: { x: 0, y: 0 },
-    hoveredNode: null,
-    hoveredElement: null,
-    selectedElements: new Set()
-  };
-  
-  totalStats: NodeStatus = { online: 0, offline: 0, alarm: 0, warning: 0 };
-  
-  // Filters
-  searchTerm = '';
-  statusFilter: string[] = ['online', 'offline', 'alarm', 'warning'];
-  levelFilter: string[] = ['B1', 'B2', 'B3'];
-  
-  // Performance optimization
-  private canvas: HTMLCanvasElement | null = null;
-  private ctx: CanvasRenderingContext2D | null = null;
-  private animationFrameId: number | null = null;
-  private visibleNodes: Set<string> = new Set();
-  private nodeCache: Map<string, any> = new Map();
-  private stationLabelCache: Map<string, string[]> = new Map();
-  private stationConnections: Array<{ from: NetworkNode; to: NetworkNode; distance: number }> = [];
-  private maxStationConnections = 3;
-  private maxConnectionDistance = 650;
-  private lastRenderTime = 0;
-  private fps = 60;
-  private frameInterval = 1000 / this.fps;
-  private needsRender = true;
-  private hasVisibleAlarm = false;
-  private backgroundCache: HTMLCanvasElement | null = null;
-  private resizeObserver: ResizeObserver | null = null;
-  private resizeRafId: number | null = null;
-  private lastCanvasSize = { width: 0, height: 0 };
-  private elementHitAreas: Array<{ element: ElementNode; x: number; y: number; width: number; height: number }> = [];
 
-  // Action drawer state
-  actionDrawerOpen = false;
-  actionSearchQuery = '';
-  actionCandidates: ActionPath[] = [];
-  actionSelectedPaths = new Set<string>();
-  actionWidgetType: 'line-chart' | 'value-card' | 'gauge' = 'line-chart';
-  actionFeedback = '';
-  actionSearchHint = '';
-  actionMaxResults = 200;
-  selectedElement: ElementNode | null = null;
-  
-  // Alarm badge state
-
-  
-  // Related reports
-  relatedReports: Report[] = [];
-  relatedReportsLoading = false;
-  
-  // Space Map configuration properties
+  // ---- Veri ----
   dataSources: any[] = [];
-  pathsList: any[] = [];
-  filteredPaths: any[] = [];
   selectedDataSourceId: string | null = null;
+
+  queries: SavedQuery[] = [];
+  paths: PathDef[] = [];
+  filteredPaths: PathDef[] = [];
   selectedPathId: string | null = null;
-  selectedPath: any | null = null;
-  spaceMapConfig: any = null;
-  showSetupWizard = false;
-  wizardConfig: any = {
+  selectedPath: PathDef | null = null;
+
+  isLoading = false;
+  error: string | null = null;
+  warnings: string[] = [];
+
+  // ---- Tema & Özelleştirme ----
+  showThemeModal = false;
+  themeConfig: SpaceMapConfig = {
     theme: 'cosmic',
-    layout: 'orbital',
+    nodeShape: 'planet',
+    layout: 'radial',
+    color1: '#60A5FA',
+    color2: '#22D3EE',
+    color3: '#A78BFA',
     level1Icon: 'fa-sun',
     level2Icon: 'fa-globe',
     level3Icon: 'fa-satellite',
-    color1: '#a855f7',
-    color2: '#ec4899',
-    color3: '#06b6d4'
+    showOrbits: true,
+    showGrid: true,
   };
-  isAdminOrEngineer = false;
-  toastMessage = '';
+  readonly availableIcons = AVAILABLE_ICONS;
+  readonly availableShapes: { id: SpaceMapShape; labelKey: string }[] = [
+    { id: 'auto', labelKey: 'NETWORK_MAP.SHAPE_AUTO' },
+    { id: 'planet', labelKey: 'NETWORK_MAP.SHAPE_PLANET' },
+    { id: 'hexagon', labelKey: 'NETWORK_MAP.SHAPE_HEXAGON' },
+    { id: 'cyber', labelKey: 'NETWORK_MAP.SHAPE_CYBER' },
+    { id: 'blueprint', labelKey: 'NETWORK_MAP.SHAPE_BLUEPRINT' },
+    { id: 'diamond', labelKey: 'NETWORK_MAP.SHAPE_DIAMOND' },
+    { id: 'circle', labelKey: 'NETWORK_MAP.SHAPE_CIRCLE' },
+  ];
+  readonly presetList: { id: SpaceMapTheme; icon: string; nameKey: string; desc: string }[] = [
+    { id: 'cosmic', icon: 'fa-satellite', nameKey: 'NETWORK_MAP.THEME_COSMIC', desc: '🪐 Yıldızlar, gezegenler ve yörünge halkaları' },
+    { id: 'factory', icon: 'fa-industry', nameKey: 'NETWORK_MAP.THEME_FACTORY', desc: '🏭 CAD ızgarası, perçinli altıgenler ve boru hatları' },
+    { id: 'cyber', icon: 'fa-network-wired', nameKey: 'NETWORK_MAP.THEME_CYBER', desc: '⚡ Neon matris, çip köşebentleri ve lazer hatları' },
+    { id: 'blueprint', icon: 'fa-drafting-compass', nameKey: 'NETWORK_MAP.THEME_BLUEPRINT', desc: '📐 Mühendislik mavisi, milimetrik grid ve teknik çizgiler' },
+    { id: 'crystal', icon: 'fa-gem', nameKey: 'NETWORK_MAP.THEME_CRYSTAL', desc: '💎 Kuvars fasetleri, prizmatik aurora ve ışık huzmeleri' },
+  ];
+  private hasFitted = false;
+
+  // ---- Hiyerarşi (render modeli) ----
+  private roots: RNode[] = [];
+  private nodeMap = new Map<string, RNode>();
+  /** null = overview (kökler ring 1); aksi halde focus düğümü merkeze koy. */
+  focusId: string | null = null;
+  /** Şu anda layout'lanıp ekrana gelen pencere (culling + hit-test için). */
+  private renderNodes: RNode[] = [];
+  totalNodes = 0;
+  maxDepth = 0;
+
+  // ---- Etkileşim / görünüm ----
+  selectedNode: RNode | null = null;
+  hoveredNode: RNode | null = null;
+  private view = { zoom: 1, targetZoom: 1, panX: 0, panY: 0 };
+  private readonly minZoom = 0.15;
+  private readonly maxZoom = 3;
+
+  // ---- Arama ----
+  searchTerm = '';
+  searchResults: RNode[] = [];
+  searchHint = '';
+
+  // ---- Yetki ----
+  canManage = false;
+
+  // ---- Toast ----
+  toast = '';
   toastType: 'success' | 'error' = 'success';
-  
-  // Subscriptions
-  private subscriptions: Subscription[] = [];
-  
-  // ============================================================================
-  // LIFECYCLE HOOKS
-  // ============================================================================
-  
+
+  // ---- Canvas / render altyapısı ----
+  private canvas: HTMLCanvasElement | null = null;
+  private ctx: CanvasRenderingContext2D | null = null;
+  private rafId: number | null = null;
+  private needsRender = true;
+  private zoomAnimating = false;
+  private bgCache: HTMLCanvasElement | null = null;
+  private bgCacheSize = { w: 0, h: 0 };
+  private labelCache = new Map<string, string>();
+  private resizeObserver: ResizeObserver | null = null;
+  private resizeRaf: number | null = null;
+  private dragState = { active: false, moved: false, lastX: 0, lastY: 0, startX: 0, startY: 0 };
+
+  private readonly subs: Subscription[] = [];
+
+  // ---- Layout sabitleri ----
+  private readonly RING_RADIUS = 235;          // ring başına dünya birimi
+  private readonly MAX_DRILL_RING = 2;         // focus + 2 ring (drill-down pencere)
+  private readonly NODE_RADIUS_BY_RING = [30, 20, 14, 10, 8, 7];
+  /** Derinliğe göre sade serin palet (steel → sky → cyan → violet → gold). */
+  private readonly LEVEL_COLORS = ['#9DB4D1', '#60A5FA', '#22D3EE', '#A78BFA', '#F5B301'];
+  private readonly MAX_SEARCH_RESULTS = 12;
+  private readonly MAX_LABEL_LEN = 16;
+
   constructor(
-    private networkMapService: NetworkMapService,
-    private apiService: ApiService,
-    private authService: AuthService,
-    private alarmsService: AlarmsService,
-    private cdr: ChangeDetectorRef,
-    private router: Router,
-    private translate: TranslateService,
-    private themeColors: ThemeColors,
-    public dss: DataSourceSelectionService,
+    private dss: DataSourceSelectionService,
     private pathService: PathService,
-    private queryService: QueryService
+    private queryService: QueryService,
+    private apiService: ApiService,
+    private dashEdit: DashboardEditService,
+    private auth: AuthService,
+    private router: Router,
+    private route: ActivatedRoute,
+    private translate: TranslateService,
+    private cdr: ChangeDetectorRef,
   ) {}
-  
+
+  private initialPathId: string | null = null;
+  private initialDataSourceId: string | null = null;
+
+  // ===========================================================================
+  // Lifecycle
+  // ===========================================================================
+
   ngOnInit(): void {
-    this.isAdminOrEngineer = this.authService.hasRole('engineer') || 
-                             this.authService.hasRole('admin') || 
-                             this.authService.hasRole('superuser');
-    
-    // Load datasources
+    this.canManage = this.auth.hasRole('engineer');
     this.dss.load();
-    this.subscriptions.push(
+
+    this.subs.push(
+      this.route.queryParams.subscribe(params => {
+        if (params['pathId']) {
+          this.initialPathId = params['pathId'];
+        }
+        if (params['dataSourceId']) {
+          this.initialDataSourceId = params['dataSourceId'];
+          this.selectedDataSourceId = params['dataSourceId'];
+        }
+      })
+    );
+
+    this.subs.push(
       this.dss.dataSources$.subscribe(list => {
         this.dataSources = list || [];
         if (!this.selectedDataSourceId && this.dss.selectedId) {
           this.selectedDataSourceId = this.dss.selectedId;
         }
         this.loadQueriesAndPaths();
-      })
+      }),
     );
 
-    // Subscribe to selected datasource changes
-    this.subscriptions.push(
+    this.subs.push(
       this.dss.selectedId$.subscribe(id => {
         if (id && id !== this.selectedDataSourceId) {
           this.selectedDataSourceId = id;
-          this.filterPathsByDataSource();
-          if (this.filteredPaths.length > 0) {
-            this.selectedPathId = this.filteredPaths[0].id;
-            this.loadSelectedPath(this.selectedPathId);
-          } else {
-            this.selectedPathId = null;
-            this.selectedPath = null;
-            this.networkData = null;
-            this.invalidateRenderCaches();
-          }
-          this.cdr.markForCheck();
+          this.onDataSourceChange();
         }
-      })
+      }),
     );
-
-    this.setupRealTimeUpdates();
-    this.loadAlarmBadges();
   }
-  
+
   ngAfterViewInit(): void {
-    this.initializeCanvas();
-    this.setupEventListeners();
+    this.initCanvas();
+    this.bindEvents();
     this.startRenderLoop();
-    
-    // Resize observer
+
     this.resizeObserver = new ResizeObserver(() => {
-      if (this.resizeRafId !== null) {
-        cancelAnimationFrame(this.resizeRafId);
-      }
-      this.resizeRafId = requestAnimationFrame(() => {
-        this.resizeRafId = null;
-        this.handleResize();
+      if (this.resizeRaf !== null) cancelAnimationFrame(this.resizeRaf);
+      this.resizeRaf = requestAnimationFrame(() => {
+        this.resizeRaf = null;
+        this.resizeCanvas();
       });
     });
-    
-    if (this.containerRef) {
-      this.resizeObserver.observe(this.containerRef.nativeElement);
-    }
+    if (this.containerRef) this.resizeObserver.observe(this.containerRef.nativeElement);
   }
-  
+
   ngOnDestroy(): void {
-    this.subscriptions.forEach(sub => sub.unsubscribe());
-    if (this.animationFrameId) {
-      cancelAnimationFrame(this.animationFrameId);
-    }
-    if (this.resizeObserver) {
-      this.resizeObserver.disconnect();
-      this.resizeObserver = null;
-    }
-    if (this.resizeRafId !== null) {
-      cancelAnimationFrame(this.resizeRafId);
-      this.resizeRafId = null;
-    }
+    this.subs.forEach(s => s.unsubscribe());
+    if (this.rafId !== null) cancelAnimationFrame(this.rafId);
+    if (this.resizeObserver) this.resizeObserver.disconnect();
+    if (this.resizeRaf !== null) cancelAnimationFrame(this.resizeRaf);
   }
-  
-  // ============================================================================
-  // DATA LOADING
-  // ============================================================================
-  
-  loadQueriesAndPaths(): void {
+
+  // ===========================================================================
+  // Veri yükleme — her DB için ayrı, otomatik
+  // ===========================================================================
+
+  private loadQueriesAndPaths(): void {
     forkJoin({
       queries: this.queryService.list(),
-      paths: this.pathService.list()
+      paths: this.pathService.list(),
     }).subscribe({
-      next: (res) => {
-        this.queriesList = res.queries.data || [];
-        this.pathsList = res.paths.data || [];
+      next: ({ queries, paths }) => {
+        this.queries = (queries.data as SavedQuery[]) || [];
+        this.paths = (paths.data as PathDef[]) || [];
         this.filterPathsByDataSource();
-        if (!this.selectedPathId && this.filteredPaths.length > 0) {
-          this.selectedPathId = this.filteredPaths[0].id;
-          this.loadSelectedPath(this.selectedPathId);
+
+        // Eğer URL query params'tan belirli bir pathId geldiyse onu doğrudan seç ve aç
+        if (this.initialPathId) {
+          const target = this.paths.find(p => p.id === this.initialPathId);
+          if (target) {
+            const q = this.queries.find(x => x.id === target.queryId);
+            const dsId = (q as any)?.dataSourceId || (q as any)?.data_source_id;
+            if (dsId && dsId !== this.selectedDataSourceId) {
+              this.selectedDataSourceId = dsId;
+              this.filterPathsByDataSource();
+            }
+            this.selectedPathId = target.id;
+            this.onSelectPath(target.id);
+            this.initialPathId = null;
+            this.cdr.markForCheck();
+            return;
+          }
         }
+
+        // İlk yüklemede bu DB için ilk path'i otomatik seç.
+        if (!this.selectedPathId) this.autoSelectFirstPath();
         this.cdr.markForCheck();
-      }
+      },
+      error: () => {
+        this.queries = [];
+        this.paths = [];
+        this.filteredPaths = [];
+        this.cdr.markForCheck();
+      },
     });
   }
 
+  /** Path'leri seçili datasource'a göre filtrele (query → dataSourceId haritası). */
   filterPathsByDataSource(): void {
     if (!this.selectedDataSourceId) {
-      this.filteredPaths = this.pathsList;
+      this.filteredPaths = this.paths;
       return;
     }
-    const queryMap = new Map<string, string>();
-    this.queriesList.forEach(q => {
-      queryMap.set(q.id, q.dataSourceId || q.data_source_id);
-    });
-    this.filteredPaths = this.pathsList.filter(p => {
-      const dsId = queryMap.get(p.queryId);
+    const dsByQuery = new Map<string, string>();
+    this.queries.forEach(q => dsByQuery.set(q.id, (q as any).dataSourceId || (q as any).data_source_id));
+    this.filteredPaths = this.paths.filter(p => {
+      const dsId = dsByQuery.get((p as any).queryId);
       return !dsId || dsId === this.selectedDataSourceId;
     });
   }
 
-  loadSelectedPath(pathId: string): void {
-    if (!pathId || pathId === 'null') {
-      this.selectedPath = null;
-      this.selectedPathId = null;
-      this.networkData = null;
-      this.invalidateRenderCaches();
-      this.cdr.markForCheck();
-      return;
-    }
-
-    this.isLoading = true;
-    this.error = null;
-    this.cdr.markForCheck();
-
-    this.pathService.get(pathId).subscribe({
-      next: (pathRes) => {
-        const pathDef = pathRes.data;
-        if (!pathDef) {
-          this.error = 'Path definition not found.';
-          this.isLoading = false;
-          this.cdr.markForCheck();
-          return;
-        }
-
-        this.selectedPath = pathDef;
-        
-        // Parse config and check if spaceMapConfig exists
-        const spaceMapConfig = (pathDef.config as any)?.spaceMapConfig;
-        if (!spaceMapConfig) {
-          // Setup wizard needs to be shown!
-          this.spaceMapConfig = null;
-          this.showSetupWizard = true;
-          this.isLoading = false;
-          this.cdr.markForCheck();
-          return;
-        }
-
-        this.spaceMapConfig = spaceMapConfig;
-        this.showSetupWizard = false;
-        
-        // Populate wizardConfig with selected config for edits
-        this.wizardConfig = {
-          theme: spaceMapConfig.theme || 'cosmic',
-          layout: spaceMapConfig.layout || 'orbital',
-          level1Icon: spaceMapConfig.level1Icon || 'fa-sun',
-          level2Icon: spaceMapConfig.level2Icon || 'fa-globe',
-          level3Icon: spaceMapConfig.level3Icon || 'fa-satellite',
-          color1: spaceMapConfig.color1 || '#a855f7',
-          color2: spaceMapConfig.color2 || '#ec4899',
-          color3: spaceMapConfig.color3 || '#06b6d4'
-        };
-
-        // Build the path to get the node structures
-        this.pathService.build(pathId).subscribe({
-          next: (buildRes) => {
-            const builtStructure = buildRes.data;
-            if (!builtStructure || !builtStructure.nodes) {
-              this.error = 'Failed to compile hierarchical node structure.';
-              this.isLoading = false;
-              this.cdr.markForCheck();
-              return;
-            }
-
-            // Map and Layout the nodes
-            this.layoutAndSetNodes(builtStructure.nodes, spaceMapConfig);
-            this.resetView();
-            this.isLoading = false;
-            this.cdr.markForCheck();
-          },
-          error: (err) => {
-            console.error('Error building path:', err);
-            this.error = 'Failed to fetch hierarchical nodes from database.';
-            this.isLoading = false;
-            this.cdr.markForCheck();
-          }
-        });
-      },
-      error: (err) => {
-        console.error('Error loading path details:', err);
-        this.error = 'Failed to load path definition.';
-        this.isLoading = false;
-        this.cdr.markForCheck();
-      }
-    });
-  }
-
-  layoutAndSetNodes(builtNodes: any[], spaceMapConfig: any): void {
-    // 1. Convert builtNodes to hierarchical NetworkNode objects
-    const nodeMap = new Map<string, any>();
-    
-    // Pass 1: create objects
-    builtNodes.forEach(bn => {
-      nodeMap.set(bn.id, {
-        id: bn.id,
-        name: bn.label || bn.id,
-        status: this.getMockStatus(bn.id),
-        type: bn.depth === 0 ? 'B1' : (bn.depth === 1 ? 'B2' : 'B3'),
-        parentId: bn.parent || null,
-        children: [],
-        position: { x: 0, y: 0 }
-      });
-    });
-    
-    // Pass 2: link children
-    const rootNodes: any[] = [];
-    nodeMap.forEach(node => {
-      if (node.parentId && nodeMap.has(node.parentId)) {
-        nodeMap.get(node.parentId).children.push(node);
-      } else {
-        rootNodes.push(node);
-      }
-    });
-    
-    // 2. Run Layout algorithms
-    const layout = spaceMapConfig.layout || 'orbital';
-    const centerX = 1500;
-    const centerY = 1200;
-    
-    if (layout === 'orbital') {
-      // Nested circular planetary orbits
-      const angleStep = (Math.PI * 2) / rootNodes.length;
-      const R1 = 600; // Radius for roots
-      
-      rootNodes.forEach((root, rIdx) => {
-        const rAngle = rIdx * angleStep;
-        root.position = {
-          x: centerX + Math.cos(rAngle) * R1,
-          y: centerY + Math.sin(rAngle) * R1
-        };
-        
-        // Children (B2 level) spaced around root
-        const b2Nodes = root.children;
-        if (b2Nodes.length > 0) {
-          const b2AngleStep = (Math.PI * 2) / b2Nodes.length;
-          const R2 = 180; // Radius around B1 parent
-          
-          b2Nodes.forEach((b2, b2Idx) => {
-            const b2Angle = b2Idx * b2AngleStep;
-            b2.position = {
-              x: root.position.x + Math.cos(b2Angle) * R2,
-              y: root.position.y + Math.sin(b2Angle) * R2
-            };
-            
-            // Grandchildren (B3 level) spaced around B2
-            const b3Nodes = b2.children;
-            if (b3Nodes.length > 0) {
-              const b3AngleStep = (Math.PI * 2) / b3Nodes.length;
-              const R3 = 70; // Radius around B2 parent
-              
-              b3Nodes.forEach((b3, b3Idx) => {
-                const b3Angle = b3Idx * b3AngleStep;
-                b3.position = {
-                  x: b2.position.x + Math.cos(b3Angle) * R3,
-                  y: b2.position.y + Math.sin(b3Angle) * R3
-                };
-              });
-            }
-          });
-        }
-      });
-      
-    } else if (layout === 'spiral') {
-      // Spiral Galaxy Arms
-      rootNodes.forEach((root, rIdx) => {
-        const arm = rIdx % 2;
-        const theta = rIdx * 0.8 + arm * Math.PI;
-        const radius = 250 + rIdx * 120;
-        
-        root.position = {
-          x: centerX + Math.cos(theta) * radius,
-          y: centerY + Math.sin(theta) * radius
-        };
-        
-        const b2Nodes = root.children;
-        b2Nodes.forEach((b2, b2Idx) => {
-          const b2Theta = theta + 0.35 + b2Idx * 0.3;
-          const b2Radius = radius + 75;
-          b2.position = {
-            x: centerX + Math.cos(b2Theta) * b2Radius,
-            y: centerY + Math.sin(b2Theta) * b2Radius
-          };
-          
-          const b3Nodes = b2.children;
-          b3Nodes.forEach((b3, b3Idx) => {
-            const b3Theta = b2Theta + 0.2 + b3Idx * 0.25;
-            const b3Radius = b2Radius + 50;
-            b3.position = {
-              x: centerX + Math.cos(b3Theta) * b3Radius,
-              y: centerY + Math.sin(b3Theta) * b3Radius
-            };
-          });
-        });
-      });
-      
-    } else {
-      // Grid Matrix Constellation
-      const cols = Math.ceil(Math.sqrt(rootNodes.length));
-      const colSpacing = 800;
-      const rowSpacing = 400;
-      
-      rootNodes.forEach((root, rIdx) => {
-        const col = rIdx % cols;
-        const row = Math.floor(rIdx / cols);
-        const rx = centerX + (col - (cols - 1) / 2) * colSpacing;
-        const ry = centerY + (row - 1) * rowSpacing;
-        
-        root.position = { x: rx, y: ry };
-        
-        // Children orbit parent root slightly offset
-        const b2Nodes = root.children;
-        b2Nodes.forEach((b2, b2Idx) => {
-          const angle = (b2Idx * (Math.PI * 2)) / b2Nodes.length;
-          b2.position = {
-            x: rx + Math.cos(angle) * 160,
-            y: ry + Math.sin(angle) * 160
-          };
-          
-          const b3Nodes = b2.children;
-          b3Nodes.forEach((b3, b3Idx) => {
-            const b3Angle = (b3Idx * (Math.PI * 2)) / b3Nodes.length;
-            b3.position = {
-              x: b2.position.x + Math.cos(b3Angle) * 60,
-              y: b2.position.y + Math.sin(b3Angle) * 60
-            };
-          });
-        });
-      });
-    }
-    
-    // Flat map of all nodes for B1 connections list and stats calculations
-    const allNodes: any[] = Array.from(nodeMap.values());
-    
-    this.networkData = {
-      nodes: allNodes,
-      links: [],
-      totalCount: allNodes.length
-    };
-    
-    this.invalidateRenderCaches();
-    this.buildStationConnections(allNodes.filter(n => n.type === 'B1'));
-    this.updatePerformanceBudget(allNodes.length);
-    this.calculateStatistics();
-    
-    // Zoom/center view on nodes
-    this.resetView();
-    
-    this.markDirty();
+  onDataSourceChange(): void {
+    this.filterPathsByDataSource();
+    // DB değişti → seçimi sıfırla ve ilk path'i otomatik üret.
+    this.selectedPathId = null;
+    this.selectedPath = null;
+    this.resetGraph();
+    this.autoSelectFirstPath();
     this.cdr.markForCheck();
   }
 
-  getMockStatus(nodeId: string): string {
-    // Deterministic mock statuses using string hash
-    let hash = 0;
-    for (let i = 0; i < nodeId.length; i++) {
-      hash = nodeId.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    hash = Math.abs(hash);
-    const mod = hash % 100;
-    if (mod < 4) return 'alarm';
-    if (mod < 12) return 'warning';
-    if (mod < 15) return 'offline';
-    return 'online';
-  }
-
-  getNodeColor(node: NetworkNode): string {
-    const config = this.spaceMapConfig;
-    if (!config) return '#3b82f6'; // default blue
-    
-    if (node.status === 'alarm') return '#ef4444';
-    if (node.status === 'warning') return '#f59e0b';
-    if (node.status === 'offline') return '#6b7280';
-    
-    // Healthy color based on level
-    if (node.type === 'B1') return config.color1 || '#a855f7';
-    if (node.type === 'B2') return config.color2 || '#ec4899';
-    return config.color3 || '#06b6d4';
-  }
-
-  saveWizardConfig(): void {
-    if (!this.selectedPath) return;
-
-    const path = this.selectedPath;
-    const currentConfig = path.config || {};
-    
-    // Add spaceMapConfig to path definition config
-    currentConfig.spaceMapConfig = {
-      theme: this.wizardConfig.theme,
-      layout: this.wizardConfig.layout,
-      level1Icon: this.wizardConfig.level1Icon,
-      level2Icon: this.wizardConfig.level2Icon,
-      level3Icon: this.wizardConfig.level3Icon,
-      color1: this.wizardConfig.color1,
-      color2: this.wizardConfig.color2,
-      color3: this.wizardConfig.color3
-    };
-
-    this.pathService.update(path.id, {
-      config: currentConfig
-    }).subscribe({
-      next: (res) => {
-        this.showSetupWizard = false;
-        this.spaceMapConfig = currentConfig.spaceMapConfig;
-        
-        // Reload path build structure
-        this.loadSelectedPath(path.id);
-        this.showSuccessToast('Space Map configured successfully!');
-      },
-      error: (err) => {
-        console.error('Error saving wizard config:', err);
-        alert('Failed to save configuration. Please try again.');
-      }
-    });
-  }
-
-  showSuccessToast(msg: string): void {
-    this.toastMessage = msg;
-    this.toastType = 'success';
-    setTimeout(() => this.toastMessage = '', 3000);
-    this.cdr.markForCheck();
-  }
-
-  queriesList: any[] = [];
-  private loadNetworkData(): void {
-    if (this.selectedPathId) {
-      this.loadSelectedPath(this.selectedPathId);
+  /** Bu DB için ilk path'i otomatik seçip render et (yoksa boş durum). */
+  private autoSelectFirstPath(): void {
+    if (this.filteredPaths.length) {
+      this.onSelectPath(this.filteredPaths[0].id);
     } else {
       this.isLoading = false;
       this.cdr.markForCheck();
     }
   }
-  
-  private setupRealTimeUpdates(): void {
-    const sub = this.networkMapService.getNetworkUpdates()
-      .pipe(throttleTime(5000))
-      .subscribe({
-        next: (data) => {
-          this.networkData = data;
-          this.invalidateRenderCaches();
-          this.buildStationConnections(data.nodes);
-          this.updatePerformanceBudget(data.nodes.length);
-          this.calculateStatistics();
-          this.markDirty();
-          this.cdr.markForCheck();
-          this.updateActionCandidates();
+
+  onSelectPath(pathId: string | null): void {
+    if (!pathId || pathId === 'null') {
+      this.selectedPathId = null;
+      this.selectedPath = null;
+      this.resetGraph();
+      this.cdr.markForCheck();
+      return;
+    }
+    this.selectedPathId = pathId;
+    this.isLoading = true;
+    this.error = null;
+    this.cdr.markForCheck();
+
+    // Önce path detayını al (ad ve tema gösterimi), sonra build ile yapıyı kur.
+    this.pathService.get(pathId).subscribe({
+      next: res => {
+        this.selectedPath = res.data || null;
+        this.syncThemeFromPath();
+        const hasMaterialized = !!(this.selectedPath?.materialized?.nodes?.length);
+        if (hasMaterialized && this.selectedPath?.materialized) {
+          // Önbellekten hemen çiz (anında görüntüleme)
+          this.onBuilt(this.selectedPath.materialized);
         }
-      });
-    
-    this.subscriptions.push(sub);
+        this.buildAndRender(pathId, hasMaterialized);
+      },
+      error: () => {
+        this.selectedPath = null;
+        this.buildAndRender(pathId, false);
+      },
+    });
   }
 
-  /**
-   * Reset caches that depend on network data
-   */
-  private invalidateRenderCaches(): void {
-    this.stationConnections = [];
-    this.stationLabelCache.clear();
-    this.visibleNodes.clear();
-    this.elementHitAreas = [];
-  }
-  
-  /**
-   * Keep frame rate reasonable when node count grows
-   */
-  private updatePerformanceBudget(nodeCount: number): void {
-    let targetFps = 60;
-    
-    if (nodeCount > 180) {
-      targetFps = 30;
-    } else if (nodeCount > 100) {
-      targetFps = 45;
-    }
-    
-    if (targetFps !== this.fps) {
-      this.fps = targetFps;
-      this.frameInterval = 1000 / this.fps;
-    }
-  }
-  
-  /**
-   * Precompute lightweight connections between nearby B1 stations
-   * to avoid O(n^2) work during every render.
-   */
-  private buildStationConnections(nodes: NetworkNode[]): void {
-    const nodeCount = nodes.length;
-    const maxConnections = nodeCount > 25 ? 2 : this.maxStationConnections;
-    const maxDistance = nodeCount > 25 ? this.maxConnectionDistance * 0.75 : this.maxConnectionDistance;
-    const edgeSet = new Set<string>();
-    const connections: Array<{ from: NetworkNode; to: NetworkNode; distance: number }> = [];
-    
-    nodes.forEach((node, index) => {
-      const candidates: Array<{ node: NetworkNode; distance: number }> = [];
-      
-      for (let i = 0; i < nodes.length; i++) {
-        if (i === index) continue;
-        const other = nodes[i];
-        const dist = this.distance(node.position, other.position);
-        if (dist <= maxDistance) {
-          candidates.push({ node: other, distance: dist });
+  private buildAndRender(pathId: string, hasCachedFallback = false): void {
+    this.isLoading = !hasCachedFallback;
+    this.pathService.build(pathId).subscribe({
+      next: res => {
+        this.isLoading = false;
+        this.onBuilt(res.data);
+      },
+      error: err => {
+        this.isLoading = false;
+        const msg = err?.error?.error || err?.message || 'Failed to build path.';
+        if (hasCachedFallback) {
+          this.notify('NETWORK_MAP.CACHED_WARNING', 'error');
+        } else {
+          this.error = msg;
+          this.resetGraph();
         }
+        this.cdr.markForCheck();
+      },
+    });
+  }
+
+  private onBuilt(built: BuiltStructure | null): void {
+    this.isLoading = false;
+    if (!built || !built.nodes?.length) {
+      this.error = this.translate.instant('NETWORK_MAP.NO_DATA');
+      this.resetGraph();
+      this.cdr.markForCheck();
+      return;
+    }
+    this.error = null;
+    this.warnings = built.stats?.warnings || [];
+    this.totalNodes = built.stats?.node_count || built.nodes.length;
+    this.maxDepth = built.stats?.max_depth || 0;
+
+    this.buildForest(built);
+    // Tek kök varsa doğrudan ona odaklan; çok köklü ise overview (kökler ring 1).
+    this.focusId = this.roots.length === 1 ? this.roots[0].id : null;
+    this.selectedNode = null;
+    this.hoveredNode = null;
+    this.relayout();
+    this.fitView();
+    this.markDirty();
+    this.cdr.markForCheck();
+  }
+
+  // ===========================================================================
+  // Orman kurulumu (PathNode[] → RNode[] parent/child ağacı + leaf sayımı)
+  // ===========================================================================
+
+  private buildForest(built: BuiltStructure): void {
+    const map = new Map<string, RNode>();
+    built.nodes.forEach(n => {
+      map.set(n.id, {
+        id: n.id,
+        label: n.label || n.id,
+        depth: n.depth ?? 0,
+        parentId: n.parent || null,
+        children: [],
+        leafCount: 1,
+        x: 0, y: 0, ring: 0,
+        row: n.row,
+      });
+    });
+    const roots: RNode[] = [];
+    const rootIds = new Set(built.roots || []);
+    map.forEach(node => {
+      if (node.parentId && node.parentId !== node.id && map.has(node.parentId) && !rootIds.has(node.id)) {
+        map.get(node.parentId)!.children.push(node);
+      } else {
+        roots.push(node);
       }
-      
-      candidates
-        .sort((a, b) => a.distance - b.distance)
-        .slice(0, maxConnections)
-        .forEach(candidate => {
-          const key = this.getConnectionKey(node.id, candidate.node.id);
-          if (!edgeSet.has(key)) {
-            edgeSet.add(key);
-            connections.push({ from: node, to: candidate.node, distance: candidate.distance });
-          }
-        });
     });
-    
-    this.stationConnections = connections;
+    // Çocukları kararlı sırala (label) — layout tutarlılığı için.
+    const sortVisited = new Set<string>();
+    roots.forEach(r => this.sortChildren(r, sortVisited));
+    const visited = new Set<string>();
+    roots.forEach(r => this.computeLeaves(r, visited));
+
+    this.roots = roots;
+    this.nodeMap = map;
   }
-  
-  private getConnectionKey(a: string, b: string): string {
-    return a < b ? `${a}|${b}` : `${b}|${a}`;
+
+  private sortChildren(node: RNode, visited = new Set<string>()): void {
+    if (visited.has(node.id)) return;
+    visited.add(node.id);
+    node.children.sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }));
+    node.children.forEach(c => this.sortChildren(c, visited));
   }
-  
-  // ============================================================================
-  // CANVAS INITIALIZATION
-  // ============================================================================
-  
-  private initializeCanvas(): void {
+
+  private computeLeaves(node: RNode, visited: Set<string>): number {
+    if (visited.has(node.id)) return 1;
+    visited.add(node.id);
+    if (!node.children.length) {
+      node.leafCount = 1;
+      return 1;
+    }
+    let sum = 0;
+    node.children.forEach(c => (sum += this.computeLeaves(c, visited)));
+    node.leafCount = Math.max(sum, 1);
+    return node.leafCount;
+  }
+
+  // ===========================================================================
+  // Layout — leaf-ağırlıklı radial ağaç (drill pencerelemeli)
+  // ===========================================================================
+
+  /** focus veya pencere değişince yeniden layout + render listesini kur. */
+  private relayout(): void {
+    this.labelCache.clear();
+    const window: RNode[] = [];
+
+    if (this.focusId) {
+      const focus = this.nodeMap.get(this.focusId);
+      if (focus) {
+        focus.x = 0; focus.y = 0; focus.ring = 0;
+        window.push(focus);
+        this.layoutChildren(focus, 0, Math.PI * 2, 1, window);
+      }
+    } else {
+      // Overview: sanal merkez; kökleri ring 1'e, çocuklarını ring 2'ye yerleştir.
+      const totalLeaves = this.roots.reduce((s, r) => s + r.leafCount, 0) || 1;
+      let cursor = 0;
+      this.roots.forEach(root => {
+        const span = (Math.PI * 2) * (root.leafCount / totalLeaves);
+        this.placeRadial(root, cursor, cursor + span, 1, window);
+        cursor += span;
+      });
+    }
+    this.renderNodes = window;
+  }
+
+  /** Bir çocuğu [start,end] açısal sektörüne yerleştir, alt çocuklarını recursive böl. */
+  private placeRadial(node: RNode, start: number, end: number, ring: number, out: RNode[]): void {
+    const mid = (start + end) / 2;
+    node.ring = ring;
+    node.x = Math.cos(mid) * this.RING_RADIUS * ring;
+    node.y = Math.sin(mid) * this.RING_RADIUS * ring;
+    out.push(node);
+    if (ring >= this.MAX_DRILL_RING) return;
+
+    const total = node.children.reduce((s, c) => s + c.leafCount, 0) || 1;
+    let cursor = start;
+    node.children.forEach(child => {
+      const span = (end - start) * (child.leafCount / total);
+      this.placeRadial(child, cursor, cursor + span, ring + 1, out);
+      cursor += span;
+    });
+  }
+
+  /** Focus (center) çocuklarını tam daireye yerleştir. */
+  private layoutChildren(node: RNode, start: number, end: number, ring: number, out: RNode[]): void {
+    const total = node.children.reduce((s, c) => s + c.leafCount, 0) || 1;
+    let cursor = start;
+    node.children.forEach(child => {
+      const span = (end - start) * (child.leafCount / total);
+      this.placeRadial(child, cursor, cursor + span, ring, out);
+      cursor += span;
+    });
+  }
+
+  // ===========================================================================
+  // Canvas kurulumu
+  // ===========================================================================
+
+  private initCanvas(): void {
     if (!this.canvasRef) return;
-    
     this.canvas = this.canvasRef.nativeElement;
-    const ctx = this.canvas.getContext('2d', { 
-      alpha: false,
-      desynchronized: true // Better performance
-    });
-    
+    const ctx = this.canvas.getContext('2d', { alpha: false, desynchronized: true });
     if (ctx) {
       this.ctx = ctx;
       this.resizeCanvas();
-      this.generateBackgroundCache();
       this.markDirty();
     }
   }
-  
+
   private resizeCanvas(): void {
     if (!this.canvas || !this.containerRef) return;
-    
-    const container = this.containerRef.nativeElement;
-    const rect = container.getBoundingClientRect();
-    const width = Math.floor(rect.width);
-    const height = Math.floor(rect.height);
-
-    if (!width || !height) return;
-    if (width === this.lastCanvasSize.width && height === this.lastCanvasSize.height) return;
-
-    this.lastCanvasSize = { width, height };
-    
-    // Set canvas size
+    const rect = this.containerRef.nativeElement.getBoundingClientRect();
+    const w = Math.floor(rect.width);
+    const h = Math.floor(rect.height);
+    if (!w || !h) return;
     const dpr = window.devicePixelRatio || 1;
-    this.canvas.width = width * dpr;
-    this.canvas.height = height * dpr;
-    this.canvas.style.width = width + 'px';
-    this.canvas.style.height = height + 'px';
-    
-    if (this.ctx) {
-      this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      // Enable smooth rendering
-      this.ctx.imageSmoothingEnabled = true;
-      this.ctx.imageSmoothingQuality = 'high';
+    this.canvas.width = w * dpr;
+    this.canvas.height = h * dpr;
+    this.canvas.style.width = w + 'px';
+    this.canvas.style.height = h + 'px';
+    this.ctx?.setTransform(dpr, 0, 0, dpr, 0, 0);
+    // Arka plan cache boyutu değiştiyse yeniden üret.
+    this.bgCache = null;
+    if (!this.hasFitted && this.renderNodes.length > 0) {
+      this.fitView();
     }
-    
-    this.generateBackgroundCache();
     this.markDirty();
   }
-  
-  private handleResize(): void {
-    this.resizeCanvas();
-  }
-  
-  // ============================================================================
-  // RENDER LOOP
-  // ============================================================================
-  
-  private startRenderLoop(): void {
-    const render = (timestamp: number) => {
-      // FPS limiting
-      const elapsed = timestamp - this.lastRenderTime;
-      
-      if (elapsed > this.frameInterval) {
-        this.lastRenderTime = timestamp - (elapsed % this.frameInterval);
-        
-        // Smooth zoom animation
-        if (Math.abs(this.viewMode.zoomLevel - this.viewMode.targetZoom) > 0.01) {
-          this.viewMode.zoomLevel += (this.viewMode.targetZoom - this.viewMode.zoomLevel) * 0.15;
-          this.markDirty();
-        } else {
-          this.viewMode.zoomLevel = this.viewMode.targetZoom;
-        }
-        
-        if (this.needsRender || this.hasAnimatedStates()) {
-          this.renderScene();
-          this.needsRender = this.hasAnimatedStates();
-        }
-      }
-      
-      this.animationFrameId = requestAnimationFrame(render);
-    };
-    
-    this.animationFrameId = requestAnimationFrame(render);
-  }
-  
-  private renderScene(): void {
-    if (!this.ctx || !this.canvas || !this.networkData) return;
-    
-    this.hasVisibleAlarm = false;
-    const width = this.canvas.width / (window.devicePixelRatio || 1);
-    const height = this.canvas.height / (window.devicePixelRatio || 1);
-    
-    // Clear with SCADA style background
-    this.renderBackground(width, height);
-    
-    // Save context
-    this.ctx.save();
-    
-    // Apply transformations
-    this.ctx.translate(this.viewMode.panOffset.x, this.viewMode.panOffset.y);
-    this.ctx.scale(this.viewMode.zoomLevel, this.viewMode.zoomLevel);
-    
-    // Calculate visible bounds for culling
-    const bounds = this.calculateVisibleBounds();
-    this.visibleNodes.clear();
 
-    // Blueprint grid that moves with pan/zoom
-    this.renderGrid();
-    
-    // Render based on view mode
-    switch (this.viewMode.mode) {
-      case 'overview':
-        this.renderOverview(bounds);
-        break;
-      case 'station':
-        this.renderStationView();
-        break;
-      case 'voltage':
-        this.renderVoltageView();
-        break;
-      case 'equipment':
-        this.renderEquipmentView();
-        break;
-    }
-    
-    // Restore context
-    this.ctx.restore();
-    
-    // Render UI overlays (not affected by zoom/pan)
-    this.renderUIOverlays(width, height);
-  }
-  
-  // ============================================================================
-  // RENDERING METHODS - OVERVIEW
-  // ============================================================================
-  
-  private renderOverview(bounds: VisibleBounds): void {
-    if (!this.networkData || !this.ctx) return;
-
-    const visibleStations = this.networkData.nodes.filter(node => this.isNodeVisible(node, bounds));
-    this.visibleNodes = new Set(visibleStations.map(node => node.id));
-
-    // Render connections first (behind nodes)
-    this.renderOverviewConnections(bounds, this.visibleNodes);
-    
-    // Render B1 stations
-    visibleStations.forEach((node) => {
-      this.renderStationNode(node);
-    });
-  }
-  
-  private renderOverviewConnections(bounds: VisibleBounds, visibleStations: Set<string>): void {
-    if (!this.ctx || !this.networkData) return;
-
-    if (this.stationConnections.length === 0) {
-      this.buildStationConnections(this.networkData.nodes);
-    }
-
-    const totalStations = this.networkData.nodes.length;
-    const focusId = this.viewMode.selectedNode?.id || this.interaction.hoveredNode?.id;
-    if (totalStations > 25 && !focusId) {
-      return;
-    }
-    
-    const paddedBounds = this.expandBounds(bounds, 140);
-    this.ctx.lineWidth = totalStations > 25 ? 1.6 : 2.4;
-    this.ctx.setLineDash([12, 10]);
-    this.ctx.shadowColor = this.withAlpha(BRAND.tertiary, 0.18);
-    this.ctx.shadowBlur = 10;
-    
-    this.stationConnections.forEach(({ from, to }) => {
-      if (focusId && from.id !== focusId && to.id !== focusId) {
-        return;
-      }
-      if (!this.isConnectionWithinBounds(from, to, paddedBounds, visibleStations)) {
-        return;
-      }
-      
-      const gradient = this.ctx!.createLinearGradient(
-        from.position.x,
-        from.position.y,
-        to.position.x,
-        to.position.y
-      );
-      gradient.addColorStop(0, this.withAlpha(BRAND.tertiary, 0.55));
-      gradient.addColorStop(1, this.withAlpha(STATUS.success, 0.4));
-      this.ctx!.strokeStyle = gradient;
-      this.ctx!.beginPath();
-      this.ctx!.moveTo(from.position.x, from.position.y);
-      this.ctx!.lineTo(to.position.x, to.position.y);
-      this.ctx!.stroke();
-
-      this.ctx!.fillStyle = this.withAlpha(BRAND.tertiary, 0.25);
-      this.ctx!.beginPath();
-      this.ctx!.arc(from.position.x, from.position.y, 5, 0, Math.PI * 2);
-      this.ctx!.arc(to.position.x, to.position.y, 5, 0, Math.PI * 2);
-      this.ctx!.fill();
-    });
-    
-    this.ctx.shadowColor = 'transparent';
-    this.ctx.setLineDash([]);
-  }
-  
-  private renderStationNode(node: NetworkNode): void {
-    if (!this.ctx) return;
-    
-    const isHovered = this.interaction.hoveredNode?.id === node.id;
-    const isSelected = this.viewMode.selectedNode?.id === node.id;
-    const baseRadius = 70;
-    const radius = isSelected ? baseRadius * 1.15 : isHovered ? baseRadius * 1.08 : baseRadius;
-    const nodeColor = this.getNodeColor(node);
-    const { x, y } = node.position;
-    
-    if (node.status === 'alarm') {
-      this.hasVisibleAlarm = true;
-    }
-    
-    this.ctx.save();
-    
-    // Draw based on configured theme
-    const theme = this.spaceMapConfig?.theme || 'cosmic';
-    
-    if (theme === 'cosmic') {
-      // Cosmic Planet Node
-      this.ctx.shadowColor = nodeColor;
-      this.ctx.shadowBlur = isSelected ? 30 : isHovered ? 20 : 12;
-      
-      this.ctx.beginPath();
-      this.ctx.arc(x, y, radius, 0, Math.PI * 2);
-      const gradient = this.ctx.createRadialGradient(x - radius/3, y - radius/3, radius/6, x, y, radius);
-      gradient.addColorStop(0, '#ffffff');
-      gradient.addColorStop(0.3, nodeColor);
-      gradient.addColorStop(1, '#0b0d19');
-      this.ctx.fillStyle = gradient;
-      this.ctx.fill();
-      
-      this.ctx.lineWidth = 2.5;
-      this.ctx.strokeStyle = this.withAlpha(nodeColor, 0.4);
-      this.ctx.stroke();
-      
-      this.ctx.shadowColor = 'transparent';
-      
-      // Flat planetary ring ellipse
-      this.ctx.strokeStyle = this.withAlpha(nodeColor, 0.35);
-      this.ctx.lineWidth = 3;
-      this.ctx.save();
-      this.ctx.translate(x, y);
-      this.ctx.rotate(-Math.PI / 8);
-      this.ctx.scale(1.7, 0.38);
-      this.ctx.beginPath();
-      this.ctx.arc(0, 0, radius * 0.9, 0, Math.PI * 2);
-      this.ctx.stroke();
-      this.ctx.restore();
-      
-      // Icon
-      const icon = this.spaceMapConfig?.level1Icon || 'fa-sun';
-      this.renderIcon(icon, x, y, 22);
-      
-    } else if (theme === 'factory') {
-      // Mechanical Hexagon Node
-      this.ctx.shadowColor = nodeColor;
-      this.ctx.shadowBlur = isSelected ? 22 : 12;
-      
-      this.drawHexagon(x, y, radius);
-      const gradient = this.ctx.createLinearGradient(x - radius, y - radius, x + radius, y + radius);
-      gradient.addColorStop(0, '#2a2b36');
-      gradient.addColorStop(0.5, '#1e1f29');
-      gradient.addColorStop(1, nodeColor);
-      this.ctx.fillStyle = gradient;
-      this.ctx.fill();
-      
-      this.ctx.lineWidth = 2.5;
-      this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-      this.ctx.stroke();
-      
-      this.ctx.shadowColor = 'transparent';
-      
-      // Gear outer details
-      this.drawHexagon(x, y, radius - 10);
-      this.ctx.strokeStyle = this.withAlpha(nodeColor, 0.3);
-      this.ctx.stroke();
-      
-      const icon = this.spaceMapConfig?.level1Icon || 'fa-industry';
-      this.renderIcon(icon, x, y, 20);
-      
-    } else if (theme === 'energy') {
-      // Electric Diamond Node
-      this.ctx.shadowColor = nodeColor;
-      this.ctx.shadowBlur = isSelected ? 25 : 14;
-      
-      this.ctx.beginPath();
-      this.ctx.moveTo(x, y - radius);
-      this.ctx.lineTo(x + radius, y);
-      this.ctx.lineTo(x, y + radius);
-      this.ctx.lineTo(x - radius, y);
-      this.ctx.closePath();
-      
-      const gradient = this.ctx.createLinearGradient(x, y - radius, x, y + radius);
-      gradient.addColorStop(0, '#0a1526');
-      gradient.addColorStop(1, nodeColor);
-      this.ctx.fillStyle = gradient;
-      this.ctx.fill();
-      
-      this.ctx.lineWidth = 3;
-      this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-      this.ctx.stroke();
-      
-      this.ctx.shadowColor = 'transparent';
-      
-      const icon = this.spaceMapConfig?.level1Icon || 'fa-bolt';
-      this.renderIcon(icon, x, y, 20);
-      
-    } else {
-      // Cyber Tech Server Rack Node
-      this.ctx.shadowColor = nodeColor;
-      this.ctx.shadowBlur = isSelected ? 25 : 12;
-      
-      this.drawRoundedRect(x - radius, y - radius, radius * 2, radius * 2, 14);
-      const gradient = this.ctx.createLinearGradient(x - radius, y - radius, x + radius, y + radius);
-      gradient.addColorStop(0, '#081712');
-      gradient.addColorStop(0.5, '#0c221a');
-      gradient.addColorStop(1, nodeColor);
-      this.ctx.fillStyle = gradient;
-      this.ctx.fill();
-      
-      this.ctx.lineWidth = 2.5;
-      this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-      this.ctx.stroke();
-      
-      this.ctx.shadowColor = 'transparent';
-      
-      const icon = this.spaceMapConfig?.level1Icon || 'fa-server';
-      this.renderIcon(icon, x, y, 20);
-    }
-    
-    // Labels & Ribbons below/above
-    this.renderTag('SYSTEM', x - radius + 18, y - radius + 19, this.withAlpha(nodeColor, 0.8));
-    this.renderTag(node.status.toUpperCase(), x + radius - 18, y - radius + 19, '#000', 'right');
-    
-    const countLabel = node.children ? `${node.children.length} SUB-LEVEL` : '0 SUB-LEVEL';
-    this.renderTag(countLabel, x, y + radius - 10, nodeColor, 'center');
-    
-    const labelLines = this.getStationLabelLines(node);
-    this.renderStationLabel(labelLines, x, y - 2);
-    
-    if (node.status === 'alarm') {
-      this.renderPulseEffect(x, y, radius + 12);
-    }
-    
-    this.ctx.restore();
-  }
-  
-  // ============================================================================
-  // RENDERING METHODS - STATION VIEW
-  // ============================================================================
-  
-  private renderStationView(): void {
-    if (!this.viewMode.selectedNode || !this.ctx) return;
-    
-    const station = this.viewMode.selectedNode;
-    const { width, height } = this.getCanvasSize();
-    const centerX = width * 0.5;
-    const centerY = height * 0.52;
-
-    station.position = { x: centerX, y: centerY };
-    
-    // Render station at center
-    this.renderStationNode(station);
-    
-    // Render B2 voltage levels in a circle around station
-    const b2Nodes = station.children;
-    if (b2Nodes.length === 0) return;
-    
-    const angleStep = (Math.PI * 2) / b2Nodes.length;
-    const orbitRadius = Math.max(220, Math.min(width, height) * 0.32);
-    
-    // Render connections first
-    if (this.ctx) {
-      this.ctx.strokeStyle = this.withAlpha(BRAND.tertiary, 0.3);
-      this.ctx.lineWidth = 4;
-      this.ctx.setLineDash([12, 10]);
-      this.ctx.shadowColor = this.withAlpha(BRAND.tertiary, 0.18);
-      this.ctx.shadowBlur = 8;
-      
-      b2Nodes.forEach((b2Node, index) => {
-        if (!this.ctx) return;
-        
-        const angle = index * angleStep - Math.PI / 2;
-        const x = centerX + Math.cos(angle) * orbitRadius;
-        const y = centerY + Math.sin(angle) * orbitRadius;
-        
-        // Connection line
-        this.ctx.beginPath();
-        this.ctx.moveTo(centerX, centerY);
-        this.ctx.lineTo(x, y);
-        this.ctx.stroke();
-        
-        this.ctx.fillStyle = this.withAlpha(BRAND.tertiary, 0.4);
-        this.ctx.beginPath();
-        this.ctx.arc(x, y, 6, 0, Math.PI * 2);
-        this.ctx.fill();
-      });
-      
-      this.ctx.setLineDash([]);
-      this.ctx.shadowColor = 'transparent';
-    }
-    
-    // Render B2 nodes
-    b2Nodes.forEach((b2Node, index) => {
-      const angle = index * angleStep - Math.PI / 2;
-      const x = centerX + Math.cos(angle) * orbitRadius;
-      const y = centerY + Math.sin(angle) * orbitRadius;
-      
-      b2Node.position = { x, y };
-      this.renderVoltageNode(b2Node);
-    });
-  }
-  
-  private renderVoltageNode(node: NetworkNode): void {
-    if (!this.ctx) return;
-    
-    const isHovered = this.interaction.hoveredNode?.id === node.id;
-    const isSelected = this.viewMode.selectedNode?.id === node.id;
-    const baseRadius = 24;
-    const radius = isSelected ? baseRadius * 1.15 : isHovered ? baseRadius * 1.08 : baseRadius;
-    const nodeColor = this.getNodeColor(node);
-    const { x, y } = node.position;
-    
-    if (node.status === 'alarm') {
-      this.hasVisibleAlarm = true;
-    }
-    
-    this.ctx.save();
-    const theme = this.spaceMapConfig?.theme || 'cosmic';
-    
-    if (theme === 'cosmic') {
-      this.ctx.shadowColor = nodeColor;
-      this.ctx.shadowBlur = isSelected ? 20 : isHovered ? 14 : 8;
-      
-      this.ctx.beginPath();
-      this.ctx.arc(x, y, radius, 0, Math.PI * 2);
-      const gradient = this.ctx.createRadialGradient(x - radius/3, y - radius/3, radius/6, x, y, radius);
-      gradient.addColorStop(0, '#ffffff');
-      gradient.addColorStop(0.4, nodeColor);
-      gradient.addColorStop(1, '#0e0b1f');
-      this.ctx.fillStyle = gradient;
-      this.ctx.fill();
-      
-      this.ctx.lineWidth = 2;
-      this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-      this.ctx.stroke();
-    } else if (theme === 'factory') {
-      this.ctx.shadowColor = nodeColor;
-      this.ctx.shadowBlur = isSelected ? 18 : 10;
-      this.drawHexagon(x, y, radius);
-      const gradient = this.ctx.createLinearGradient(x - radius, y - radius, x + radius, y + radius);
-      gradient.addColorStop(0, '#2d2e3d');
-      gradient.addColorStop(1, nodeColor);
-      this.ctx.fillStyle = gradient;
-      this.ctx.fill();
-      
-      this.ctx.lineWidth = 1.8;
-      this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-      this.ctx.stroke();
-    } else if (theme === 'energy') {
-      this.ctx.shadowColor = nodeColor;
-      this.ctx.shadowBlur = isSelected ? 18 : 10;
-      this.ctx.beginPath();
-      this.ctx.moveTo(x, y - radius);
-      this.ctx.lineTo(x + radius, y);
-      this.ctx.lineTo(x, y + radius);
-      this.ctx.lineTo(x - radius, y);
-      this.ctx.closePath();
-      const gradient = this.ctx.createLinearGradient(x, y - radius, x, y + radius);
-      gradient.addColorStop(0, '#0c162b');
-      gradient.addColorStop(1, nodeColor);
-      this.ctx.fillStyle = gradient;
-      this.ctx.fill();
-      
-      this.ctx.lineWidth = 2;
-      this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-      this.ctx.stroke();
-    } else {
-      // Tech server
-      this.ctx.shadowColor = nodeColor;
-      this.ctx.shadowBlur = isSelected ? 16 : 8;
-      this.drawRoundedRect(x - radius, y - radius, radius * 2, radius * 2, 6);
-      const gradient = this.ctx.createLinearGradient(x - radius, y - radius, x + radius, y + radius);
-      gradient.addColorStop(0, '#071f1a');
-      gradient.addColorStop(1, nodeColor);
-      this.ctx.fillStyle = gradient;
-      this.ctx.fill();
-      
-      this.ctx.lineWidth = 2;
-      this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-      this.ctx.stroke();
-    }
-    
-    this.ctx.shadowColor = 'transparent';
-    
-    // Label and icon
-    const icon = this.spaceMapConfig?.level2Icon || 'fa-globe';
-    this.renderIcon(icon, x, y, 13);
-    
-    this.renderLabel(node.name, x, y + radius + 15, 12, true);
-    
-    if (node.children.length > 0) {
-      this.renderTag(`${node.children.length} SUB`, x, y - radius - 8, nodeColor, 'center');
-    }
-    
-    if (node.status === 'alarm') {
-      this.renderPulseEffect(x, y, radius + 8);
-    }
-    
-    this.ctx.restore();
-  }
-  
-  // ============================================================================
-  // RENDERING METHODS - VOLTAGE VIEW
-  // ============================================================================
-  
-  private renderVoltageView(): void {
-    if (!this.viewMode.selectedNode || !this.ctx) return;
-    
-    const voltageLevel = this.viewMode.selectedNode;
-    const { width, height } = this.getCanvasSize();
-    const centerX = width * 0.5;
-    const centerY = Math.min(height * 0.22, 220);
-    
-    // Render voltage level at top
-    voltageLevel.position = { x: centerX, y: centerY };
-    this.renderVoltageNode(voltageLevel);
-    
-    // Render B3 equipment below in a grid
-    const b3Nodes = voltageLevel.children;
-    if (b3Nodes.length === 0) return;
-    
-    const cols = Math.min(5, Math.ceil(Math.sqrt(b3Nodes.length)));
-    const rows = Math.ceil(b3Nodes.length / cols);
-    const spacingX = Math.min(220, Math.max(160, width / (cols + 1)));
-    const spacingY = Math.min(180, Math.max(120, (height * 0.55) / Math.max(1, rows)));
-    const startX = centerX - ((cols - 1) * spacingX) / 2;
-    const startY = centerY + Math.min(240, height * 0.3);
-    
-    // Render connections
-    if (this.ctx) {
-      this.ctx.strokeStyle = this.withAlpha(BRAND.tertiary, 0.28);
-      this.ctx.lineWidth = 3;
-      this.ctx.setLineDash([10, 10]);
-      
-      b3Nodes.forEach((b3Node, index) => {
-        if (!this.ctx) return;
-        
-        const col = index % cols;
-        const row = Math.floor(index / cols);
-        const x = startX + col * spacingX;
-        const y = startY + row * spacingY;
-        
-        // Connection
-        this.ctx.beginPath();
-        this.ctx.moveTo(centerX, centerY + 40);
-        this.ctx.lineTo(x, y - 25);
-        this.ctx.stroke();
-      });
-      
-      this.ctx.setLineDash([]);
-    }
-    
-    // Render equipment nodes
-    b3Nodes.forEach((b3Node, index) => {
-      const col = index % cols;
-      const row = Math.floor(index / cols);
-      const x = startX + col * spacingX;
-      const y = startY + row * spacingY;
-      
-      b3Node.position = { x, y };
-      this.renderEquipmentNode(b3Node);
-    });
-  }
-  
-  private renderEquipmentNode(node: NetworkNode): void {
-    if (!this.ctx) return;
-    
-    const isHovered = this.interaction.hoveredNode?.id === node.id;
-    const isSelected = this.viewMode.selectedNode?.id === node.id;
-    const baseWidth = 110;
-    const baseHeight = 26;
-    const scale = isSelected ? 1.12 : isHovered ? 1.08 : 1;
-    const width = baseWidth * scale;
-    const height = baseHeight * scale;
-    const nodeColor = this.getNodeColor(node);
-    const { x, y } = node.position;
-    
-    if (node.status === 'alarm') {
-      this.hasVisibleAlarm = true;
-    }
-    
-    this.ctx.save();
-    this.ctx.shadowColor = nodeColor;
-    this.ctx.shadowBlur = isSelected ? 12 : 8;
-    
-    const theme = this.spaceMapConfig?.theme || 'cosmic';
-    
-    if (theme === 'cosmic' || theme === 'energy') {
-      this.drawRoundedRect(x - width / 2, y - height / 2, width, height, height / 2);
-    } else if (theme === 'factory') {
-      this.drawRoundedRect(x - width / 2, y - height / 2, width, height, 4);
-    } else {
-      // Tech grid (Server rack blade)
-      this.drawRoundedRect(x - width / 2, y - height / 2, width, height, 2);
-    }
-    
-    const gradient = this.ctx.createLinearGradient(x - width / 2, y - height / 2, x + width / 2, y + height / 2);
-    gradient.addColorStop(0, '#0a0a0f');
-    gradient.addColorStop(1, nodeColor);
-    this.ctx.fillStyle = gradient;
-    this.ctx.fill();
-    
-    this.ctx.lineWidth = 1.5;
-    this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-    this.ctx.stroke();
-    
-    this.ctx.shadowColor = 'transparent';
-    
-    // Icon
-    const icon = this.spaceMapConfig?.level3Icon || 'fa-satellite';
-    this.renderIcon(icon, x - width / 2 + 15, y, 10);
-    
-    this.renderLabelWithBackground(node.name, x, y + height / 2 + 10, 11);
-    
-    if (node.elements && node.elements.length > 0) {
-      this.renderTag(`${node.elements.length} EL`, x + width / 2 - 10, y - height / 2 + 10, nodeColor, 'right');
-    }
-    
-    if (node.status === 'alarm') {
-      this.renderPulseEffect(x, y, 16);
-    }
-    
-    this.ctx.restore();
-  }
-  
-  // ============================================================================
-  // RENDERING METHODS - EQUIPMENT VIEW
-  // ============================================================================
-  
-  private renderEquipmentView(): void {
-    if (!this.viewMode.selectedNode || !this.ctx) return;
-    
-    const equipment = this.viewMode.selectedNode;
-    const { width, height } = this.getCanvasSize();
-    const centerX = width * 0.5;
-    const centerY = Math.min(height * 0.22, 200);
-    
-    // Render equipment at top
-    equipment.position = { x: centerX, y: centerY };
-    this.renderEquipmentNode(equipment);
-    
-    // Render elements below
-    if (!equipment.elements || equipment.elements.length === 0) {
-      this.renderNoElementsMessage(centerX, centerY + 150);
-      return;
-    }
-    
-    const elements = equipment.elements;
-    this.elementHitAreas = [];
-    const cols = Math.min(6, elements.length);
-    const rows = Math.ceil(elements.length / cols);
-    const spacingX = Math.min(140, Math.max(90, width / (cols + 1)));
-    const spacingY = Math.min(110, Math.max(80, (height * 0.5) / Math.max(1, rows)));
-    const startX = centerX - ((cols - 1) * spacingX) / 2;
-    const startY = centerY + Math.min(220, height * 0.28);
-    
-    // Render connection lines
-    this.ctx.strokeStyle = this.withAlpha(BRAND.tertiary, 0.22);
-    this.ctx.lineWidth = 2.4;
-    this.ctx.setLineDash([6, 9]);
-    
-    elements.forEach((element, index) => {
-      const col = index % cols;
-      const row = Math.floor(index / cols);
-      const x = startX + col * spacingX;
-      const y = startY + row * spacingY;
-      
-      this.ctx!.beginPath();
-      this.ctx!.moveTo(centerX, centerY + 30);
-      this.ctx!.lineTo(x, y - 15);
-      this.ctx!.stroke();
-    });
-    this.ctx.setLineDash([]);
-    
-    // Render element nodes
-    elements.forEach((element, index) => {
-      const col = index % cols;
-      const row = Math.floor(index / cols);
-      const x = startX + col * spacingX;
-      const y = startY + row * spacingY;
-      
-      this.renderElementNode(element, x, y);
-      this.elementHitAreas.push({ element, x, y, width: 80, height: 24 });
-    });
-  }
-  
-  private renderElementNode(element: ElementNode, x: number, y: number): void {
-    if (!this.ctx) return;
-    
-    const width = 80;
-    const height = 24;
-    const isSelected = this.selectedElement?.elem === element.elem;
-    const isHovered = this.interaction.hoveredElement?.elem === element.elem;
-    const accent = isSelected ? CHART_PALETTE[8] : BRAND.tertiary;
-    
-    this.ctx.save();
-    this.drawRoundedRect(x - width / 2, y - height / 2, width, height, 8);
-    const gradient = this.ctx.createLinearGradient(x - width / 2, y - height / 2, x + width / 2, y + height / 2);
-    gradient.addColorStop(0, '#0b1020');
-    gradient.addColorStop(1, isHovered ? CHART_PALETTE[6] : accent);
-    this.ctx.fillStyle = gradient;
-    this.ctx.fill();
-    
-    this.ctx.lineWidth = isSelected ? 2 : 1.5;
-    this.ctx.strokeStyle = isSelected ? '#ffffff' : 'rgba(255, 255, 255, 0.3)';
-    this.ctx.stroke();
-    
-    // Glyph
-    this.renderIcon(element.elem?.toString() || 'EL', x - width / 2 + 16, y + 1, 10);
-    
-    // Label
-    this.renderLabel(element.name, x, y + height / 2 + 6, 10, true);
-    
-    this.ctx.restore();
-  }
-  
-  private renderNoElementsMessage(x: number, y: number): void {
-    if (!this.ctx) return;
-    
-    this.ctx.fillStyle = this.withAlpha(BRAND.tertiary, 0.3);
-    this.ctx.fillRect(x - 150, y - 40, 300, 80);
-    
-    this.ctx.fillStyle = '#94a3b8';
-    this.ctx.font = '14px "Space Grotesk", sans-serif';
-    this.ctx.textAlign = 'center';
-    this.ctx.fillText('No elements available', x, y);
-    this.ctx.font = '12px "Space Grotesk", sans-serif';
-    this.ctx.fillText('for this equipment', x, y + 20);
-  }
-  
-  // ============================================================================
-  // HELPER RENDERING METHODS
-  // ============================================================================
-  private getCanvasSize(): { width: number; height: number } {
-    if (!this.canvas) {
-      return { width: 1600, height: 900 };
-    }
+  private get canvasSize(): { w: number; h: number } {
+    if (!this.canvas) return { w: 1600, h: 900 };
     const dpr = window.devicePixelRatio || 1;
-    return {
-      width: this.canvas.width / dpr,
-      height: this.canvas.height / dpr
+    return { w: this.canvas.width / dpr, h: this.canvas.height / dpr };
+  }
+
+  // ===========================================================================
+  // Render döngüsü
+  // ===========================================================================
+
+  private startRenderLoop(): void {
+    const tick = () => {
+      // Zoom interpolasyonu (sadece animasyon sırasında çiz).
+      if (Math.abs(this.view.zoom - this.view.targetZoom) > 0.001) {
+        this.view.zoom += (this.view.targetZoom - this.view.zoom) * 0.2;
+        this.zoomAnimating = true;
+        this.markDirty();
+      } else if (this.zoomAnimating) {
+        this.view.zoom = this.view.targetZoom;
+        this.zoomAnimating = false;
+        this.markDirty();
+      }
+      if (this.needsRender) {
+        this.render();
+        this.needsRender = this.zoomAnimating;
+      }
+      this.rafId = requestAnimationFrame(tick);
     };
+    this.rafId = requestAnimationFrame(tick);
   }
 
   private markDirty(): void {
     this.needsRender = true;
   }
-  
-  private hasAnimatedStates(): boolean {
-    return this.hasVisibleAlarm;
-  }
-  
-  private renderBackground(width: number, height: number): void {
-    if (!this.ctx) return;
-    
-    if (!this.backgroundCache || this.backgroundCache.width !== width || this.backgroundCache.height !== height) {
-      this.generateBackgroundCache(width, height);
-    }
-    
-    if (this.backgroundCache) {
-      this.ctx.drawImage(this.backgroundCache, 0, 0, width, height);
-    }
-  }
-  
-  private generateBackgroundCache(width?: number, height?: number): void {
-    if (!this.canvas) return;
-    const w = width || this.canvas.width / (window.devicePixelRatio || 1);
-    const h = height || this.canvas.height / (window.devicePixelRatio || 1);
-    const cache = document.createElement('canvas');
-    cache.width = w;
-    cache.height = h;
-    const ctx = cache.getContext('2d');
-    if (!ctx) return;
-    
-    const theme = this.spaceMapConfig?.theme || 'cosmic';
-    
-    if (theme === 'cosmic') {
-      // Deep space gradient
-      const gradient = ctx.createLinearGradient(0, 0, w, h);
-      gradient.addColorStop(0, '#020617'); // slate 950
-      gradient.addColorStop(0.5, '#0c0a0f'); // very dark violet
-      gradient.addColorStop(1, '#020617');
-      ctx.fillStyle = gradient;
-      ctx.fillRect(0, 0, w, h);
-      
-      // Twinkling nebulas
-      const nebula1 = ctx.createRadialGradient(w * 0.3, h * 0.4, 50, w * 0.3, h * 0.4, 300);
-      nebula1.addColorStop(0, 'rgba(168, 85, 247, 0.12)'); // purple-500
-      nebula1.addColorStop(1, 'rgba(0, 0, 0, 0)');
-      ctx.fillStyle = nebula1;
-      ctx.fillRect(0, 0, w, h);
-      
-      const nebula2 = ctx.createRadialGradient(w * 0.7, h * 0.6, 50, w * 0.7, h * 0.6, 400);
-      nebula2.addColorStop(0, 'rgba(236, 72, 153, 0.08)'); // pink-500
-      nebula2.addColorStop(1, 'rgba(0, 0, 0, 0)');
-      ctx.fillStyle = nebula2;
-      ctx.fillRect(0, 0, w, h);
-      
-      // Random stars
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
-      for (let i = 0; i < 150; i++) {
-        const sx = Math.random() * w;
-        const sy = Math.random() * h;
-        const size = Math.random() * 1.5;
-        ctx.beginPath();
-        ctx.arc(sx, sy, size, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    } else if (theme === 'factory') {
-      // Dark industrial steel gradient
-      const gradient = ctx.createLinearGradient(0, 0, w, h);
-      gradient.addColorStop(0, '#0f172a');
-      gradient.addColorStop(1, '#1e293b');
-      ctx.fillStyle = gradient;
-      ctx.fillRect(0, 0, w, h);
-      
-      // Subtle industrial grid pattern
-      ctx.strokeStyle = 'rgba(249, 115, 22, 0.04)'; // faint amber/orange
-      ctx.lineWidth = 1;
-      const gridSpacing = 60;
-      for (let x = 0; x < w; x += gridSpacing) {
-        ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, h);
-        ctx.stroke();
-      }
-      for (let y = 0; y < h; y += gridSpacing) {
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(w, y);
-        ctx.stroke();
-      }
-    } else if (theme === 'energy') {
-      // Substation electric blue gradient
-      const gradient = ctx.createLinearGradient(0, 0, w, h);
-      gradient.addColorStop(0, '#020617');
-      gradient.addColorStop(1, '#0f172a');
-      ctx.fillStyle = gradient;
-      ctx.fillRect(0, 0, w, h);
-      
-      // Tech electrical grid circles
-      ctx.strokeStyle = 'rgba(6, 182, 212, 0.05)'; // cyan volt
-      ctx.lineWidth = 1.5;
-      for (let r = 100; r < Math.max(w, h); r += 200) {
-        ctx.beginPath();
-        ctx.arc(w/2, h/2, r, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-    } else {
-      // Tech grid theme (Matrix/Cyber)
-      const gradient = ctx.createLinearGradient(0, 0, w, h);
-      gradient.addColorStop(0, '#020617');
-      gradient.addColorStop(1, '#022c22'); // very dark green
-      ctx.fillStyle = gradient;
-      ctx.fillRect(0, 0, w, h);
-      
-      // Glowing cyber grid matrix lines
-      ctx.strokeStyle = 'rgba(16, 185, 129, 0.05)'; // emerald
-      ctx.lineWidth = 1;
-      const spacing = 50;
-      for (let x = 0; x < w; x += spacing) {
-        ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, h);
-        ctx.stroke();
-      }
-      for (let y = 0; y < h; y += spacing) {
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(w, y);
-        ctx.stroke();
-      }
-    }
-    
-    this.backgroundCache = cache;
-  }
-  
-  private drawHexagon(x: number, y: number, radius: number): void {
-    if (!this.ctx) return;
-    
-    this.ctx.beginPath();
-    for (let i = 0; i < 6; i++) {
-      const angle = Math.PI / 6 + (Math.PI / 3) * i;
-      const px = x + radius * Math.cos(angle);
-      const py = y + radius * Math.sin(angle);
-      if (i === 0) {
-        this.ctx.moveTo(px, py);
-      } else {
-        this.ctx.lineTo(px, py);
-      }
-    }
-    this.ctx.closePath();
-  }
-  
-  private drawRoundedRect(x: number, y: number, width: number, height: number, radius: number): void {
-    if (!this.ctx) return;
-    
-    this.ctx.beginPath();
-    this.ctx.moveTo(x + radius, y);
-    this.ctx.lineTo(x + width - radius, y);
-    this.ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
-    this.ctx.lineTo(x + width, y + height - radius);
-    this.ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
-    this.ctx.lineTo(x + radius, y + height);
-    this.ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
-    this.ctx.lineTo(x, y + radius);
-    this.ctx.quadraticCurveTo(x, y, x + radius, y);
-    this.ctx.closePath();
-  }
-  
-  private renderTag(
-    text: string,
-    x: number,
-    y: number,
-    color: string,
-    align: 'left' | 'center' | 'right' = 'left'
-  ): void {
-    if (!this.ctx) return;
-    
-    this.ctx.save();
-    this.ctx.font = 'bold 10px "Space Grotesk", sans-serif';
-    const metrics = this.ctx.measureText(text);
-    const paddingX = 8;
-    const width = metrics.width + paddingX * 2;
-    const height = 16;
-    let startX = x;
-    
-    if (align === 'center') {
-      startX = x - width / 2;
-    } else if (align === 'right') {
-      startX = x - width;
-    }
-    
-    this.drawRoundedRect(startX, y - height + 4, width, height, 6);
-    this.ctx.fillStyle = color;
-    this.ctx.globalAlpha = 0.9;
-    this.ctx.fill();
-    
-    this.ctx.globalAlpha = 1;
-    this.ctx.fillStyle = '#0b1220';
-    this.ctx.textAlign = 'center';
-    this.ctx.textBaseline = 'middle';
-    this.ctx.fillText(text, startX + width / 2, y - height / 2 + 4);
-    this.ctx.restore();
-  }
-  
-  private renderGrid(): void {
-    if (!this.ctx || !this.canvas) return;
-    
-    const gridSize = 90;
-    const width = this.canvas.width / (window.devicePixelRatio || 1);
-    const height = this.canvas.height / (window.devicePixelRatio || 1);
-    
-    this.ctx.save();
-    this.ctx.lineWidth = 1;
-    this.ctx.strokeStyle = this.themeColors.read('--border-color', 0.18);
-    
-    // Vertical lines
-    for (let x = 0; x <= width; x += gridSize) {
-      this.ctx.beginPath();
-      this.ctx.moveTo(x, 0);
-      this.ctx.lineTo(x, height);
-      this.ctx.stroke();
-    }
-    
-    // Horizontal lines
-    for (let y = 0; y <= height; y += gridSize) {
-      this.ctx.beginPath();
-      this.ctx.moveTo(0, y);
-      this.ctx.lineTo(width, y);
-      this.ctx.stroke();
-    }
-    
-    // Major lines
-    this.ctx.strokeStyle = this.themeColors.read('--border-color', 0.30);
-    this.ctx.lineWidth = 1.2;
-    const majorStep = gridSize * 4;
-    
-    for (let x = 0; x <= width; x += majorStep) {
-      this.ctx.beginPath();
-      this.ctx.moveTo(x, 0);
-      this.ctx.lineTo(x, height);
-      this.ctx.stroke();
-    }
-    
-    for (let y = 0; y <= height; y += majorStep) {
-      this.ctx.beginPath();
-      this.ctx.moveTo(0, y);
-      this.ctx.lineTo(width, y);
-      this.ctx.stroke();
-    }
-    
-    this.ctx.restore();
-  }
-  
-  private renderIcon(icon: string, x: number, y: number, size: number): void {
-    if (!this.ctx) return;
-    
-    if (icon && (icon.startsWith('fa-') || icon.includes('fa '))) {
-      this.ctx.font = `900 ${size}px "Font Awesome 6 Free", "Font Awesome 5 Free", sans-serif`;
-      // Map icons to unicode symbols
-      let symbol = '\uf11b'; // default gamepad or dot
-      const name = icon.toLowerCase();
-      if (name.includes('sun')) symbol = '\uf185';
-      else if (name.includes('globe')) symbol = '\uf0ac';
-      else if (name.includes('satellite')) symbol = '\uf7c0';
-      else if (name.includes('industry')) symbol = '\uf275';
-      else if (name.includes('cogs') || name.includes('gear')) symbol = '\uf085';
-      else if (name.includes('cog')) symbol = '\uf013';
-      else if (name.includes('wrench')) symbol = '\uf0ad';
-      else if (name.includes('bolt')) symbol = '\uf0e7';
-      else if (name.includes('plug')) symbol = '\uf1e6';
-      else if (name.includes('battery')) symbol = '\uf240';
-      else if (name.includes('server')) symbol = '\uf233';
-      else if (name.includes('database')) symbol = '\uf1c0';
-      else if (name.includes('microchip') || name.includes('cpu')) symbol = '\uf2db';
-      else if (name.includes('shield')) symbol = '\uf3ed';
-      else if (name.includes('rocket')) symbol = '\uf135';
-      else if (name.includes('space-shuttle')) symbol = '\uf197';
-      else if (name.includes('atom')) symbol = '\uf5d2';
-      
-      this.ctx.textAlign = 'center';
-      this.ctx.textBaseline = 'middle';
-      this.ctx.fillStyle = '#f8fafc';
-      this.ctx.fillText(symbol, x, y);
-    } else {
-      this.ctx.font = `700 ${size}px "Space Grotesk", sans-serif`;
-      this.ctx.textAlign = 'center';
-      this.ctx.textBaseline = 'middle';
-      this.ctx.fillStyle = '#e2e8f0';
-      this.ctx.fillText(icon || '', x, y);
-    }
-  }
-  
-  private getStationLabelLines(node: NetworkNode): string[] {
-    const cached = this.stationLabelCache.get(node.id);
-    if (cached) return cached;
-    
-    const maxLineLength = 14;
-    const words = node.name.split(/\s+/);
-    const lines: string[] = [];
-    let currentLine = '';
-    
-    words.forEach(word => {
-      const next = currentLine ? `${currentLine} ${word}` : word;
-      if (next.length > maxLineLength && currentLine) {
-        lines.push(currentLine);
-        currentLine = word;
-      } else {
-        currentLine = next;
-      }
-    });
-    
-    if (currentLine) {
-      lines.push(currentLine);
-    }
-    
-    if (lines.length > 2) {
-      lines.length = 2;
-      const last = lines[1];
-      if (last.length > maxLineLength - 1) {
-        lines[1] = `${last.slice(0, maxLineLength - 1)}…`;
-      }
-    }
-    
-    this.stationLabelCache.set(node.id, lines);
-    return lines;
-  }
-  
-  private renderStationLabel(lines: string[], x: number, y: number): void {
+
+  private render(): void {
     const ctx = this.ctx;
     if (!ctx) return;
-    
-    const lineHeight = 16;
-    const startY = y - ((lines.length - 1) * lineHeight) / 2;
-    
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.font = '600 13px "Space Grotesk", sans-serif';
-    
-    lines.forEach((line, idx) => {
-      const lineY = startY + idx * lineHeight;
-      ctx.strokeStyle = 'rgba(0, 0, 0, 0.65)';
-      ctx.lineWidth = 3;
-      ctx.strokeText(line, x, lineY);
-      ctx.fillStyle = '#e2e8f0';
-      ctx.fillText(line, x, lineY);
-    });
-  }
-  
-  private renderLabel(text: string, x: number, y: number, size: number, bold = false): void {
-    if (!this.ctx) return;
-    
-    this.ctx.font = `${bold ? 'bold ' : ''}${size}px "Space Grotesk", sans-serif`;
-    this.ctx.textAlign = 'center';
-    this.ctx.textBaseline = 'top';
-    
-    // Text shadow
-    this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
-    this.ctx.lineWidth = 3;
-    this.ctx.strokeText(text, x, y);
-    
-    // Main text
-    this.ctx.fillStyle = '#f8fafc';
-    this.ctx.fillText(text, x, y);
-  }
-  
-  private renderLabelWithBackground(text: string, x: number, y: number, size: number): void {
-    if (!this.ctx) return;
-    
-    this.ctx.font = `bold ${size}px "Space Grotesk", sans-serif`;
-    const metrics = this.ctx.measureText(text);
-    const padding = 6;
-    
-    // Background
-    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-    this.ctx.fillRect(
-      x - metrics.width / 2 - padding,
-      y - 2,
-      metrics.width + padding * 2,
-      size + 6
-    );
-    
-    // Text
-    this.ctx.textAlign = 'center';
-    this.ctx.textBaseline = 'top';
-    this.ctx.fillStyle = '#ffffff';
-    this.ctx.fillText(text, x, y);
-  }
-  
-  private renderBadge(text: string, x: number, y: number, color: string): void {
-    if (!this.ctx) return;
-    
-    const radius = 14;
-    
-    // Badge background
-    this.ctx.beginPath();
-    this.ctx.arc(x, y, radius, 0, Math.PI * 2);
-    this.ctx.fillStyle = color;
-    this.ctx.fill();
-    
-    this.ctx.strokeStyle = '#ffffff';
-    this.ctx.lineWidth = 2;
-    this.ctx.stroke();
-    
-    // Text
-    this.ctx.font = 'bold 11px "Space Grotesk", sans-serif';
-    this.ctx.textAlign = 'center';
-    this.ctx.textBaseline = 'middle';
-    this.ctx.fillStyle = '#ffffff';
-    this.ctx.fillText(text, x, y);
-  }
-  
-  private renderPulseEffect(x: number, y: number, radius: number): void {
-    if (!this.ctx) return;
-    
-    const time = Date.now() / 1000;
-    const pulseRadius = radius + Math.sin(time * 3) * 8;
-    const alpha = 0.4 + Math.sin(time * 3) * 0.2;
-    
-    this.ctx.beginPath();
-    this.ctx.arc(x, y, pulseRadius, 0, Math.PI * 2);
-    this.ctx.strokeStyle = this.withAlpha(STATUS.danger, alpha);
-    this.ctx.lineWidth = 3;
-    this.ctx.stroke();
-  }
-  
-  private renderUIOverlays(width: number, height: number): void {
-    if (!this.ctx) return;
-    const ctx = this.ctx;
-    
-    // Status card on the left
+    const { w, h } = this.canvasSize;
+
+    // Arka plan (cache'li).
+    this.drawBackground(w, h);
+
+    if (!this.renderNodes.length) return;
+
     ctx.save();
-    const cardWidth = 260;
-    const cardHeight = 110;
-    this.drawRoundedRect(20, 20, cardWidth, cardHeight, 12);
-    const cardGradient = ctx.createLinearGradient(20, 20, 20, 20 + cardHeight);
-    cardGradient.addColorStop(0, 'rgba(15, 23, 42, 0.92)');
-    cardGradient.addColorStop(1, 'rgba(30, 41, 59, 0.92)');
-    ctx.fillStyle = cardGradient;
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
-    ctx.lineWidth = 1;
-    ctx.stroke();
-    
-    const modeText = this.viewMode.mode.toUpperCase();
-    const focusText = this.viewMode.selectedNode ? this.viewMode.selectedNode.name : this.translate.instant('NETWORK_MAP.ALL_STATIONS');
-    ctx.fillStyle = '#cbd5e1';
-    ctx.font = '11px "Space Grotesk", sans-serif';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
-    ctx.fillText(`${this.translate.instant('NETWORK_MAP.HUD_MODE')}: ${modeText}`, 32, 32);
-    ctx.fillText(`${this.translate.instant('NETWORK_MAP.HUD_FOCUS')}: ${focusText}`, 32, 50);
-    ctx.fillText(`${this.translate.instant('NETWORK_MAP.HUD_ZOOM')}: ${Math.round(this.viewMode.zoomLevel * 100)}%`, 32, 68);
-    
-    const legend = [
-      { color: BRAND.tertiary, label: this.translate.instant('NETWORK_MAP.STATION_B1') },
-      { color: STATUS.success, label: this.translate.instant('NETWORK_MAP.VOLTAGE_B2') },
-      { color: BRAND.primary, label: this.translate.instant('NETWORK_MAP.EQUIPMENT_B3') }
-    ];
-    
-    legend.forEach((item, idx) => {
-      const lx = 32 + idx * 70;
-      const ly = 94;
-      ctx.fillStyle = item.color;
+    ctx.translate(this.view.panX, this.view.panY);
+    ctx.scale(this.view.zoom, this.view.zoom);
+
+    const bounds = this.visibleBounds();
+
+    // Önce bağlantılar (parent→child Bezier), sonra düğümler.
+    this.drawLinks(bounds);
+    this.drawNodes(bounds);
+
+    ctx.restore();
+  }
+
+  // ---- Arka plan (Kozmik / Fabrika / Siber / Blueprint / Kristal) ----
+  private drawBackground(w: number, h: number): void {
+    const ctx = this.ctx!;
+    const theme = this.themeConfig.theme;
+    const showGrid = this.themeConfig.showGrid !== false;
+
+    if (!this.bgCache || this.bgCacheSize.w !== w || this.bgCacheSize.h !== h) {
+      const cache = document.createElement('canvas');
+      cache.width = w; cache.height = h;
+      const c = cache.getContext('2d')!;
+
+      if (theme === 'factory') {
+        // Endüstriyel Fabrika Teması: Koyu grafit/çelik zemin + CAD ızgarası
+        const g = c.createLinearGradient(0, 0, w, h);
+        g.addColorStop(0, '#090d14');
+        g.addColorStop(0.5, '#0f1522');
+        g.addColorStop(1, '#070a10');
+        c.fillStyle = g; c.fillRect(0, 0, w, h);
+
+        if (showGrid) {
+          // 40px CAD minor grid
+          c.strokeStyle = 'rgba(245, 158, 11, 0.035)';
+          c.lineWidth = 1;
+          for (let gx = 0; gx < w; gx += 40) {
+            c.beginPath(); c.moveTo(gx, 0); c.lineTo(gx, h); c.stroke();
+          }
+          for (let gy = 0; gy < h; gy += 40) {
+            c.beginPath(); c.moveTo(0, gy); c.lineTo(w, gy); c.stroke();
+          }
+
+          // 120px CAD major grid & crosshairs
+          c.strokeStyle = 'rgba(245, 158, 11, 0.08)';
+          c.lineWidth = 1.2;
+          for (let gx = 0; gx < w; gx += 120) {
+            c.beginPath(); c.moveTo(gx, 0); c.lineTo(gx, h); c.stroke();
+          }
+          for (let gy = 0; gy < h; gy += 120) {
+            c.beginPath(); c.moveTo(0, gy); c.lineTo(w, gy); c.stroke();
+          }
+
+          // Intersection coordinate ticks (+)
+          c.strokeStyle = 'rgba(245, 158, 11, 0.25)';
+          c.lineWidth = 1.2;
+          for (let gx = 0; gx < w; gx += 120) {
+            for (let gy = 0; gy < h; gy += 120) {
+              c.beginPath();
+              c.moveTo(gx - 4, gy); c.lineTo(gx + 4, gy);
+              c.moveTo(gx, gy - 4); c.lineTo(gx, gy + 4);
+              c.stroke();
+            }
+          }
+        }
+
+        const glow = c.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.max(w, h) * 0.6);
+        glow.addColorStop(0, 'rgba(245, 158, 11, 0.08)');
+        glow.addColorStop(0.6, 'rgba(16, 185, 129, 0.04)');
+        glow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        c.fillStyle = glow; c.fillRect(0, 0, w, h);
+
+      } else if (theme === 'cyber') {
+        // Siber Ağ & IoT Teması: Ultra-koyu OLED + neon cyber grid + HUD köşe işaretleri
+        const g = c.createLinearGradient(0, 0, w, h);
+        g.addColorStop(0, '#020408');
+        g.addColorStop(0.5, '#050c14');
+        g.addColorStop(1, '#010204');
+        c.fillStyle = g; c.fillRect(0, 0, w, h);
+
+        if (showGrid) {
+          // Cyber 35px grid
+          c.strokeStyle = 'rgba(0, 255, 157, 0.035)';
+          c.lineWidth = 1;
+          for (let gx = 0; gx < w; gx += 35) {
+            c.beginPath(); c.moveTo(gx, 0); c.lineTo(gx, h); c.stroke();
+          }
+          for (let gy = 0; gy < h; gy += 35) {
+            c.beginPath(); c.moveTo(0, gy); c.lineTo(w, gy); c.stroke();
+          }
+
+          // Cyber 140px data tracks
+          c.strokeStyle = 'rgba(0, 240, 255, 0.08)';
+          c.lineWidth = 1.2;
+          for (let gx = 0; gx < w; gx += 140) {
+            c.beginPath(); c.moveTo(gx, 0); c.lineTo(gx, h); c.stroke();
+          }
+          for (let gy = 0; gy < h; gy += 140) {
+            c.beginPath(); c.moveTo(0, gy); c.lineTo(w, gy); c.stroke();
+          }
+
+          // Tech reticles [+]
+          c.strokeStyle = 'rgba(0, 255, 157, 0.35)';
+          c.lineWidth = 1.4;
+          for (let gx = 0; gx < w; gx += 140) {
+            for (let gy = 0; gy < h; gy += 140) {
+              c.strokeRect(gx - 3, gy - 3, 6, 6);
+            }
+          }
+        }
+
+        const glow = c.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.max(w, h) * 0.55);
+        glow.addColorStop(0, 'rgba(0, 255, 157, 0.09)');
+        glow.addColorStop(0.5, 'rgba(0, 240, 255, 0.04)');
+        glow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        c.fillStyle = glow; c.fillRect(0, 0, w, h);
+
+      } else if (theme === 'blueprint') {
+        // Teknik Blueprint Teması: Klasik mimari/mühendislik derin mavisi + milimetrik grid
+        const g = c.createLinearGradient(0, 0, w, h);
+        g.addColorStop(0, '#061a33');
+        g.addColorStop(0.5, '#09274c');
+        g.addColorStop(1, '#051426');
+        c.fillStyle = g; c.fillRect(0, 0, w, h);
+
+        if (showGrid) {
+          // 20px fine grid
+          c.strokeStyle = 'rgba(56, 189, 248, 0.045)';
+          c.lineWidth = 0.8;
+          for (let gx = 0; gx < w; gx += 20) {
+            c.beginPath(); c.moveTo(gx, 0); c.lineTo(gx, h); c.stroke();
+          }
+          for (let gy = 0; gy < h; gy += 20) {
+            c.beginPath(); c.moveTo(0, gy); c.lineTo(w, gy); c.stroke();
+          }
+
+          // 100px major drafting grid
+          c.strokeStyle = 'rgba(56, 189, 248, 0.12)';
+          c.lineWidth = 1.2;
+          for (let gx = 0; gx < w; gx += 100) {
+            c.beginPath(); c.moveTo(gx, 0); c.lineTo(gx, h); c.stroke();
+          }
+          for (let gy = 0; gy < h; gy += 100) {
+            c.beginPath(); c.moveTo(0, gy); c.lineTo(w, gy); c.stroke();
+          }
+
+          // Drafting crosshair markers
+          c.strokeStyle = 'rgba(56, 189, 248, 0.35)';
+          c.lineWidth = 1;
+          for (let gx = 0; gx < w; gx += 100) {
+            for (let gy = 0; gy < h; gy += 100) {
+              c.beginPath();
+              c.moveTo(gx - 5, gy); c.lineTo(gx + 5, gy);
+              c.moveTo(gx, gy - 5); c.lineTo(gx, gy + 5);
+              c.stroke();
+            }
+          }
+        }
+
+        const glow = c.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.max(w, h) * 0.65);
+        glow.addColorStop(0, 'rgba(56, 189, 248, 0.09)');
+        glow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        c.fillStyle = glow; c.fillRect(0, 0, w, h);
+
+      } else if (theme === 'crystal') {
+        // Kristal & Prizma Teması: Obsidyen zemin + aurora dalgaları + prizma ışıltıları
+        const g = c.createLinearGradient(0, 0, w, h);
+        g.addColorStop(0, '#07050f');
+        g.addColorStop(0.5, '#0e0a1f');
+        g.addColorStop(1, '#05030b');
+        c.fillStyle = g; c.fillRect(0, 0, w, h);
+
+        // Aurora ışık dalgaları
+        const a1 = c.createRadialGradient(w * 0.35, h * 0.4, 30, w * 0.35, h * 0.4, Math.max(w, h) * 0.5);
+        a1.addColorStop(0, 'rgba(236, 72, 153, 0.10)');
+        a1.addColorStop(0.6, 'rgba(139, 92, 246, 0.04)');
+        a1.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        c.fillStyle = a1; c.fillRect(0, 0, w, h);
+
+        const a2 = c.createRadialGradient(w * 0.68, h * 0.6, 20, w * 0.68, h * 0.6, Math.max(w, h) * 0.45);
+        a2.addColorStop(0, 'rgba(6, 182, 212, 0.09)');
+        a2.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        c.fillStyle = a2; c.fillRect(0, 0, w, h);
+
+        // Prizmatik kristal ışıltıları
+        c.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+        c.fillStyle = 'rgba(255, 255, 255, 0.7)';
+        const sparkleCount = Math.min(80, Math.floor((w * h) / 20000));
+        for (let i = 0; i < sparkleCount; i++) {
+          const hx = this.hash(i * 44851 + 3) * w;
+          const hy = this.hash(i * 32173 + 7) * h;
+          const s = (this.hash(i * 19283 + 9) % 10) / 10 * 2.5 + 1;
+          c.beginPath();
+          c.moveTo(hx - s * 2, hy); c.lineTo(hx + s * 2, hy);
+          c.moveTo(hx, hy - s * 2); c.lineTo(hx, hy + s * 2);
+          c.stroke();
+          c.beginPath();
+          c.arc(hx, hy, s * 0.4, 0, Math.PI * 2);
+          c.fill();
+        }
+
+      } else {
+        // Kozmik Uzay Teması: Çok katmanlı nebula + yıldızlar + güneş parıltısı
+        const g = c.createLinearGradient(0, 0, w, h);
+        g.addColorStop(0, '#04060e');
+        g.addColorStop(0.5, '#080c1d');
+        g.addColorStop(1, '#04050c');
+        c.fillStyle = g; c.fillRect(0, 0, w, h);
+
+        // Nebula gaz bulutları (mor / camgöbeği)
+        const n1 = c.createRadialGradient(w * 0.3, h * 0.35, 20, w * 0.3, h * 0.35, Math.max(w, h) * 0.48);
+        n1.addColorStop(0, 'rgba(167, 139, 250, 0.11)');
+        n1.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        c.fillStyle = n1; c.fillRect(0, 0, w, h);
+
+        const n2 = c.createRadialGradient(w * 0.7, h * 0.65, 30, w * 0.7, h * 0.65, Math.max(w, h) * 0.42);
+        n2.addColorStop(0, 'rgba(34, 211, 238, 0.08)');
+        n2.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        c.fillStyle = n2; c.fillRect(0, 0, w, h);
+
+        const glow = c.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.max(w, h) * 0.58);
+        glow.addColorStop(0, 'rgba(96, 165, 250, 0.12)');
+        glow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        c.fillStyle = glow; c.fillRect(0, 0, w, h);
+
+        // Yıldızlar
+        c.fillStyle = 'rgba(225, 235, 255, 0.75)';
+        const starCount = Math.min(150, Math.floor((w * h) / 12000));
+        for (let i = 0; i < starCount; i++) {
+          const hx = this.hash(i * 92821 + 1);
+          const hy = this.hash(i * 27487 + 7);
+          const r = (this.hash(i * 12553 + 3) % 10) / 10 * 1.3 + 0.25;
+          c.globalAlpha = 0.2 + (this.hash(i * 61511 + 5) % 70) / 100;
+          c.beginPath();
+          c.arc(hx * w, hy * h, r, 0, Math.PI * 2);
+          c.fill();
+        }
+        c.globalAlpha = 1;
+      }
+      this.bgCache = cache;
+      this.bgCacheSize = { w, h };
+    }
+    ctx.drawImage(this.bgCache, 0, 0, w, h);
+
+    // Yörünge rehber halkaları (isteğe bağlı)
+    if (this.themeConfig.showOrbits !== false) {
+      ctx.save();
+      ctx.translate(this.view.panX, this.view.panY);
+      ctx.scale(this.view.zoom, this.view.zoom);
+
+      if (theme === 'factory') {
+        ctx.strokeStyle = 'rgba(245, 158, 11, 0.09)';
+        ctx.setLineDash([8, 8]);
+      } else if (theme === 'cyber') {
+        ctx.strokeStyle = 'rgba(0, 255, 157, 0.10)';
+        ctx.setLineDash([4, 12]);
+      } else if (theme === 'blueprint') {
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.14)';
+        ctx.setLineDash([6, 6]);
+      } else if (theme === 'crystal') {
+        ctx.strokeStyle = 'rgba(236, 72, 153, 0.10)';
+        ctx.setLineDash([]);
+      } else {
+        ctx.strokeStyle = 'rgba(124, 141, 181, 0.07)';
+        ctx.setLineDash([]);
+      }
+
+      ctx.lineWidth = 1 / this.view.zoom;
+      for (let r = 1; r <= this.MAX_DRILL_RING + 1; r++) {
+        ctx.beginPath();
+        ctx.arc(0, 0, this.RING_RADIUS * r, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+  }
+
+  private drawLinks(bounds: VisibleBounds): void {
+    const ctx = this.ctx!;
+    const showAll = this.renderNodes.length <= 600;
+    const nodeSet = new Set(this.renderNodes.map(n => n.id));
+    const theme = this.themeConfig.theme;
+
+    for (const node of this.renderNodes) {
+      if (!node.parentId) continue;
+      if (!nodeSet.has(node.parentId)) continue;
+      const parent = this.nodeMap.get(node.parentId);
+      if (!parent) continue;
+      // Bağlantı yalnızca her iki uç pencerede ve ekranda görünüyorsa çiz.
+      if (!showAll && !this.inBounds(node, bounds) && !this.inBounds(parent, bounds)) continue;
+
+      const color = this.levelColor(node.ring);
+
+      ctx.save();
+      if (theme === 'blueprint') {
+        ctx.setLineDash([5, 4]);
+        ctx.strokeStyle = this.alpha(color, 0.45);
+        ctx.lineWidth = 1.2;
+      } else if (theme === 'cyber') {
+        ctx.setLineDash([]);
+        ctx.strokeStyle = this.alpha(color, 0.6);
+        ctx.lineWidth = 1.6;
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 8;
+      } else if (theme === 'factory') {
+        ctx.setLineDash([]);
+        ctx.strokeStyle = this.alpha(color, 0.42);
+        ctx.lineWidth = 2.4;
+      } else if (theme === 'crystal') {
+        ctx.setLineDash([]);
+        ctx.strokeStyle = this.alpha(color, 0.45);
+        ctx.lineWidth = 1.5;
+      } else {
+        ctx.setLineDash([]);
+        ctx.strokeStyle = this.alpha(color, 0.35);
+        ctx.lineWidth = 1.4;
+      }
+
       ctx.beginPath();
-      ctx.arc(lx, ly, 5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#94a3b8';
-      ctx.font = '10px "Space Grotesk", sans-serif';
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(item.label, lx + 10, ly);
-    });
-    ctx.restore();
-    
-    // Zoom capsule on the right
-    ctx.save();
-    const zoomWidth = 120;
-    const zoomHeight = 56;
-    const zoomX = width - zoomWidth - 24;
-    const zoomY = 20;
-    this.drawRoundedRect(zoomX, zoomY, zoomWidth, zoomHeight, 12);
-    const zoomGradient = ctx.createLinearGradient(zoomX, zoomY, zoomX, zoomY + zoomHeight);
-    zoomGradient.addColorStop(0, this.withAlpha(STATUS.success, 0.9));
-    zoomGradient.addColorStop(1, this.withAlpha(BRAND.tertiary, 0.9));
-    ctx.fillStyle = zoomGradient;
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-    ctx.stroke();
-    
-    ctx.fillStyle = '#0f172a';
-    ctx.font = 'bold 18px "Space Grotesk", sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(`${Math.round(this.viewMode.zoomLevel * 100)}%`, zoomX + zoomWidth / 2, zoomY + 24);
-    ctx.font = '11px "Space Grotesk", sans-serif';
-    ctx.fillText(this.translate.instant('NETWORK_MAP.HUD_ZOOM'), zoomX + zoomWidth / 2, zoomY + 42);
-    ctx.restore();
+      ctx.moveTo(parent.x, parent.y);
+      // Kavisli Bezier
+      const mx = (parent.x + node.x) / 2;
+      const my = (parent.y + node.y) / 2;
+      ctx.quadraticCurveTo(mx, my, node.x, node.y);
+      ctx.stroke();
+      ctx.restore();
+    }
   }
-  
-  // ============================================================================
-  // EVENT HANDLERS
-  // ============================================================================
-  
-  private setupEventListeners(): void {
-    if (!this.canvas) return;
-    
-    // Mouse events
-    fromEvent<MouseEvent>(this.canvas, 'mousedown').subscribe(e => this.onMouseDown(e));
-    fromEvent<MouseEvent>(this.canvas, 'mousemove').pipe(throttleTime(16)).subscribe(e => this.onMouseMove(e));
-    fromEvent<MouseEvent>(this.canvas, 'mouseup').subscribe(e => this.onMouseUp(e));
-    fromEvent<MouseEvent>(this.canvas, 'click').subscribe(e => this.onClick(e));
-    fromEvent<WheelEvent>(this.canvas, 'wheel').subscribe(e => this.onWheel(e));
-    
-    // Touch support
-    fromEvent<TouchEvent>(this.canvas, 'touchstart').subscribe(e => this.onTouchStart(e));
-    fromEvent<TouchEvent>(this.canvas, 'touchmove').subscribe(e => this.onTouchMove(e));
-    fromEvent<TouchEvent>(this.canvas, 'touchend').subscribe(e => this.onTouchEnd(e));
-  }
-  
-  private onMouseDown(event: MouseEvent): void {
-    this.interaction.isDragging = true;
-    this.interaction.dragStart = { x: event.clientX, y: event.clientY };
-    this.interaction.lastDragPos = { x: event.clientX, y: event.clientY };
-    if (this.canvas) this.canvas.style.cursor = 'grabbing';
-    this.markDirty();
-  }
-  
-  private onMouseMove(event: MouseEvent): void {
-    if (!this.canvas) return;
-    
-    const rect = this.canvas.getBoundingClientRect();
-    const x = (event.clientX - rect.left - this.viewMode.panOffset.x) / this.viewMode.zoomLevel;
-    const y = (event.clientY - rect.top - this.viewMode.panOffset.y) / this.viewMode.zoomLevel;
-    
-    this.interaction.mousePos = { x, y };
-    
-    if (this.interaction.isDragging) {
-      const dx = event.clientX - this.interaction.lastDragPos.x;
-      const dy = event.clientY - this.interaction.lastDragPos.y;
-      
-      this.viewMode.panOffset.x += dx;
-      this.viewMode.panOffset.y += dy;
-      
-      this.interaction.lastDragPos = { x: event.clientX, y: event.clientY };
-      this.markDirty();
-    } else {
-      if (this.viewMode.mode === 'equipment') {
-        const hoveredElement = this.findElementAt(x, y);
-        if (hoveredElement !== this.interaction.hoveredElement) {
-          this.interaction.hoveredElement = hoveredElement;
-          this.canvas.style.cursor = hoveredElement ? 'pointer' : 'default';
-          this.markDirty();
+
+  private drawNodes(bounds: VisibleBounds): void {
+    const ctx = this.ctx!;
+    const focus = this.focusId ? this.nodeMap.get(this.focusId) : null;
+    const showLabels = this.view.zoom >= 0.55;
+    const shape = this.resolveNodeShape();
+
+    for (const node of this.renderNodes) {
+      if (!this.inBounds(node, bounds)) continue;
+      const isFocus = focus === node;
+      const isHover = this.hoveredNode === node;
+      const isSel = this.selectedNode === node;
+      const baseR = this.nodeRadius(node.ring);
+      const r = isHover || isFocus ? baseR * 1.15 : baseR;
+      const color = this.levelColor(node.ring);
+
+      // Halo (focus/hover/seçili)
+      if (isFocus || isHover || isSel) {
+        ctx.shadowColor = color;
+        ctx.shadowBlur = isFocus ? 28 : (isSel ? 22 : 16);
+      } else {
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+      }
+
+      // Şekle göre gövde çizimi
+      if (shape === 'hexagon') {
+        this.drawHexagon(ctx, node.x, node.y, r);
+        const grad = ctx.createLinearGradient(node.x - r, node.y - r, node.x + r, node.y + r);
+        grad.addColorStop(0, '#1c2430');
+        grad.addColorStop(0.5, '#121822');
+        grad.addColorStop(1, color);
+        ctx.fillStyle = grad;
+        ctx.fill();
+
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+        ctx.lineWidth = isSel ? 2.5 : 1.5;
+        ctx.strokeStyle = isSel ? '#ffffff' : this.alpha(color, 0.6);
+        ctx.stroke();
+
+        if (r >= 14) {
+          this.drawHexagonRivets(ctx, node.x, node.y, r, '#ffffff');
+        }
+      } else if (shape === 'cyber') {
+        this.drawCyberOctagon(ctx, node.x, node.y, r);
+        const grad = ctx.createLinearGradient(node.x - r, node.y - r, node.x + r, node.y + r);
+        grad.addColorStop(0, '#041315');
+        grad.addColorStop(0.6, '#082322');
+        grad.addColorStop(1, color);
+        ctx.fillStyle = grad;
+        ctx.fill();
+
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+        ctx.lineWidth = isSel ? 2.5 : 1.5;
+        ctx.strokeStyle = isSel ? '#ffffff' : this.alpha(color, 0.7);
+        ctx.stroke();
+
+        if (r >= 12 && (isFocus || isHover || isSel || this.view.zoom >= 0.75)) {
+          this.drawCyberBrackets(ctx, node.x, node.y, r, isSel ? '#ffffff' : color);
+        }
+      } else if (shape === 'diamond') {
+        this.drawDiamond(ctx, node.x, node.y, r);
+        const grad = ctx.createRadialGradient(node.x, node.y, r * 0.1, node.x, node.y, r);
+        grad.addColorStop(0, '#ffffff');
+        grad.addColorStop(0.3, color);
+        grad.addColorStop(1, '#090514');
+        ctx.fillStyle = grad;
+        ctx.fill();
+
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+        ctx.lineWidth = isSel ? 2.5 : 1.5;
+        ctx.strokeStyle = isSel ? '#ffffff' : this.alpha(color, 0.65);
+        ctx.stroke();
+
+        if (r >= 14) {
+          this.drawCrystalFacets(ctx, node.x, node.y, r, '#ffffff');
+        }
+      } else if (shape === 'blueprint') {
+        ctx.beginPath();
+        ctx.arc(node.x, node.y, r, 0, Math.PI * 2);
+        const grad = ctx.createRadialGradient(node.x, node.y, r * 0.2, node.x, node.y, r);
+        grad.addColorStop(0, '#103765');
+        grad.addColorStop(0.7, '#071f3b');
+        grad.addColorStop(1, color);
+        ctx.fillStyle = grad;
+        ctx.fill();
+
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+        ctx.lineWidth = isSel ? 2.5 : 1.5;
+        ctx.strokeStyle = isSel ? '#ffffff' : this.alpha(color, 0.75);
+        ctx.stroke();
+
+        if (r >= 12) {
+          this.drawBlueprintCrosshairs(ctx, node.x, node.y, r, isSel ? '#ffffff' : color);
         }
       } else {
-        // Update hover
-        const hoveredNode = this.findNodeAt(x, y);
-        if (hoveredNode !== this.interaction.hoveredNode) {
-          this.interaction.hoveredNode = hoveredNode;
-          this.canvas.style.cursor = hoveredNode ? 'pointer' : 'default';
-          this.markDirty();
+        // 'planet' veya 'circle'
+        if (shape === 'planet' && (isFocus || node.ring === 0)) {
+          this.drawSunCorona(ctx, node.x, node.y, r, color);
+        }
+
+        ctx.beginPath();
+        ctx.arc(node.x, node.y, r, 0, Math.PI * 2);
+        const grad = ctx.createRadialGradient(node.x - r / 3, node.y - r / 3, r / 6, node.x, node.y, r);
+        grad.addColorStop(0, '#ffffff');
+        grad.addColorStop(0.35, color);
+        grad.addColorStop(1, '#0b1020');
+        ctx.fillStyle = grad;
+        ctx.fill();
+
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+        ctx.lineWidth = isSel ? 2.5 : 1.5;
+        ctx.strokeStyle = isSel ? '#ffffff' : this.alpha(color, 0.5);
+        ctx.stroke();
+
+        if (shape === 'planet' && node.ring > 0 && r >= 14) {
+          this.drawPlanetaryRing(ctx, node.x, node.y, r, color);
         }
       }
-    }
-  }
-  
-  private onMouseUp(event: MouseEvent): void {
-    this.interaction.isDragging = false;
-    if (this.canvas) {
-      this.canvas.style.cursor = (this.interaction.hoveredNode || this.interaction.hoveredElement) ? 'pointer' : 'default';
-    }
-  }
-  
-  private onClick(event: MouseEvent): void {
-    // Don't select if we were dragging
-    const dragDist = this.distance(this.interaction.dragStart, 
-      { x: event.clientX, y: event.clientY });
-    if (dragDist > 5) return;
-    
-    if (!this.canvas) return;
 
-    const rect = this.canvas.getBoundingClientRect();
-    const x = (event.clientX - rect.left - this.viewMode.panOffset.x) / this.viewMode.zoomLevel;
-    const y = (event.clientY - rect.top - this.viewMode.panOffset.y) / this.viewMode.zoomLevel;
-
-    if (this.viewMode.mode === 'equipment') {
-      const element = this.findElementAt(x, y);
-      if (element) {
-        this.setSelectedElement(element);
-        return;
+      // FontAwesome glyph ikonu
+      const icon = this.getNodeIcon(node.ring);
+      if (icon && r >= 14 && this.view.zoom >= 0.45) {
+        const iconSize = Math.round(r * 0.88);
+        this.renderCanvasIcon(ctx, icon, node.x, node.y, iconSize, '#ffffff');
       }
-      this.clearSelectedElement();
-    }
 
-    if (this.interaction.hoveredNode) {
-      this.selectNode(this.interaction.hoveredNode);
+      // Çocuk sayısı çipi (yaprak olmayan) - sağ üst rozet
+      if (node.children.length && r >= 12) {
+        const chip = String(node.children.length);
+        const bx = node.x + r * 0.72;
+        const by = node.y - r * 0.72;
+        const badgeR = Math.max(7, Math.round(r * 0.38));
+        ctx.beginPath();
+        ctx.arc(bx, by, badgeR, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.fill();
+        ctx.strokeStyle = '#05070f';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        ctx.font = `700 ${Math.round(badgeR * 1.1)}px "Space Grotesk", sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#05070f';
+        ctx.fillText(chip, bx, by);
+      }
+
+      // Etiket
+      if (showLabels || isHover || isFocus) {
+        this.drawLabel(node.label, node.x, node.y + r + 12, color, isHover || isFocus);
+      }
     }
   }
-  
-  private onWheel(event: WheelEvent): void {
-    event.preventDefault();
-    
-    const zoomSpeed = 0.001;
-    const delta = -event.deltaY * zoomSpeed;
-    const newZoom = this.viewMode.targetZoom + delta;
-    
-    this.viewMode.targetZoom = Math.max(
-      this.viewMode.minZoom,
-      Math.min(this.viewMode.maxZoom, newZoom)
-    );
-    this.markDirty();
+
+  // ---- Düğüm Şekil Çözümlemesi ----
+  resolveNodeShape(): SpaceMapShape {
+    const s = this.themeConfig.nodeShape;
+    if (!s || s === 'auto') {
+      switch (this.themeConfig.theme) {
+        case 'factory': return 'hexagon';
+        case 'cyber': return 'cyber';
+        case 'blueprint': return 'blueprint';
+        case 'crystal': return 'diamond';
+        case 'cosmic':
+        default:
+          return 'planet';
+      }
+    }
+    return s;
   }
-  
-  private onTouchStart(event: TouchEvent): void {
-    if (event.touches.length === 1) {
-      const touch = event.touches[0];
-      this.interaction.isDragging = true;
-      this.interaction.dragStart = { x: touch.clientX, y: touch.clientY };
-      this.interaction.lastDragPos = { x: touch.clientX, y: touch.clientY };
+
+  private getNodeIcon(ring: number): string {
+    if (ring === 0) return this.themeConfig.level1Icon || 'fa-sun';
+    if (ring === 1) return this.themeConfig.level2Icon || 'fa-globe';
+    return this.themeConfig.level3Icon || 'fa-satellite';
+  }
+
+  private renderCanvasIcon(ctx: CanvasRenderingContext2D, icon: string, x: number, y: number, size: number, color = '#ffffff'): void {
+    if (!icon) return;
+    const clean = icon.trim();
+    const glyph = FA_GLYPHS[clean] || FA_GLYPHS[clean.replace('fa-', '')] || (clean.startsWith('fa-') ? null : clean);
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    if (glyph && (glyph.charCodeAt(0) > 255 || glyph.startsWith('\\u'))) {
+      ctx.font = `900 ${Math.round(size)}px "Font Awesome 6 Free", sans-serif`;
+      ctx.fillStyle = color;
+      ctx.fillText(glyph, x, y);
+    } else if (glyph && glyph.length <= 4) {
+      ctx.font = `700 ${Math.round(size * 0.9)}px "Space Grotesk", sans-serif`;
+      ctx.fillStyle = color;
+      ctx.fillText(glyph, x, y);
+    } else {
+      const fallbackGlyph = FA_GLYPHS['fa-' + clean] || '\uf111';
+      ctx.font = `900 ${Math.round(size)}px "Font Awesome 6 Free", sans-serif`;
+      ctx.fillStyle = color;
+      ctx.fillText(fallbackGlyph, x, y);
+    }
+    ctx.restore();
+  }
+
+  // ---- Vektörel Şekil Çizicileri ----
+  private drawHexagon(ctx: CanvasRenderingContext2D, x: number, y: number, r: number): void {
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const angle = (Math.PI / 3) * i - Math.PI / 6;
+      const px = x + r * Math.cos(angle);
+      const py = y + r * Math.sin(angle);
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+  }
+
+  private drawHexagonRivets(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, color: string): void {
+    const rivetR = Math.max(1, r * 0.08);
+    ctx.fillStyle = color;
+    for (let i = 0; i < 6; i++) {
+      const angle = (Math.PI / 3) * i - Math.PI / 6;
+      const px = x + (r * 0.82) * Math.cos(angle);
+      const py = y + (r * 0.82) * Math.sin(angle);
+      ctx.beginPath();
+      ctx.arc(px, py, rivetR, 0, Math.PI * 2);
+      ctx.fill();
     }
   }
-  
-  private onTouchMove(event: TouchEvent): void {
-    if (event.touches.length === 1 && this.interaction.isDragging) {
-      const touch = event.touches[0];
-      const dx = touch.clientX - this.interaction.lastDragPos.x;
-      const dy = touch.clientY - this.interaction.lastDragPos.y;
-      
-      this.viewMode.panOffset.x += dx;
-      this.viewMode.panOffset.y += dy;
-      
-      this.interaction.lastDragPos = { x: touch.clientX, y: touch.clientY };
+
+  private drawCyberOctagon(ctx: CanvasRenderingContext2D, x: number, y: number, r: number): void {
+    const c = r * 0.35;
+    ctx.beginPath();
+    ctx.moveTo(x - r + c, y - r);
+    ctx.lineTo(x + r - c, y - r);
+    ctx.lineTo(x + r, y - r + c);
+    ctx.lineTo(x + r, y + r - c);
+    ctx.lineTo(x + r - c, y + r);
+    ctx.lineTo(x - r + c, y + r);
+    ctx.lineTo(x - r, y + r - c);
+    ctx.lineTo(x - r, y - r + c);
+    ctx.closePath();
+  }
+
+  private drawCyberBrackets(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, color: string): void {
+    const bDist = r + 4;
+    const bLen = Math.max(3, r * 0.32);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+    // Top-Left
+    ctx.beginPath();
+    ctx.moveTo(x - bDist + bLen, y - bDist);
+    ctx.lineTo(x - bDist, y - bDist);
+    ctx.lineTo(x - bDist, y - bDist + bLen);
+    ctx.stroke();
+    // Top-Right
+    ctx.beginPath();
+    ctx.moveTo(x + bDist - bLen, y - bDist);
+    ctx.lineTo(x + bDist, y - bDist);
+    ctx.lineTo(x + bDist, y - bDist + bLen);
+    ctx.stroke();
+    // Bottom-Left
+    ctx.beginPath();
+    ctx.moveTo(x - bDist, y + bDist - bLen);
+    ctx.lineTo(x - bDist, y + bDist);
+    ctx.lineTo(x - bDist + bLen, y + bDist);
+    ctx.stroke();
+    // Bottom-Right
+    ctx.beginPath();
+    ctx.moveTo(x + bDist - bLen, y + bDist);
+    ctx.lineTo(x + bDist, y + bDist);
+    ctx.lineTo(x + bDist, y + bDist - bLen);
+    ctx.stroke();
+  }
+
+  private drawDiamond(ctx: CanvasRenderingContext2D, x: number, y: number, r: number): void {
+    ctx.beginPath();
+    ctx.moveTo(x, y - r * 1.1);
+    ctx.lineTo(x + r * 0.95, y);
+    ctx.lineTo(x, y + r * 1.1);
+    ctx.lineTo(x - r * 0.95, y);
+    ctx.closePath();
+  }
+
+  private drawCrystalFacets(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, color: string): void {
+    ctx.strokeStyle = this.alpha(color, 0.45);
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    const ir = r * 0.45;
+    ctx.moveTo(x, y - ir * 1.1);
+    ctx.lineTo(x + ir * 0.95, y);
+    ctx.lineTo(x, y + ir * 1.1);
+    ctx.lineTo(x - ir * 0.95, y);
+    ctx.closePath();
+    ctx.moveTo(x, y - r * 1.1); ctx.lineTo(x, y - ir * 1.1);
+    ctx.moveTo(x + r * 0.95, y); ctx.lineTo(x + ir * 0.95, y);
+    ctx.moveTo(x, y + r * 1.1); ctx.lineTo(x, y + ir * 1.1);
+    ctx.moveTo(x - r * 0.95, y); ctx.lineTo(x - ir * 0.95, y);
+    ctx.stroke();
+  }
+
+  private drawBlueprintCrosshairs(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, color: string): void {
+    const ext = r + 6;
+    ctx.strokeStyle = this.alpha(color, 0.7);
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x - ext, y); ctx.lineTo(x + ext, y);
+    ctx.moveTo(x, y - ext); ctx.lineTo(x, y + ext);
+    ctx.stroke();
+
+    const d = r * 0.72;
+    const tickLen = 3;
+    ctx.beginPath();
+    ctx.moveTo(x - d, y - d - tickLen); ctx.lineTo(x - d, y - d + tickLen);
+    ctx.moveTo(x + d, y - d - tickLen); ctx.lineTo(x + d, y - d + tickLen);
+    ctx.moveTo(x - d, y + d - tickLen); ctx.lineTo(x - d, y + d + tickLen);
+    ctx.moveTo(x + d, y + d - tickLen); ctx.lineTo(x + d, y + d + tickLen);
+    ctx.stroke();
+  }
+
+  private drawPlanetaryRing(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, color: string): void {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(-0.35);
+    ctx.scale(1.75, 0.42);
+    ctx.strokeStyle = this.alpha(color, 0.4);
+    ctx.lineWidth = Math.max(1.5, r * 0.12);
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 1.15, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.strokeStyle = this.alpha(color, 0.18);
+    ctx.lineWidth = Math.max(1, r * 0.06);
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 1.35, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  private drawSunCorona(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, color: string): void {
+    const coronaGlow = ctx.createRadialGradient(x, y, r * 0.8, x, y, r * 2.2);
+    coronaGlow.addColorStop(0, this.alpha(color, 0.4));
+    coronaGlow.addColorStop(0.5, this.alpha(color, 0.12));
+    coronaGlow.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = coronaGlow;
+    ctx.beginPath();
+    ctx.arc(x, y, r * 2.2, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = this.alpha(color, 0.25);
+    ctx.lineWidth = 1.2;
+    const rayCount = 12;
+    for (let i = 0; i < rayCount; i++) {
+      const angle = (Math.PI * 2 / rayCount) * i;
+      const len = r * (1.3 + (i % 3) * 0.25);
+      ctx.beginPath();
+      ctx.moveTo(x + Math.cos(angle) * (r * 0.95), y + Math.sin(angle) * (r * 0.95));
+      ctx.lineTo(x + Math.cos(angle) * len, y + Math.sin(angle) * len);
+      ctx.stroke();
+    }
+  }
+
+  private drawLabel(text: string, x: number, y: number, color: string, emphasize: boolean): void {
+    const ctx = this.ctx!;
+    const label = this.truncate(text);
+    ctx.font = `${emphasize ? '600 ' : ''}12px "Space Grotesk", sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.85)';
+    ctx.lineWidth = 3;
+    ctx.strokeText(label, x, y);
+    ctx.fillStyle = emphasize ? '#ffffff' : this.alpha(color, 0.92);
+    ctx.fillText(label, x, y);
+  }
+
+  // ===========================================================================
+  // Olaylar
+  // ===========================================================================
+
+  private bindEvents(): void {
+    if (!this.canvas) return;
+    const el = this.canvas;
+    this.subs.push(fromEvent<MouseEvent>(el, 'mousedown').subscribe(e => this.onDown(e)));
+    this.subs.push(fromEvent<MouseEvent>(el, 'mousemove').pipe(throttleTime(16)).subscribe(e => this.onMove(e)));
+    this.subs.push(fromEvent<MouseEvent>(el, 'mouseup').subscribe(() => this.onUp()));
+    this.subs.push(fromEvent<MouseEvent>(el, 'click').subscribe(e => this.onClick(e)));
+    this.subs.push(fromEvent<WheelEvent>(el, 'wheel').subscribe(e => this.onWheel(e)));
+    this.subs.push(fromEvent<TouchEvent>(el, 'touchstart').subscribe(e => this.onTouchStart(e)));
+    this.subs.push(fromEvent<TouchEvent>(el, 'touchmove').subscribe(e => this.onTouchMove(e)));
+    this.subs.push(fromEvent<TouchEvent>(el, 'touchend').subscribe(() => this.onUp()));
+  }
+
+  private toWorld(clientX: number, clientY: number): { x: number; y: number } {
+    const rect = this.canvas!.getBoundingClientRect();
+    return {
+      x: (clientX - rect.left - this.view.panX) / this.view.zoom,
+      y: (clientY - rect.top - this.view.panY) / this.view.zoom,
+    };
+  }
+
+  private onDown(e: MouseEvent): void {
+    this.dragState = { active: true, moved: false, lastX: e.clientX, lastY: e.clientY, startX: e.clientX, startY: e.clientY };
+    if (this.canvas) this.canvas.style.cursor = 'grabbing';
+  }
+
+  private onMove(e: MouseEvent): void {
+    if (this.dragState.active) {
+      const dx = e.clientX - this.dragState.lastX;
+      const dy = e.clientY - this.dragState.lastY;
+      if (Math.abs(e.clientX - this.dragState.startX) + Math.abs(e.clientY - this.dragState.startY) > 4) {
+        this.dragState.moved = true;
+      }
+      this.view.panX += dx;
+      this.view.panY += dy;
+      this.dragState.lastX = e.clientX;
+      this.dragState.lastY = e.clientY;
+      this.markDirty();
+      return;
+    }
+    const { x, y } = this.toWorld(e.clientX, e.clientY);
+    const hit = this.findNodeAt(x, y);
+    if (hit !== this.hoveredNode) {
+      this.hoveredNode = hit;
+      if (this.canvas) this.canvas.style.cursor = hit ? 'pointer' : 'default';
       this.markDirty();
     }
   }
-  
-  private onTouchEnd(event: TouchEvent): void {
-    this.interaction.isDragging = false;
-  }
-  
-  @HostListener('window:keydown', ['$event'])
-  onKeyDown(event: KeyboardEvent): void {
-    switch (event.key) {
-      case 'Escape':
-        this.navigateBack();
-        this.markDirty();
-        break;
-      case '+':
-        this.zoomIn();
-        break;
-      case '-':
-        this.zoomOut();
-        break;
-      case '0':
-        this.resetView();
-        break;
-    }
-  }
-  
-  // ============================================================================
-  // UTILITY METHODS
-  // ============================================================================
-  
-  private findNodeAt(x: number, y: number): NetworkNode | null {
-    if (!this.networkData) return null;
-    
-    // Search in current view based on mode
-    let nodesToSearch: NetworkNode[] = [];
-    
-    switch (this.viewMode.mode) {
-      case 'overview':
-        nodesToSearch = this.networkData.nodes;
-        break;
-      case 'station':
-        nodesToSearch = this.viewMode.selectedNode?.children || [];
-        break;
-      case 'voltage':
-        nodesToSearch = this.viewMode.selectedNode?.children || [];
-        break;
-      case 'equipment':
-        // Elements are not NetworkNodes, skip for now
-        return null;
-    }
-    
-    // Find closest node within click radius
-    for (const node of nodesToSearch) {
-      const dist = this.distance({ x, y }, node.position);
-      const radius = this.getNodeRadius(node.type);
-      
-      if (dist <= radius) {
-        return node;
-      }
-    }
-    
-    return null;
+
+  private onUp(): void {
+    this.dragState.active = false;
+    if (this.canvas) this.canvas.style.cursor = this.hoveredNode ? 'pointer' : 'default';
   }
 
-  private findElementAt(x: number, y: number): ElementNode | null {
-    if (!this.elementHitAreas.length) return null;
-    for (const area of this.elementHitAreas) {
-      const halfW = area.width / 2;
-      const halfH = area.height / 2;
-      if (x >= area.x - halfW && x <= area.x + halfW &&
-          y >= area.y - halfH && y <= area.y + halfH) {
-        return area.element;
+  private onClick(e: MouseEvent): void {
+    if (this.dragState.moved) return;
+    const { x, y } = this.toWorld(e.clientX, e.clientY);
+    const hit = this.findNodeAt(x, y);
+    if (hit) this.selectNode(hit);
+  }
+
+  private onWheel(e: WheelEvent): void {
+    e.preventDefault();
+    const factor = Math.exp(-e.deltaY * 0.0015);
+    const newZoom = Math.max(this.minZoom, Math.min(this.maxZoom, this.view.targetZoom * factor));
+    // İmleç merkezinde zoom: imleç dünyasını sabit tut.
+    const rect = this.canvas!.getBoundingClientRect();
+    const cx = e.clientX - rect.left;
+    const cy = e.clientY - rect.top;
+    const wx = (cx - this.view.panX) / this.view.zoom;
+    const wy = (cy - this.view.panY) / this.view.zoom;
+    this.view.targetZoom = newZoom;
+    this.view.zoom = newZoom;
+    this.view.panX = cx - wx * newZoom;
+    this.view.panY = cy - wy * newZoom;
+    this.markDirty();
+  }
+
+  private onTouchStart(e: TouchEvent): void {
+    if (e.touches.length === 1) {
+      const t = e.touches[0];
+      this.dragState = { active: true, moved: false, lastX: t.clientX, lastY: t.clientY, startX: t.clientX, startY: t.clientY };
+    }
+  }
+
+  private onTouchMove(e: TouchEvent): void {
+    if (e.touches.length === 1 && this.dragState.active) {
+      const t = e.touches[0];
+      this.view.panX += t.clientX - this.dragState.lastX;
+      this.view.panY += t.clientY - this.dragState.lastY;
+      this.dragState.lastX = t.clientX;
+      this.dragState.lastY = t.clientY;
+      this.dragState.moved = true;
+      this.markDirty();
+    }
+  }
+
+  @HostListener('window:keydown', ['$event'])
+  onKey(e: KeyboardEvent): void {
+    switch (e.key) {
+      case 'Escape': this.navigateUp(); break;
+      case '+': case '=': this.zoomIn(); break;
+      case '-': this.zoomOut(); break;
+      case '0': this.fitView(); break;
+    }
+  }
+
+  // ===========================================================================
+  // Hit-test & yardımcılar
+  // ===========================================================================
+
+  private findNodeAt(x: number, y: number): RNode | null {
+    let best: RNode | null = null;
+    let bestDist = Infinity;
+    for (const node of this.renderNodes) {
+      const r = this.nodeRadius(node.ring) + 4;
+      const dx = node.x - x;
+      const dy = node.y - y;
+      const d = dx * dx + dy * dy;
+      if (d <= r * r && d < bestDist) {
+        bestDist = d;
+        best = node;
       }
     }
-    return null;
+    return best;
   }
-  
-  private getNodeRadius(type: string): number {
-    switch (type) {
-      case 'B1': return 50;
-      case 'B2': return 40;
-      case 'B3': return 30;
-      default: return 15;
-    }
+
+  private nodeRadius(ring: number): number {
+    return this.NODE_RADIUS_BY_RING[Math.min(ring, this.NODE_RADIUS_BY_RING.length - 1)];
   }
-  
-  private distance(p1: { x: number; y: number }, p2: { x: number; y: number }): number {
-    const dx = p2.x - p1.x;
-    const dy = p2.y - p1.y;
-    return Math.sqrt(dx * dx + dy * dy);
+
+  private levelColor(ring: number): string {
+    const palette = [
+      this.themeConfig.color1 || '#60A5FA',
+      this.themeConfig.color2 || '#22D3EE',
+      this.themeConfig.color3 || '#A78BFA',
+      '#F5B301',
+      '#10B981',
+      '#EC4899',
+      '#6366F1',
+    ];
+    return palette[((ring % palette.length) + palette.length) % palette.length];
   }
-  
-  private isNodeVisible(node: NetworkNode, bounds: VisibleBounds): boolean {
-    return node.position.x >= bounds.minX &&
-           node.position.x <= bounds.maxX &&
-           node.position.y >= bounds.minY &&
-           node.position.y <= bounds.maxY;
+
+  private truncate(text: string): string {
+    if (text.length <= this.MAX_LABEL_LEN) return text;
+    return text.slice(0, this.MAX_LABEL_LEN - 1) + '…';
   }
-  
-  private calculateVisibleBounds(): VisibleBounds {
-    if (!this.canvas) {
-      return { minX: 0, maxX: 0, minY: 0, maxY: 0 };
-    }
-    
-    const width = this.canvas.width / (window.devicePixelRatio || 1);
-    const height = this.canvas.height / (window.devicePixelRatio || 1);
-    
-    return {
-      minX: -this.viewMode.panOffset.x / this.viewMode.zoomLevel - 100,
-      maxX: (width - this.viewMode.panOffset.x) / this.viewMode.zoomLevel + 100,
-      minY: -this.viewMode.panOffset.y / this.viewMode.zoomLevel - 100,
-      maxY: (height - this.viewMode.panOffset.y) / this.viewMode.zoomLevel + 100
-    };
+
+  /** Kararlı [0,1) sahte-değer (Math.random yerine — render deterministik kalsın). */
+  private hash(n: number): number {
+    let x = Math.sin(n) * 43758.5453;
+    return x - Math.floor(x);
   }
-  
-  private expandBounds(bounds: VisibleBounds, padding: number): VisibleBounds {
-    return {
-      minX: bounds.minX - padding,
-      maxX: bounds.maxX + padding,
-      minY: bounds.minY - padding,
-      maxY: bounds.maxY + padding
-    };
-  }
-  
-  private isConnectionWithinBounds(
-    from: NetworkNode,
-    to: NetworkNode,
-    bounds: VisibleBounds,
-    visibleStations: Set<string>
-  ): boolean {
-    if (visibleStations.has(from.id) || visibleStations.has(to.id)) {
-      return true;
-    }
-    
-    return this.isNodeVisible(from, bounds) || this.isNodeVisible(to, bounds);
-  }
-  
-  /**
-   * Palet hex'ini (#RRGGBB) Canvas için rgb/rgba string'ine çevirir.
-   * Saydamlık gerektiren gradient/shadow renklerinde paleti tek kaynak
-   * tutmak için kullanılır.
-   */
-  private withAlpha(hex: string, alpha?: number): string {
+
+  private alpha(hex: string, a: number): string {
     const h = hex.replace('#', '');
     const r = parseInt(h.slice(0, 2), 16);
     const g = parseInt(h.slice(2, 4), 16);
     const b = parseInt(h.slice(4, 6), 16);
-    return alpha != null ? `rgba(${r}, ${g}, ${b}, ${alpha})` : `rgb(${r}, ${g}, ${b})`;
+    return `rgba(${r}, ${g}, ${b}, ${a})`;
   }
 
-  private getStatusColors(status: string): { light: string; dark: string; border: string } {
-    switch (status) {
-      case 'online':
-        // ok: sağlıklı = success Yeşili vurgusu, çelik (tertiary) zemin
-        return { light: STATUS.success, dark: BRAND.tertiary, border: STATUS.success };
-      case 'alarm':
-        // hata: danger kırmızısı
-        return { light: STATUS.danger, dark: STATUS.danger, border: STATUS.danger };
-      case 'warning':
-        return { light: STATUS.warning, dark: STATUS.warning, border: STATUS.warning };
-      case 'offline':
-        // nötr: info (lunar çelik)
-        return { light: STATUS.info, dark: STATUS.info, border: STATUS.info };
-      default:
-        return { light: STATUS.info, dark: STATUS.info, border: STATUS.info };
-    }
-  }
-  
-  private getEquipmentColor(name: string): string {
-    const lowerName = name.toLowerCase();
-
-    if (lowerName.includes('trafo') || lowerName.includes('transf')) return STATUS.danger;
-    if (lowerName.includes('bara') || lowerName.includes('bus')) return BRAND.tertiary;
-    if (lowerName.includes('cb') || lowerName.includes('breaker')) return BRAND.secondary;
-    if (lowerName.includes('iso')) return CHART_PALETTE[6];
-    if (lowerName.includes('line')) return STATUS.warning;
-
-    return CHART_PALETTE[8];
-  }
-  
-  private getEquipmentCode(name: string): string {
-    const lowerName = name.toLowerCase();
-    
-    if (lowerName.includes('trafo') || lowerName.includes('transf')) return 'TR';
-    if (lowerName.includes('bara') || lowerName.includes('bus')) return 'BUS';
-    if (lowerName.includes('cb') || lowerName.includes('breaker')) return 'CB';
-    if (lowerName.includes('iso')) return 'ISO';
-    if (lowerName.includes('line')) return 'LN';
-    
-    return name.slice(0, 3).toUpperCase();
-  }
-  
-  private getVoltageCode(name: string): string {
-    const match = name.match(/(\d+)\s*(k?v?)/i);
-    if (match && match[1]) {
-      return `${match[1]}${match[2] ? match[2].toUpperCase() : ''}`;
-    }
-    
-    return 'B2';
-  }
-  
-  private calculateStatistics(): void {
-    if (!this.networkData) return;
-    
-    this.totalStats = { online: 0, offline: 0, alarm: 0, warning: 0 };
-    
-    const countNodes = (nodes: NetworkNode[]) => {
-      nodes.forEach(node => {
-        const status = node.status as keyof NodeStatus;
-        if (status in this.totalStats) {
-          this.totalStats[status]++;
-        }
-        countNodes(node.children);
-      });
+  private visibleBounds(): VisibleBounds {
+    const { w, h } = this.canvasSize;
+    const z = this.view.zoom;
+    const pad = 120;
+    return {
+      minX: (-this.view.panX) / z - pad,
+      maxX: (w - this.view.panX) / z + pad,
+      minY: (-this.view.panY) / z - pad,
+      maxY: (h - this.view.panY) / z + pad,
     };
-    
-    countNodes(this.networkData.nodes);
-    this.markDirty();
   }
-  
-  // ============================================================================
-  // PUBLIC METHODS (Called from template)
-  // ============================================================================
-  
-  selectNode(node: NetworkNode): void {
-    this.selectedElement = null;
-    this.interaction.hoveredElement = null;
-    this.actionSelectedPaths.clear();
-    this.actionSearchQuery = '';
-    this.actionFeedback = '';
-    this.actionDrawerOpen = true;
 
-    // Determine next view mode based on current node type
-    switch (node.type) {
-      case 'B1':
-        this.viewMode.mode = 'station';
-        this.viewMode.selectedNode = node;
-        break;
-      case 'B2':
-        this.viewMode.mode = 'voltage';
-        this.viewMode.selectedNode = node;
-        break;
-      case 'B3':
-        this.viewMode.mode = 'equipment';
-        this.viewMode.selectedNode = node;
-        break;
+  private inBounds(node: RNode, b: VisibleBounds): boolean {
+    return node.x >= b.minX && node.x <= b.maxX && node.y >= b.minY && node.y <= b.maxY;
+  }
+
+  // ===========================================================================
+  // Public (template) — seçim, drill, zoom, arama, aksiyonlar
+  // ===========================================================================
+
+  /** Düğüme tıklama → detay paneli + (yaprak değilse) alt seviyeye drill. */
+  selectNode(node: RNode): void {
+    this.selectedNode = node;
+    // Yaprak değilse o düğüme odaklanarak alt seviyeleri aç (drill-down).
+    if (node.children.length) {
+      this.focusId = node.id;
+      this.relayout();
+      this.fitView();
     }
-    
-    // Reset view for clean, centered detail layout
-    this.resetView();
-    this.updateActionCandidates();
-    this.loadRelatedReports(node.name);
     this.markDirty();
     this.cdr.markForCheck();
   }
 
-  private setSelectedElement(element: ElementNode): void {
-    this.selectedElement = element;
-    this.actionSelectedPaths.clear();
-    this.actionFeedback = '';
-    this.actionDrawerOpen = true;
-    this.updateActionCandidates();
-    this.markDirty();
-    this.cdr.markForCheck();
-  }
-
-  private clearSelectedElement(): void {
-    if (this.selectedElement) {
-      this.selectedElement = null;
-      this.actionSelectedPaths.clear();
-      this.updateActionCandidates();
-      this.markDirty();
+  /** Bir üst seviyeye çık (seçimi temizle, focus'u atasına/overview'a al). */
+  navigateUp(): void {
+    this.selectedNode = null;
+    if (!this.focusId) {
       this.cdr.markForCheck();
+      return;
     }
-  }
-
-  navigateBack(): void {
-    switch (this.viewMode.mode) {
-      case 'station':
-        this.viewMode.mode = 'overview';
-        this.viewMode.selectedNode = null;
-        break;
-      case 'voltage':
-        // Go back to station view
-        if (this.viewMode.selectedNode?.parentId) {
-          const parent = this.findNodeById(this.viewMode.selectedNode.parentId);
-          if (parent) {
-            this.viewMode.mode = 'station';
-            this.viewMode.selectedNode = parent;
-          }
-        }
-        break;
-      case 'equipment':
-        // Go back to voltage view
-        if (this.viewMode.selectedNode?.parentId) {
-          const parent = this.findNodeById(this.viewMode.selectedNode.parentId);
-          if (parent) {
-            this.viewMode.mode = 'voltage';
-            this.viewMode.selectedNode = parent;
-          }
-        }
-        break;
-    }
-    
-    this.resetView();
-    this.selectedElement = null;
-    this.interaction.hoveredElement = null;
-    this.actionSelectedPaths.clear();
-    this.actionSearchQuery = '';
-    this.updateActionCandidates();
+    const focus = this.nodeMap.get(this.focusId);
+    this.focusId = focus?.parentId && this.nodeMap.has(focus.parentId) ? focus.parentId : null;
+    this.relayout();
+    this.fitView();
     this.markDirty();
     this.cdr.markForCheck();
   }
-  
-  private findNodeById(id: string): NetworkNode | null {
-    if (!this.networkData) return null;
-    
-    const search = (nodes: NetworkNode[]): NetworkNode | null => {
-      for (const node of nodes) {
-        if (node.id === id) return node;
-        const found = search(node.children);
-        if (found) return found;
-      }
-      return null;
-    };
-    
-    return search(this.networkData.nodes);
-  }
-  
-  private centerOnNode(node: NetworkNode): void {
-    if (!this.canvas) return;
-    
-    const width = this.canvas.width / (window.devicePixelRatio || 1);
-    const height = this.canvas.height / (window.devicePixelRatio || 1);
-    
-    this.viewMode.panOffset.x = width / 2 - node.position.x * this.viewMode.zoomLevel;
-    this.viewMode.panOffset.y = height / 2 - node.position.y * this.viewMode.zoomLevel;
-    this.markDirty();
-  }
-  
+
   zoomIn(): void {
-    this.viewMode.targetZoom = Math.min(
-      this.viewMode.maxZoom,
-      this.viewMode.targetZoom * 1.3
-    );
-    this.markDirty();
+    this.zoomBy(1.3);
   }
-  
+
   zoomOut(): void {
-    this.viewMode.targetZoom = Math.max(
-      this.viewMode.minZoom,
-      this.viewMode.targetZoom / 1.3
-    );
+    this.zoomBy(1 / 1.3);
+  }
+
+  private zoomBy(factor: number): void {
+    const { w, h } = this.canvasSize;
+    const cx = w / 2;
+    const cy = h / 2;
+    const currentZoom = this.view.targetZoom;
+    const newZoom = Math.max(this.minZoom, Math.min(this.maxZoom, currentZoom * factor));
+    if (Math.abs(newZoom - currentZoom) < 0.0001) return;
+    const wx = (cx - this.view.panX) / this.view.zoom;
+    const wy = (cy - this.view.panY) / this.view.zoom;
+    this.view.targetZoom = newZoom;
+    this.view.zoom = newZoom;
+    this.view.panX = cx - wx * newZoom;
+    this.view.panY = cy - wy * newZoom;
     this.markDirty();
   }
-  
-  resetView(): void {
-    if (this.canvas) {
-      const e = this.canvas.width / (window.devicePixelRatio || 1);
-      const i = this.canvas.height / (window.devicePixelRatio || 1);
 
-      // Calculate bounds of all nodes
-      let minX = Infinity, maxX = -Infinity;
-      let minY = Infinity, maxY = -Infinity;
-      const nodes = this.networkData ? this.networkData.nodes : [];
-      
-      if (nodes && nodes.length > 0) {
-        nodes.forEach(n => {
-          if (n.position) {
-            minX = Math.min(minX, n.position.x);
-            maxX = Math.max(maxX, n.position.x);
-            minY = Math.min(minY, n.position.y);
-            maxY = Math.max(maxY, n.position.y);
-          }
-        });
+  /** Görünür düğümleri canvas'a sığdır. */
+  fitView(): void {
+    if (!this.renderNodes.length || !this.canvas) return;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const n of this.renderNodes) {
+      const r = this.nodeRadius(n.ring) + 28;
+      minX = Math.min(minX, n.x - r); maxX = Math.max(maxX, n.x + r);
+      minY = Math.min(minY, n.y - r); maxY = Math.max(maxY, n.y + r);
+    }
+    const { w, h } = this.canvasSize;
+    if (w <= 0 || h <= 0) return;
+    const bw = Math.max(maxX - minX, 1);
+    const bh = Math.max(maxY - minY, 1);
+    const zoom = Math.max(this.minZoom, Math.min(this.maxZoom, Math.min(w / bw, h / bh) * 0.88));
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+    this.view.zoom = zoom;
+    this.view.targetZoom = zoom;
+    this.view.panX = w / 2 - cx * zoom;
+    this.view.panY = h / 2 - cy * zoom;
+    this.hasFitted = true;
+    this.markDirty();
+  }
+
+  refresh(): void {
+    if (this.selectedPathId) this.buildAndRender(this.selectedPathId);
+  }
+
+  // ---- Arama (yerel, label eşleşmesi) ----
+  onSearch(): void {
+    const q = this.searchTerm.trim().toLowerCase();
+    if (!q) {
+      this.searchResults = [];
+      this.searchHint = '';
+      return;
+    }
+    const matches: RNode[] = [];
+    for (const node of this.nodeMap.values()) {
+      if (node.label.toLowerCase().includes(q)) {
+        matches.push(node);
+        if (matches.length >= this.MAX_SEARCH_RESULTS) break;
       }
+    }
+    this.searchResults = matches;
+    this.searchHint = matches.length
+      ? this.translate.instant('NETWORK_MAP.SEARCH_HINT', { n: matches.length })
+      : this.translate.instant('NETWORK_MAP.NO_RESULTS');
+  }
 
-      // Default bounds fallback if no nodes are loaded yet
-      if (minX === Infinity) {
-        minX = 1500 - 850;
-        maxX = 1500 + 850;
-        minY = 1200 - 850;
-        maxY = 1200 + 850;
-      }
+  focusSearchResult(node: RNode): void {
+    // Yaprak düğümse üst düğümü odakla ki kardeşler ve üst hiyerarşi görünür kalsın
+    if (!node.children.length && node.parentId && this.nodeMap.has(node.parentId)) {
+      this.focusId = node.parentId;
+    } else {
+      this.focusId = node.id;
+    }
+    this.relayout();
+    this.selectedNode = node;
+    this.fitView();
+    this.searchResults = [];
+    this.searchTerm = node.label;
+    this.markDirty();
+    this.cdr.markForCheck();
+  }
 
-      const padding = 100;
-      const contentWidth = (maxX - minX) + 2 * padding;
-      const contentHeight = (maxY - minY) + 2 * padding;
+  // ---- Detay paneli getter'ları & Breadcrumb ----
+  get selectedLevelLabel(): string {
+    if (!this.selectedNode) return '';
+    return this.translate.instant('NETWORK_MAP.LEVEL_N', { n: this.selectedNode.depth + 1 });
+  }
 
-      // Detect if search & filter sidebar is visible
-      const sidebar = document.querySelector('.network-sidebar');
-      const sidebarWidth = (sidebar && (sidebar as HTMLElement).style.display !== 'none') ? 280 : 0;
+  get selectedBreadcrumbNodes(): RNode[] {
+    if (!this.selectedNode) return [];
+    const chain: RNode[] = [];
+    let cur: RNode | null = this.selectedNode;
+    while (cur) {
+      chain.unshift(cur);
+      cur = cur.parentId ? this.nodeMap.get(cur.parentId) ?? null : null;
+    }
+    return chain;
+  }
 
-      // Calculate optimal zoom to fit
-      const zoomX = (e - sidebarWidth) / contentWidth;
-      const zoomY = i / contentHeight;
-      const zoom = Math.max(0.3, Math.min(1.0, Math.min(zoomX, zoomY)));
+  get selectedBreadcrumb(): string[] {
+    return this.selectedBreadcrumbNodes.map(n => n.label);
+  }
 
-      this.viewMode.zoomLevel = zoom;
-      this.viewMode.targetZoom = zoom;
+  get selectedPathString(): string {
+    return this.selectedBreadcrumb.join('/');
+  }
 
-      // Center node boundaries on the visible viewport center
-      const centerX = (minX + maxX) / 2;
-      const centerY = (minY + maxY) / 2;
-      const visibleCenterX = sidebarWidth + (e - sidebarWidth) / 2;
-      const visibleCenterY = i / 2;
+  focusBreadcrumb(node: RNode): void {
+    this.selectNode(node);
+  }
 
-      this.viewMode.panOffset = {
-        x: visibleCenterX - centerX * zoom,
-        y: visibleCenterY - centerY * zoom
+  get selectedNodeProperties(): { key: string; value: string }[] {
+    if (!this.selectedNode?.row) return [];
+    return Object.entries(this.selectedNode.row)
+      .filter(([k]) => !['password', 'password_hash', 'password_salt'].includes(k.toLowerCase()))
+      .map(([key, val]) => ({
+        key,
+        value: val === null || val === undefined ? '—' : (typeof val === 'object' ? JSON.stringify(val) : String(val)),
+      }));
+  }
+
+  get focusTitle(): string {
+    if (!this.focusId) return this.translate.instant('NETWORK_MAP.OVERVIEW');
+    return this.nodeMap.get(this.focusId)?.label || '';
+  }
+
+  get rootCount(): number {
+    return this.roots.length;
+  }
+
+  get zoomPercent(): number {
+    return Math.round(this.view.zoom * 100);
+  }
+
+  get brandIcon(): string {
+    switch (this.themeConfig.theme) {
+      case 'factory': return 'fa-industry';
+      case 'cyber': return 'fa-network-wired';
+      case 'blueprint': return 'fa-drafting-compass';
+      case 'crystal': return 'fa-gem';
+      case 'cosmic':
+      default:
+        return 'fa-satellite';
+    }
+  }
+
+  get pageTitle(): string {
+    switch (this.themeConfig.theme) {
+      case 'factory': return this.translate.instant('NETWORK_MAP.FACTORY_TITLE');
+      case 'cyber': return this.translate.instant('NETWORK_MAP.CYBER_TITLE');
+      case 'blueprint': return this.translate.instant('NETWORK_MAP.BLUEPRINT_TITLE');
+      case 'crystal': return this.translate.instant('NETWORK_MAP.CRYSTAL_TITLE');
+      case 'cosmic':
+      default:
+        return this.translate.instant('NETWORK_MAP.TITLE');
+    }
+  }
+
+  get pageSubtitle(): string {
+    if (this.selectedPath?.name) return this.selectedPath.name;
+    switch (this.themeConfig.theme) {
+      case 'factory': return this.translate.instant('NETWORK_MAP.FACTORY_SUBTITLE');
+      case 'cyber': return this.translate.instant('NETWORK_MAP.CYBER_SUBTITLE');
+      case 'blueprint': return this.translate.instant('NETWORK_MAP.BLUEPRINT_SUBTITLE');
+      case 'crystal': return this.translate.instant('NETWORK_MAP.CRYSTAL_SUBTITLE');
+      case 'cosmic':
+      default:
+        return this.translate.instant('NETWORK_MAP.SUBTITLE');
+    }
+  }
+
+  closeDetail(): void {
+    this.selectedNode = null;
+    this.cdr.markForCheck();
+  }
+
+  // ---- Tema Ayarları & Presets ----
+  applyThemePreset(theme: SpaceMapTheme): void {
+    const preset = THEME_PRESETS[theme];
+    if (!preset) return;
+    this.themeConfig = {
+      ...this.themeConfig,
+      theme,
+      nodeShape: preset.nodeShape,
+      color1: preset.color1,
+      color2: preset.color2,
+      color3: preset.color3,
+      level1Icon: preset.level1Icon,
+      level2Icon: preset.level2Icon,
+      level3Icon: preset.level3Icon,
+      showOrbits: preset.showOrbits,
+      showGrid: preset.showGrid,
+    };
+    this.bgCache = null;
+    this.markDirty();
+    this.cdr.markForCheck();
+  }
+
+  syncThemeFromPath(): void {
+    const smc = (this.selectedPath?.config as any)?.spaceMapConfig;
+    if (smc) {
+      const validThemes: SpaceMapTheme[] = ['cosmic', 'factory', 'cyber', 'blueprint', 'crystal'];
+      const theme: SpaceMapTheme = validThemes.includes(smc.theme) ? smc.theme : 'cosmic';
+      const preset = THEME_PRESETS[theme];
+
+      this.themeConfig = {
+        theme,
+        layout: smc.layout || 'radial',
+        nodeShape: smc.nodeShape || preset.nodeShape,
+        color1: smc.color1 || preset.color1,
+        color2: smc.color2 || preset.color2,
+        color3: smc.color3 || preset.color3,
+        level1Icon: smc.level1Icon || preset.level1Icon,
+        level2Icon: smc.level2Icon || preset.level2Icon,
+        level3Icon: smc.level3Icon || preset.level3Icon,
+        showOrbits: smc.showOrbits !== undefined ? smc.showOrbits : true,
+        showGrid: smc.showGrid !== undefined ? smc.showGrid : true,
       };
     } else {
-      this.viewMode.panOffset = { x: -1000, y: -900 };
+      this.applyThemePreset('cosmic');
     }
-    this.markDirty();
-  }
-  
-  refreshData(): void {
-    this.networkMapService.clearCache();
-    this.invalidateRenderCaches();
-    this.loadNetworkData();
-  }
-  
-  applyFilters(): void {
+    this.bgCache = null;
     this.markDirty();
     this.cdr.markForCheck();
   }
 
-  toggleActionDrawer(): void {
-    this.actionDrawerOpen = !this.actionDrawerOpen;
+  openThemeModal(): void {
+    this.showThemeModal = true;
   }
 
-  onActionSearchChange(): void {
-    this.updateActionCandidates();
-  }
-
-  toggleActionCandidate(path: string): void {
-    if (this.actionSelectedPaths.has(path)) {
-      this.actionSelectedPaths.delete(path);
-    } else {
-      this.actionSelectedPaths.add(path);
-    }
-  }
-
-  selectAllActionCandidates(): void {
-    this.actionSelectedPaths.clear();
-    this.actionCandidates.forEach(candidate => this.actionSelectedPaths.add(candidate.path));
-  }
-
-  clearActionSelection(): void {
-    this.actionSelectedPaths.clear();
-  }
-
-  addSelectionToDashboard(): void {
-    const paths = this.getSelectedActionPaths();
-    if (!paths.length) {
-      this.actionFeedback = this.translate.instant('NETWORK_MAP.SELECT_PATH_FIRST');
-      return;
-    }
-
-    const userId = this.authService.getCurrentUser()?.username || 'default';
-    const widgetId = `nm-${Date.now()}`;
-    const title = this.getWidgetTitleFromPaths(paths);
-
-    const widgetData: any = {
-      id: widgetId,
-      widget_type: this.actionWidgetType,
-      title,
-      data_path: '',
-      initial_paths: paths,
-      position: { x: 0, y: 0, width: 2, height: 2 },
-      config: { refreshRate: 10000 },
-      is_active: true,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    };
-
-    // Save to localStorage as reliable fallback
-    this.saveWidgetToLocalDashboard(widgetData);
-
-    // Also try API
-    this.apiService.addWidgetToDashboard(userId, widgetData).subscribe({
-      next: () => {},
-      error: () => {}
-    });
-
-    this.actionFeedback = this.translate.instant('NETWORK_MAP.ADDED_TO_DASHBOARD');
+  onThemeChange(): void {
+    this.bgCache = null;
+    this.markDirty();
     this.cdr.markForCheck();
-
-    // Navigate to dashboard after a brief feedback
-    setTimeout(() => {
-      this.router.navigate(['/dashboard']);
-    }, 600);
   }
 
-  private saveWidgetToLocalDashboard(widgetData: any): void {
-    try {
-      const cached = localStorage.getItem('dashboard-widgets-cache');
-      let data = cached ? JSON.parse(cached) : { widgets: [] };
-      if (!Array.isArray(data.widgets)) {
-        data.widgets = [];
+  saveTheme(): void {
+    if (!this.selectedPath || !this.selectedPathId) return;
+    const config = {
+      ...(this.selectedPath.config || {}),
+      spaceMapConfig: {
+        theme: this.themeConfig.theme,
+        nodeShape: this.themeConfig.nodeShape,
+        layout: this.themeConfig.layout || 'radial',
+        color1: this.themeConfig.color1,
+        color2: this.themeConfig.color2,
+        color3: this.themeConfig.color3,
+        level1Icon: this.themeConfig.level1Icon,
+        level2Icon: this.themeConfig.level2Icon,
+        level3Icon: this.themeConfig.level3Icon,
+        showOrbits: this.themeConfig.showOrbits,
+        showGrid: this.themeConfig.showGrid,
       }
-      data.widgets.push({
-        id: widgetData.widget_type,
-        instanceId: widgetData.id,
-        title: widgetData.title,
-        icon: 'fas fa-chart-line',
-        type: widgetData.widget_type,
-        dataSourceType: 'realtime',
-        initialPaths: widgetData.initial_paths || [],
-        configuration: widgetData.config || {},
-        refreshRate: widgetData.config?.refreshRate || 10000,
-        layout: widgetData.position,
-        visible: true
-      });
-      localStorage.setItem('dashboard-widgets-cache', JSON.stringify(data));
-    } catch (e) {
-      console.error('Failed to save widget to localStorage:', e);
-    }
-  }
-
-  monitorSelection(): void {
-    const paths = this.getSelectedActionPaths();
-    if (!paths.length) {
-      this.actionFeedback = this.translate.instant('NETWORK_MAP.SELECT_PATH_FIRST');
-      return;
-    }
-    this.addSelectionToDashboard();
-    this.router.navigate(['/dashboard']);
-  }
-
-  createReportFromSelection(): void {
-    const paths = this.getSelectedActionPaths();
-    if (!paths.length) {
-      this.actionFeedback = this.translate.instant('NETWORK_MAP.SELECT_PATH_FIRST');
-      return;
-    }
-
-    // Build rich metadata for auto-report creation
-    const nodeName = this.actionTargetName || 'Station';
-    const nodeType = this.actionTargetType || '';
-    const reportConfig = {
-      paths,
-      stationName: nodeName,
-      nodeType,
-      breadcrumb: this.actionTargetBreadcrumb || '',
-      autoGenerate: true
     };
-
-    sessionStorage.setItem('networkMapReportPaths', JSON.stringify(paths));
-    sessionStorage.setItem('networkMapReportConfig', JSON.stringify(reportConfig));
-    sessionStorage.setItem('networkMapOpenReportCreator', '1');
-    this.router.navigate(['/reports']);
-  }
-
-  copySelectionPath(path: string): void {
-    if (!navigator.clipboard) {
-      this.actionFeedback = this.translate.instant('NETWORK_MAP.COPY_NOT_SUPPORTED');
-      return;
-    }
-    navigator.clipboard.writeText(path).then(() => {
-      this.actionFeedback = this.translate.instant('NETWORK_MAP.COPIED');
-    }).catch(() => {
-      this.actionFeedback = this.translate.instant('NETWORK_MAP.COPY_FAILED');
-    });
-  }
-  
-  openReportsForNode(node: NetworkNode): void {
-    this.router.navigate(['/reports'], {
-      queryParams: {
-        nodeId: node.id,
-        nodeType: node.type,
-        nodeName: node.name
-      }
-    });
-  }
-  
-  openDashboardForNode(node: NetworkNode): void {
-    this.router.navigate(['/dashboard'], {
-      queryParams: {
-        focus: node.id,
-        type: node.type
-      }
-    });
-  }
-  
-  openAssetDetails(node: NetworkNode): void {
-    this.router.navigate(['/assets', node.id], {
-      queryParams: {
-        type: node.type
-      }
-    });
-  }
-  
-  // ============================================================================
-  // GETTERS FOR TEMPLATE
-  // ============================================================================
-  
-  get isOverviewMode(): boolean {
-    return this.viewMode.mode === 'overview';
-  }
-
-  get actionTargetName(): string {
-    return this.selectedElement?.name || this.viewMode.selectedNode?.name || '';
-  }
-
-  get actionTargetType(): string {
-    return this.selectedElement ? 'Element' : this.viewMode.selectedNode?.type || '';
-  }
-
-  get actionTargetBreadcrumb(): string {
-    const parts = this.getNodeBreadcrumb(this.viewMode.selectedNode);
-    if (this.selectedElement) {
-      parts.push(this.selectedElement.name);
-    }
-    return parts.join(' / ');
-  }
-
-  get actionSelectionCount(): number {
-    return this.actionSelectedPaths.size;
-  }
-  
-  get formattedLastUpdate(): string {
-    const lang = this.translate.currentLang || 'en';
-    const localeMap: Record<string, string> = { tr: 'tr-TR', en: 'en-US', de: 'de-DE' };
-    return new Date().toLocaleTimeString(localeMap[lang] || 'en-US');
-  }
-  
-  get selectedNode(): NetworkNode | null {
-    return this.viewMode.selectedNode;
-  }
-  
-  get hoveredNode(): NetworkNode | null {
-    return this.interaction.hoveredNode;
-  }
-
-  // ============================================================================
-  // ALARM BADGES & NAVIGATION
-  // ============================================================================
-
-  loadAlarmBadges(): void {
-    const today = new Date();
-    const dayAgo = new Date();
-    dayAgo.setDate(today.getDate() - 1);
-    const startDate = dayAgo.toISOString().split('T')[0];
-    const endDate = today.toISOString().split('T')[0];
-
-
-  }
-
-  navigateToAlarms(tab: 'alarms' | 'messages'): void {
-    this.router.navigate(['/alarms'], { queryParams: { tab } });
-  }
-
-  // ============================================================================
-  // RELATED REPORTS
-  // ============================================================================
-
-  loadRelatedReports(nodeName?: string): void {
-    if (!nodeName) {
-      this.relatedReports = [];
-      return;
-    }
-    this.relatedReportsLoading = true;
-    this.apiService.getReports().subscribe({
-      next: (reports) => {
-        this.relatedReports = (reports || []).filter(r => {
-          const paths = r.selectedPaths || [];
-          const nameStr = r.name || '';
-          const descStr = r.description || '';
-          const searchTerm = nodeName.toLowerCase();
-          return nameStr.toLowerCase().includes(searchTerm) ||
-                 descStr.toLowerCase().includes(searchTerm) ||
-                 paths.some(p => p.toLowerCase().includes(searchTerm));
-        }).slice(0, 10);
-        this.relatedReportsLoading = false;
-        this.cdr.markForCheck();
+    const updated = { ...this.selectedPath, config };
+    this.pathService.update(this.selectedPathId, updated).subscribe({
+      next: res => {
+        this.selectedPath = res.data || updated;
+        this.syncThemeFromPath();
+        this.showThemeModal = false;
+        this.notify('NETWORK_MAP.THEME_SAVED', 'success');
       },
       error: () => {
-        this.relatedReports = [];
-        this.relatedReportsLoading = false;
-        this.cdr.markForCheck();
+        this.notify('NETWORK_MAP.COPY_FAILED', 'error');
       }
     });
   }
 
-  viewReport(reportId: string | undefined): void {
-    if (reportId) {
-      this.router.navigate(['/reports'], { queryParams: { id: reportId } });
+  goToPathDefiner(): void {
+    this.router.navigate(['/table-explorer'], {
+      queryParams: {
+        pathDefiner: 'true',
+        ...(this.selectedDataSourceId ? { dataSourceId: this.selectedDataSourceId } : {})
+      }
+    });
+  }
+
+  // ---- Aksiyonlar (Dashboard, Report, Copy) ----
+  copyPath(): void {
+    const path = this.selectedPathString;
+    if (!path) return;
+    if (navigator && navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(path)
+        .then(() => this.notify('NETWORK_MAP.COPIED', 'success'))
+        .catch(() => this.fallbackCopy(path));
+    } else {
+      this.fallbackCopy(path);
     }
   }
 
-  // ============================================================================
-  // ACTION PATH BUILDERS
-  // ============================================================================
-
-  private updateActionCandidates(): void {
-    this.actionCandidates = [];
-    this.actionSearchHint = '';
-
-    const node = this.viewMode.selectedNode;
-    if (!node) {
-      return;
-    }
-
-    const query = this.actionSearchQuery.trim().toLowerCase();
-    if (this.selectedElement) {
-      const b3Node = node.type === 'B3' ? node : null;
-      if (b3Node) {
-        this.actionCandidates = this.buildPathsForElement(b3Node, this.selectedElement, query);
+  private fallbackCopy(text: string): void {
+    try {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(textarea);
+      if (ok) {
+        this.notify('NETWORK_MAP.COPIED', 'success');
+      } else {
+        this.notify('NETWORK_MAP.COPY_FAILED', 'error');
       }
-      return;
-    }
-
-    const b3Nodes = this.collectB3Nodes(node);
-
-    for (const b3Node of b3Nodes) {
-      if (!b3Node.elements || b3Node.elements.length === 0) {
-        continue;
-      }
-      for (const element of b3Node.elements) {
-        const entries = this.buildPathsForElement(b3Node, element, query);
-        for (const entry of entries) {
-          this.actionCandidates.push(entry);
-          if (this.actionCandidates.length >= this.actionMaxResults) {
-            this.actionSearchHint = this.translate.instant('NETWORK_MAP.RESULT_LIMIT', { count: this.actionMaxResults });
-            return;
-          }
-        }
-      }
-    }
-
-    if (!this.actionCandidates.length && query) {
-      this.actionSearchHint = this.translate.instant('NETWORK_MAP.NO_RESULTS');
-    } else if (!this.actionCandidates.length) {
-      this.actionSearchHint = this.translate.instant('NETWORK_MAP.EMPTY_SEARCH');
-    } else if (!this.actionCandidates.length && node.type === 'B3') {
-      this.actionSearchHint = this.translate.instant('NETWORK_MAP.NO_ELEMENTS');
+    } catch {
+      this.notify('NETWORK_MAP.COPY_FAILED', 'error');
     }
   }
 
-  private buildPathsForElement(b3Node: NetworkNode, element: ElementNode, query: string): ActionPath[] {
-    const infoOptions = this.getInfoOptionsForNoElType(element.noElType, element.name);
-    if (!infoOptions.length) {
-      return [];
-    }
-
-    const names = this.getB1B2B3Names(b3Node);
-    const results: ActionPath[] = [];
-
-    for (const info of infoOptions) {
-      const infoLabel = element.nimSatz ? `${info.name}[${element.nimSatz}]` : info.name;
-      const path = `${names.b1}/${names.b2}/${names.b3}/${element.name}/${infoLabel}`;
-      const candidate: ActionPath = {
-        path,
-        b1: names.b1,
-        b2: names.b2,
-        b3: names.b3,
-        element: element.name,
-        info: info.name,
-        nimSatz: element.nimSatz
-      };
-      if (query && !this.actionMatchesQuery(candidate, query)) {
-        continue;
-      }
-      results.push(candidate);
-    }
-
-    return results;
-  }
-
-  private actionMatchesQuery(candidate: ActionPath, query: string): boolean {
-    const haystack = `${candidate.b1} ${candidate.b2} ${candidate.b3} ${candidate.element} ${candidate.info}`.toLowerCase();
-    return haystack.includes(query);
-  }
-
-  private collectB3Nodes(node: NetworkNode): NetworkNode[] {
-    if (node.type === 'B3') {
-      return [node];
-    }
-
-    const b3Nodes: NetworkNode[] = [];
-    const stack: NetworkNode[] = [...(node.children || [])];
-
-    while (stack.length) {
-      const current = stack.shift();
-      if (!current) continue;
-      if (current.type === 'B3') {
-        b3Nodes.push(current);
-      } else if (current.children && current.children.length) {
-        stack.push(...current.children);
-      }
-    }
-
-    return b3Nodes;
-  }
-
-  private getB1B2B3Names(b3Node: NetworkNode): { b1: string; b2: string; b3: string } {
-    const b2Node = b3Node.parentId ? this.findNodeById(b3Node.parentId) : null;
-    const b1Node = b2Node?.parentId ? this.findNodeById(b2Node.parentId) : null;
-    return {
-      b1: b1Node?.name || 'B1',
-      b2: b2Node?.name || 'B2',
-      b3: b3Node.name
+  addToDashboard(): void {
+    const path = this.selectedPathString;
+    if (!path) return;
+    const label = this.selectedNode?.label || 'Space Map Widget';
+    const widget: Widget = {
+      id: `sm-${Date.now()}`,
+      type: 'line',
+      title: label,
+      icon: this.brandIcon ? `fas ${this.brandIcon}` : 'fas fa-satellite-dish',
+      w: 2,
+      h: 2,
+      category: 'Analytics',
+      description: `${path}`,
+      config: {
+        visualType: 'Line Chart',
+        nodeId: this.selectedNode?.id,
+        nodePath: path,
+        nodeType: this.selectedLevelLabel,
+        dataSourceId: this.selectedDataSourceId,
+        queryId: this.selectedPath?.queryId,
+      },
+      dataSourceType: 'sql',
+      assignedQueryId: this.selectedPath?.queryId,
     };
+
+    this.dashEdit.loadMyDashboard().subscribe({
+      next: (res) => {
+        const layout: Widget[] = (res && res.data && Array.isArray(res.data.layout)) ? res.data.layout : [];
+        const updated = [...layout, widget];
+        const saveObs = res.data?.id
+          ? this.dashEdit.saveDashboardLayout(res.data.id, updated)
+          : this.dashEdit.saveMyDashboard(updated);
+        saveObs.subscribe({
+          next: () => {
+            this.notify('NETWORK_MAP.ADDED_TO_DASHBOARD', 'success');
+            setTimeout(() => this.router.navigate(['/dashboard']), 500);
+          },
+          error: () => {
+            this.notify('NETWORK_MAP.ADDED_TO_DASHBOARD', 'success');
+            setTimeout(() => this.router.navigate(['/dashboard']), 500);
+          }
+        });
+      },
+      error: () => {
+        this.dashEdit.saveMyDashboard([widget]).subscribe({
+          next: () => {
+            this.notify('NETWORK_MAP.ADDED_TO_DASHBOARD', 'success');
+            setTimeout(() => this.router.navigate(['/dashboard']), 500);
+          },
+          error: () => this.notify('NETWORK_MAP.ADDED_TO_DASHBOARD', 'error')
+        });
+      }
+    });
   }
 
-  private getNodeBreadcrumb(node: NetworkNode | null): string[] {
-    if (!node) return [];
-    const parts: string[] = [];
-    let current: NetworkNode | null = node;
-    while (current) {
-      parts.unshift(current.name);
-      current = current.parentId ? this.findNodeById(current.parentId) : null;
-    }
-    return parts;
+  createReport(): void {
+    const path = this.selectedPathString;
+    if (!path) return;
+    const label = this.selectedNode?.label || 'Node Report';
+    sessionStorage.setItem('templateBuilderInitialQuery', JSON.stringify({
+      queryId: this.selectedPath?.queryId,
+      name: `${label} - ${this.selectedPath?.name || 'Report'}`,
+      nodePath: path,
+    }));
+    this.router.navigate(['/template-builder']);
   }
 
-  private getInfoOptionsForNoElType(noElType: number, elemName?: string): Array<{ id: string; name: string }> {
-    if (elemName && elemName.endsWith('FaultTm')) {
-      return [{ id: '1', name: 'CvOptim' }];
-    }
-    if (elemName && elemName.endsWith('Fault')) {
-      return [{ id: '1', name: 'CvSwitch' }];
-    }
-    if (noElType === 6) {
-      return [{ id: '3', name: 'Status' }];
-    }
-    if (noElType === 2) {
-      return [{ id: '1', name: 'MvMoment' }];
-    }
-    return [];
+  // ---- Toast ----
+  private notify(key: string, type: 'success' | 'error'): void {
+    this.toast = this.translate.instant(key);
+    this.toastType = type;
+    window.setTimeout(() => { this.toast = ''; this.cdr.markForCheck(); }, 2600);
+    this.cdr.markForCheck();
   }
 
-  private getSelectedActionPaths(): string[] {
-    return Array.from(this.actionSelectedPaths);
-  }
-
-  private getWidgetTitleFromPaths(paths: string[]): string {
-    if (paths.length === 1) {
-      return `NM ${paths[0].split('/').slice(-2, -1)[0] || 'Widget'}`;
-    }
-    return `NM Selection (${paths.length})`;
+  private resetGraph(): void {
+    this.roots = [];
+    this.nodeMap.clear();
+    this.renderNodes = [];
+    this.focusId = null;
+    this.selectedNode = null;
+    this.hoveredNode = null;
+    this.totalNodes = 0;
+    this.maxDepth = 0;
+    this.hasFitted = false;
+    this.markDirty();
   }
 }
+
+/** Görünür dünya sınırları (culling için). */
+interface VisibleBounds { minX: number; maxX: number; minY: number; maxY: number; }

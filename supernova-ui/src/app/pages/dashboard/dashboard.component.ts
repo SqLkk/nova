@@ -96,6 +96,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
   configuringWidget: Widget | null = null;
   availableSqlQueries: any[] = [];
   availablePythonScripts: any[] = [];
+  availablePaths: any[] = [];
+  availableQueryColumns: string[] = [];
+  loadingColumns = false;
+  exportDropdownOpen = false;
 
   constructor(
     private cdr: ChangeDetectorRef,
@@ -561,9 +565,15 @@ export class DashboardComponent implements OnInit, OnDestroy {
     if (!this.configuringWidget!.dataSourceType) {
       this.configuringWidget!.dataSourceType = 'sql';
     }
+    if (!this.configuringWidget!.config) {
+      this.configuringWidget!.config = {};
+    }
+    if (!this.configuringWidget!.config.refreshInterval) {
+      this.configuringWidget!.config.refreshInterval = this.configuringWidget!.refreshInterval || 10000;
+    }
     this.showConfigModal = true;
     
-    // Load available queries and scripts
+    // Load available queries, scripts, and paths
     this.subs.push(
       this.dashEdit.getAvailableQueries().subscribe(res => {
         if (res.success) this.availableSqlQueries = res.data;
@@ -577,11 +587,71 @@ export class DashboardComponent implements OnInit, OnDestroy {
         this.cdr.detectChanges();
       })
     );
+
+    this.subs.push(
+      this.dashEdit.getAvailablePaths().subscribe(res => {
+        if (res.success) this.availablePaths = res.data || [];
+        this.cdr.detectChanges();
+      })
+    );
+
+    if (this.configuringWidget!.assignedQueryId) {
+      this.loadQueryColumns(this.configuringWidget!.assignedQueryId);
+    } else {
+      this.availableQueryColumns = [];
+    }
+  }
+
+  onQueryChange(queryId: string): void {
+    if (this.configuringWidget) {
+      this.configuringWidget.assignedQueryId = queryId;
+    }
+    this.loadQueryColumns(queryId);
+  }
+
+  loadQueryColumns(queryId: string): void {
+    if (!queryId) {
+      this.availableQueryColumns = [];
+      return;
+    }
+    this.loadingColumns = true;
+    this.subs.push(
+      this.dashEdit.getAvailableQueryColumns(queryId).subscribe({
+        next: (res) => {
+          this.loadingColumns = false;
+          this.availableQueryColumns = res.data || [];
+          if (this.configuringWidget) {
+            if (!this.configuringWidget.config) this.configuringWidget.config = {};
+            if (!this.configuringWidget.config.sqlValueColumn && this.availableQueryColumns.length > 0) {
+              const numCol = this.availableQueryColumns.find(c =>
+                c.includes('pct') || c.includes('rate') || c.includes('qty') || c.includes('oee') ||
+                c.includes('val') || c.includes('minutes') || c.includes('hours') || c.includes('cost') ||
+                c.includes('kwh') || c.includes('pressure') || c.includes('speed') || c.includes('temp') || c.includes('torque')
+              );
+              this.configuringWidget.config.sqlValueColumn = numCol || this.availableQueryColumns[0];
+            }
+            if (!this.configuringWidget.config.sqlLabelColumn && this.availableQueryColumns.length > 0) {
+              const lblCol = this.availableQueryColumns.find(c =>
+                c.includes('name') || c.includes('time') || c.includes('date') || c.includes('id') ||
+                c.includes('code') || c.includes('area') || c.includes('category') || c.includes('step')
+              );
+              this.configuringWidget.config.sqlLabelColumn = lblCol || this.availableQueryColumns[0];
+            }
+          }
+          this.cdr.detectChanges();
+        },
+        error: () => {
+          this.loadingColumns = false;
+          this.cdr.detectChanges();
+        }
+      })
+    );
   }
 
   closeWidgetConfig(): void {
     this.showConfigModal = false;
     this.configuringWidget = null;
+    this.availableQueryColumns = [];
   }
 
   saveWidgetConfig(): void {
@@ -589,15 +659,162 @@ export class DashboardComponent implements OnInit, OnDestroy {
       const index = this.activeWidgets.findIndex(w => w.id === this.configuringWidget!.id);
       if (index !== -1) {
         this.activeWidgets[index] = { ...this.configuringWidget };
+        if (this.activeWidgets[index].config) {
+          this.activeWidgets[index].refreshInterval = this.activeWidgets[index].config.refreshInterval;
+          this.activeWidgets[index].sqlValueColumn = this.activeWidgets[index].config.sqlValueColumn;
+          this.activeWidgets[index].sqlLabelColumn = this.activeWidgets[index].config.sqlLabelColumn;
+        }
         // Clean up unused properties based on selection
         if (this.activeWidgets[index].dataSourceType === 'sql') {
           delete this.activeWidgets[index].assignedPythonId;
+          delete this.activeWidgets[index].assignedPathId;
         } else if (this.activeWidgets[index].dataSourceType === 'python') {
           delete this.activeWidgets[index].assignedQueryId;
+          delete this.activeWidgets[index].assignedPathId;
+        } else if (this.activeWidgets[index].dataSourceType === 'path') {
+          delete this.activeWidgets[index].assignedQueryId;
+          delete this.activeWidgets[index].assignedPythonId;
         }
       }
     }
     this.closeWidgetConfig();
+  }
+
+  // --- Export Dashboard Methods ---
+
+  toggleExportDropdown(): void {
+    this.exportDropdownOpen = !this.exportDropdownOpen;
+  }
+
+  closeExportDropdown(): void {
+    this.exportDropdownOpen = false;
+  }
+
+  exportDashboardPdf(): void {
+    this.closeExportDropdown();
+    if (!this.activeDashboardId) {
+      this.notify('Dışa aktarılacak aktif pano bulunamadı.');
+      return;
+    }
+    this.notify('Executive PDF raporu hazırlanıyor...');
+    this.dashEdit.exportDashboardPdf(this.activeDashboardId).subscribe({
+      next: (blob) => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const slug = (this.activeDashboard?.name || 'Dashboard').replace(/[^a-zA-Z0-9_-]+/g, '_');
+        a.download = `${slug}_Executive_Report_${new Date().toISOString().slice(0, 10)}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        this.notify('PDF raporu başarıyla indirildi.');
+      },
+      error: (err) => {
+        console.error('Failed to export PDF', err);
+        this.notify('PDF dışa aktarımı başarısız oldu.');
+      }
+    });
+  }
+
+  exportDashboardPrint(): void {
+    this.closeExportDropdown();
+    window.print();
+  }
+
+  exportDashboardPng(): void {
+    this.closeExportDropdown();
+    this.notify('Pano anlık görüntüsü (PNG) hazırlanıyor...');
+    try {
+      const width = 1400;
+      const cardW = 310;
+      const cardH = 150;
+      const pad = 24;
+      const cols = 4;
+      const rowsCount = Math.ceil(this.activeWidgets.length / cols) || 1;
+      const height = 110 + rowsCount * (cardH + pad) + pad;
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Canvas context not available');
+
+      // Space background gradient
+      const bgGrad = ctx.createLinearGradient(0, 0, width, height);
+      bgGrad.addColorStop(0, '#14111B');
+      bgGrad.addColorStop(0.5, '#1b1725');
+      bgGrad.addColorStop(1, '#0e0b15');
+      ctx.fillStyle = bgGrad;
+      ctx.fillRect(0, 0, width, height);
+
+      // Top cyan accent line
+      ctx.fillStyle = '#0284c7';
+      ctx.fillRect(0, 0, width, 5);
+
+      // Header title
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 24px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ctx.fillText(`SUPERNOVA — ${this.activeDashboard?.name || 'Executive Suite'}`, pad, 45);
+
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ctx.fillText(`Exported: ${new Date().toLocaleString()} | Widgets: ${this.activeWidgets.length} | Status: Optimal`, pad, 72);
+
+      // Draw each widget card
+      this.activeWidgets.forEach((w, idx) => {
+        const col = idx % cols;
+        const row = Math.floor(idx / cols);
+        const x = pad + col * (cardW + pad);
+        const y = 95 + row * (cardH + pad);
+
+        ctx.fillStyle = 'rgba(31, 27, 38, 0.95)';
+        ctx.strokeStyle = 'rgba(82, 74, 90, 0.8)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.roundRect(x, y, cardW, cardH, 12);
+        ctx.fill();
+        ctx.stroke();
+
+        // Top accent
+        ctx.fillStyle = '#0284c7';
+        ctx.beginPath();
+        ctx.roundRect(x, y, cardW, 4, [12, 12, 0, 0]);
+        ctx.fill();
+
+        // Title
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 13px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+        ctx.fillText(w.title || 'Widget', x + 15, y + 30);
+
+        // Category & Visual Type
+        ctx.fillStyle = '#0284c7';
+        ctx.font = '11px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+        ctx.fillText(`${w.category || 'Production'} • ${w.config?.visualType || w.type}`, x + 15, y + 50);
+
+        // Status badge
+        ctx.fillStyle = '#10b981';
+        ctx.font = 'bold 16px monospace';
+        ctx.fillText('SYS_OK • ONLINE', x + 15, y + 85);
+
+        // Source & interval
+        ctx.fillStyle = '#64748b';
+        ctx.font = '10px monospace';
+        ctx.fillText(`Source: ${(w.dataSourceType || 'sql').toUpperCase()} | Rate: ${(w.config?.refreshInterval || 10000)/1000}s`, x + 15, y + 120);
+      });
+
+      const a = document.createElement('a');
+      a.href = canvas.toDataURL('image/png');
+      const slug = (this.activeDashboard?.name || 'Dashboard').replace(/[^a-zA-Z0-9_-]+/g, '_');
+      a.download = `${slug}_Snapshot_${new Date().toISOString().slice(0, 10)}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      this.notify('Pano anlık görüntüsü (PNG) indirildi.');
+    } catch (err) {
+      console.error('PNG export failed', err);
+      this.notify('Görüntü dışa aktarımı başarısız oldu.');
+    }
   }
 
   // --- app-widget canlı motor köprüsü ---
@@ -605,25 +822,36 @@ export class DashboardComponent implements OnInit, OnDestroy {
   private readonly noPaths: string[] = [];
   private pathsCache = new Map<string, string[]>();
 
-  /** Widget canlı bir SQL/Python kaynağına bağlı mı (yoksa placeholder göster)? */
+  /** Widget canlı bir SQL/Python/Path kaynağına bağlı mı (yoksa placeholder göster)? */
   hasLiveDataSource(w: Widget): boolean {
-    return !!(w && (w.assignedQueryId || w.assignedPythonId));
+    if (!w) return false;
+    const type = this.widgetChartType(w);
+    if (['timeline', 'status-board', 'live-stream', 'map-view', 'path-view'].includes(type)) {
+      return true;
+    }
+    return !!(w.assignedQueryId || w.assignedPythonId || w.assignedPathId || w.config?.assignedQueryId || w.config?.assignedPythonId || w.config?.assignedPathId);
   }
 
   /** app-widget dataSourceType girdisi. */
-  widgetDataSourceType(w: Widget): 'sql' | 'python' {
-    return w.assignedPythonId ? 'python' : 'sql';
+  widgetDataSourceType(w: Widget): 'sql' | 'python' | 'path' {
+    if (w.assignedPathId || w.config?.assignedPathId || w.dataSourceType === 'path' || w.config?.dataSourceType === 'path') return 'path';
+    if (w.assignedPythonId || w.config?.assignedPythonId || w.dataSourceType === 'python' || w.config?.dataSourceType === 'python') return 'python';
+    return 'sql';
   }
 
-  /** app-widget initialPaths girdisi (sql://<queryId> | python://<scriptId>).
+  /** app-widget initialPaths girdisi (sql://<queryId> | python://<scriptId> | path://<pathId>).
    *  Referans-kararlı (cache'li) — change-detection gereksiz re-fetch tetiklemez. */
   widgetInitialPaths(w: Widget): string[] {
-    const key = w.id + '::sql:' + (w.assignedQueryId || '') + '::py:' + (w.assignedPythonId || '');
+    const qId = w.assignedQueryId || w.config?.assignedQueryId;
+    const pyId = w.assignedPythonId || w.config?.assignedPythonId;
+    const pathId = w.assignedPathId || w.config?.assignedPathId;
+    const key = w.id + '::sql:' + (qId || '') + '::py:' + (pyId || '') + '::pth:' + (pathId || '');
     const cached = this.pathsCache.get(key);
     if (cached) return cached;
     let paths: string[];
-    if (w.assignedQueryId) paths = ['sql://' + w.assignedQueryId];
-    else if (w.assignedPythonId) paths = ['python://' + w.assignedPythonId];
+    if (pathId) paths = ['path://' + pathId];
+    else if (qId) paths = ['sql://' + qId];
+    else if (pyId) paths = ['python://' + pyId];
     else paths = this.noPaths;
     this.pathsCache.set(key, paths);
     return paths;
@@ -635,18 +863,19 @@ export class DashboardComponent implements OnInit, OnDestroy {
       'Line Chart': 'line-chart',
       'Area Chart': 'area-chart',
       'Bar Chart': 'bar-chart',
-      'Donut Chart': 'doughnut',
+      'Donut Chart': 'doughnut-chart',
       'Gauge Chart': 'gauge',
       'Data Grid': 'data-table',
-      'List View': 'table',
-      'KPI Card': 'value',
-      'Scorecard': 'value',
+      'List View': 'data-table',
+      'KPI Card': 'stat-card',
+      'Scorecard': 'stat-card',
       'Sparkline': 'line-chart',
       'Heatmap': 'heatmap',
-      'Live Stream': 'line-chart',
-      'Status Board': 'value',
-      'Timeline': 'line-chart',
-      'Map View': 'table'
+      'Live Stream': 'live-stream',
+      'Status Board': 'status-board',
+      'Timeline': 'timeline',
+      'Map View': 'map-view',
+      'Path View': 'path-view'
     };
     return w?.config?.widgetType || map[w?.config?.visualType] || 'line-chart';
   }

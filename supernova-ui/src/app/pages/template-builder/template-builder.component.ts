@@ -97,6 +97,26 @@ export class TemplateBuilderComponent implements OnInit {
     const routeId = this.route.snapshot.paramMap.get('id');
     if (routeId) {
       this.openById(routeId);
+    } else {
+      // Space Map veya harici bir yerden gelen "Create Report" isteği
+      const rawInitial = sessionStorage.getItem('templateBuilderInitialQuery');
+      if (rawInitial) {
+        sessionStorage.removeItem('templateBuilderInitialQuery');
+        try {
+          const initData = JSON.parse(rawInitial);
+          this.mode = 'editor';
+          if (initData.name) this.doc.name = initData.name;
+          if (initData.queryId) {
+            this.queryService.get(initData.queryId).subscribe({
+              next: qRes => {
+                if (qRes.data) {
+                  this.selectQuery(qRes.data);
+                }
+              }
+            });
+          }
+        } catch { /* yok say */ }
+      }
     }
   }
 

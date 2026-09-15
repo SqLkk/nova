@@ -77,7 +77,15 @@ const routes: Routes = [
   {
     path: 'template-builder',
     component: TemplateBuilderComponent,
-    canActivate: [AuthGuard]
+    canActivate: [AuthGuard],
+    data: { pageKey: 'template-builder' }
+  },
+  // Reports hub'undan "Edit" ile doğrudan bir şablonu editörde açmak için.
+  {
+    path: 'template-builder/:id',
+    component: TemplateBuilderComponent,
+    canActivate: [AuthGuard],
+    data: { pageKey: 'template-builder' }
   },
   {
     path: 'query-creator',

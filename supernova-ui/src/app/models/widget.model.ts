@@ -1,8 +1,14 @@
 export interface Widget {
   id: string;
   title: string;
-  type: 'gauge' | 'chart' | 'value' | 'table' | 'alarm';
-  dataSource: string;
+  type: 'gauge' | 'chart' | 'value' | 'table' | 'alarm' | 'timeline' | 'status-board' | 'live-stream' | 'map-view' | 'path-view' | string;
+  dataSource?: string;
+  dataSourceType?: 'realtime' | 'historical' | 'app' | 'sql' | 'python' | 'path';
+  assignedQueryId?: string;
+  assignedPythonId?: string;
+  assignedPathId?: string;
+  sqlValueColumn?: string;
+  sqlLabelColumn?: string;
   position?: {
     x: number;
     y: number;

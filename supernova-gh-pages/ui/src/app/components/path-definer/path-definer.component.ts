@@ -1,4 +1,5 @@
 import { Component, OnInit, OnChanges, SimpleChanges, Input } from '@angular/core';
+import { Router } from '@angular/router';
 import { PathService } from '../../services/path.service';
 import { QueryService } from '../../services/query.service';
 import { AuthService } from '../../services/auth.service';
@@ -65,18 +66,20 @@ export class PathDefinerComponent implements OnInit, OnChanges {
     { value: 'binary_tree', label: 'Binary Tree', icon: 'fa-tree', hint: 'each node ≤ 2 children' },
     { value: 'sequence', label: 'Sequence', icon: 'fa-list-ol', hint: 'next_id or order chain' },
     { value: 'grouped', label: 'Grouped', icon: 'fa-layer-group', hint: 'group by column' },
+    { value: 'dag', label: 'DAG (Graph)', icon: 'fa-project-diagram', hint: 'multi-parent directed graph / routing' },
   ];
 
   constructor(
     private pathService: PathService,
     private queryService: QueryService,
     private auth: AuthService,
-    private confirmService: ConfirmService
+    private confirmService: ConfirmService,
+    private router: Router
   ) {}
 
   ngOnInit(): void {
-    const role = this.auth.getCurrentUser()?.role;
-    this.canDefine = role === 'admin' || role === 'superuser' || role === 'engineer';
+    // Hiyerarşi tabanlı: engineer (60) ve üzeri path tanımlayabilir.
+    this.canDefine = this.auth.hasRole('engineer');
     this.loadPaths();
     this.loadQueries();
   }
@@ -212,6 +215,17 @@ export class PathDefinerComponent implements OnInit, OnChanges {
     this.view = 'search';
   }
 
+  openInMap(def: PathDef): void {
+    const q = this.queries.find(x => x.id === def.queryId);
+    const dsId = (q as any)?.dataSourceId || (q as any)?.data_source_id || this.dataSourceId;
+    this.router.navigate(['/network-map'], {
+      queryParams: {
+        pathId: def.id,
+        ...(dsId ? { dataSourceId: dsId } : {})
+      }
+    });
+  }
+
   // ---- Build: sorgu & yapı ----
 
   onQueryChange(): void {
@@ -255,14 +269,19 @@ export class PathDefinerComponent implements OnInit, OnChanges {
   private suggestConfig(structure: PathStructure, cols: string[]): PathConfig {
     if (!cols.length) return {};
     const find = (re: RegExp) => cols.find((c) => re.test(c));
-    const idCol = find(/^id$|_id$|code$|^kod$/i) || cols[0];
+    const idCol = find(/^id$|_id$|code$|^kod$|step_id/i) || cols[0];
     const labelCol = find(/name|label|title|desc|ad/i) || idCol;
+    const healthCol = find(/health|oee|score|quality|perform/i);
+    const statusCol = find(/status|state|condition|durum/i);
+
     if (structure === 'grouped') {
       return {
         group_col: find(/group|area|zone|region|bölge|tip|type|category|line|hat/i) || cols[0],
         label_col: labelCol,
         order_col: find(/order|seq|sort|index|pos|rank|sıra/i),
         id_col: idCol,
+        health_col: healthCol,
+        status_col: statusCol,
       };
     }
     if (structure === 'sequence') {
@@ -271,6 +290,18 @@ export class PathDefinerComponent implements OnInit, OnChanges {
         label_col: labelCol,
         next_col: find(/next|downstream|successor|sonra|child/i),
         order_col: find(/order|seq|sort|index|pos|rank|sıra/i),
+        health_col: healthCol,
+        status_col: statusCol,
+      };
+    }
+    if (structure === 'dag') {
+      return {
+        id_col: idCol,
+        parent_col: find(/prereq|parent|dependency|dep|upstream|predecessor/i) || cols[0],
+        label_col: labelCol,
+        type_col: find(/type|class|level|operation_type/i),
+        health_col: healthCol,
+        status_col: statusCol,
       };
     }
     return {
@@ -278,6 +309,8 @@ export class PathDefinerComponent implements OnInit, OnChanges {
       parent_col: find(/parent|pid|upstream|mother|üst|baba/i) || cols[0],
       label_col: labelCol,
       type_col: find(/type|class|level|katman|seviye/i),
+      health_col: healthCol,
+      status_col: statusCol,
     };
   }
 
@@ -312,15 +345,35 @@ export class PathDefinerComponent implements OnInit, OnChanges {
       structure: this.form.structure,
       config: this.form.config,
     };
-    const done = (msg: string) => { this.saving = false; this.notify(msg); this.loadPaths(); this.view = 'library'; };
+
+    const afterSave = (savedDef: PathDef) => {
+      // Otomatik derle (materialize et) ki hemen Space Map'te hazır olsun
+      this.pathService.build(savedDef.id).subscribe({
+        next: (buildRes) => {
+          this.saving = false;
+          const nodeCount = buildRes.data?.stats?.node_count || buildRes.data?.nodes?.length || 0;
+          this.notify(`Path kaydedildi ve ${nodeCount} düğümlü hiyerarşi derlendi.`);
+          this.loadPaths();
+          this.view = 'library';
+        },
+        error: (err) => {
+          this.saving = false;
+          const warn = err?.error?.error || err?.message || 'Derleme uyarısı';
+          this.notify(`Path kaydedildi (${warn})`);
+          this.loadPaths();
+          this.view = 'library';
+        }
+      });
+    };
+
     if (this.form.id) {
       this.pathService.update(this.form.id, payload).subscribe({
-        next: () => done('Updated successfully.'),
+        next: (res) => afterSave(res.data || { ...payload, id: this.form.id } as PathDef),
         error: (e) => { this.saving = false; this.notify('Update error: ' + (e.error?.error || e.message)); },
       });
     } else {
       this.pathService.create(payload).subscribe({
-        next: () => done('Path saved successfully.'),
+        next: (res) => afterSave(res.data),
         error: (e) => { this.saving = false; this.notify('Save error: ' + (e.error?.error || e.message)); },
       });
     }

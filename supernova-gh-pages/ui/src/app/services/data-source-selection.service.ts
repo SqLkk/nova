@@ -81,10 +81,6 @@ export class DataSourceSelectionService {
         const list = active.map(raw => this.normalize(raw));
         this._dataSources$.next(list);
 
-        if (!this._selectedId$.value && list.length > 0) {
-          this._selectedId$.next(list[0].id);
-        }
-
         // Her kaynak için durum probe'u başlat.
         const next: Record<string, SourceStatus> = {};
         list.forEach(d => (next[d.id] = 'checking'));

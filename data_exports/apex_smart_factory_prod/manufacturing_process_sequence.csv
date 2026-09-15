@@ -1,0 +1,11 @@
+step_id,step_order,next_step_id,step_name,assigned_line_id,workstation_name,std_cycle_time_sec,quality_gate_required,target_tolerance_um,process_description
+PRC-STEP-010,10,PRC-STEP-020,Raw Coil Laser Profiling & Destacking,LINE-MUC-PRESS-01,Schuler Destacker Station,12.5,0,50.0,Laser thickness measurement of electrical steel sheet coils and robot destack.
+PRC-STEP-020,20,PRC-STEP-030,High-Speed Tandem Servo Stamping,LINE-MUC-PRESS-01,MCH-SCHULER-2500,4.8,1,15.0,Progressive die stamping of rotor/stator laminations with interlock embossing.
+PRC-STEP-030,30,PRC-STEP-040,5-Axis CNC Precision Shaft Machining,LINE-STG-CNC-01,MCH-DMG-DMC-85,65.0,1,5.0,"High-precision turning, spline hobbing, and bearing journal grinding on rotor shaft."
+PRC-STEP-040,40,PRC-STEP-050,Multi-Stage Ultrasonic Vapor Degreasing,LINE-STG-CNC-01,Ecoclean Solvent Bath Station,45.0,0,0.0,Acoustic cavitation solvent bath eliminating residual cutting fluids and micro-swarf.
+PRC-STEP-050,50,PRC-STEP-060,Robotic Fiber Laser Seam Welding,LINE-MUC-WELD-04,MCH-TRUMPF-LASER-01,28.0,1,12.0,Continuous keyhole laser welding of laminated rotor core stacks under inert argon shield.
+PRC-STEP-060,60,PRC-STEP-070,Automated Optical 3D Profilometry (AOI),LINE-MUC-WELD-04,Cognex In-Sight 3D Vision Cell,8.5,1,2.5,Multi-camera structured light inspection for weld bead geometry and surface flaws.
+PRC-STEP-070,70,PRC-STEP-080,Hairpin Copper Winding & Impregnation,LINE-STG-CNC-01,MCH-SIEMENS-HAIRPIN,52.0,1,8.0,"Automated rectangular hairpin copper insertion, twisting, laser tip stripping and welding."
+PRC-STEP-080,80,PRC-STEP-090,High-Voltage Dielectric & Partial Discharge Test,LINE-STG-CNC-01,Schleich E-Mobility HiPot Stand,18.0,1,0.0,"3.5 kV dielectric withstand, surge voltage, and partial discharge inception testing."
+PRC-STEP-090,90,PRC-STEP-100,Full-Speed Dynamic Balancing & Dyno Test,LINE-STG-DYNO-01,MCH-AVL-DYNO-400,90.0,1,1.0,"24,000 RPM dynamometer run-up, ISO 1940 G1.0 balancing, back-EMF map and vibration check."
+PRC-STEP-100,100,,Laser DataMatrix QR Engraving & Final Packaging,LINE-STG-DYNO-01,Keyence MD-X Laser Marking Cell,14.0,0,0.0,"Direct part marking of UID/EPC QR code, digital twin cloud sync, and robotic box palletizing."

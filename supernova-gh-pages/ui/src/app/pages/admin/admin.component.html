@@ -1,247 +1,441 @@
-<div class="min-h-screen bg-[rgb(20,17,27)] relative overflow-hidden text-slate-100 font-sans pt-16">
-  
-  <!-- Subtle Space Background Effect -->
-  <div class="absolute inset-0 z-0 overflow-hidden pointer-events-none">
-    <div class="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-indigo-900/10 via-[rgb(var(--bg-primary))] to-[rgb(var(--bg-primary))]"></div>
-    <div class="absolute inset-0" style="background-image: radial-gradient(circle, rgba(255,255,255,0.05) 1px, transparent 1px); background-size: 60px 60px;"></div>
-  </div>
+<div class="admin-page">
+  <!-- Başlık -->
+  <header class="admin-header">
+    <div>
+      <h1 class="admin-title"><i class="fas fa-user-shield title-icon"></i> Yönetim Paneli</h1>
+      <p class="admin-subtitle">Kullanıcılar, roller, izinler ve yetkilendirme</p>
+    </div>
+    <div class="admin-me">
+      <span class="me-chip" [style.borderColor]="levelColor(myLevel)" [style.color]="levelColor(myLevel)">
+        <i class="fas fa-shield-halved"></i> {{ auth.getCurrentUser()?.displayName }}
+        <span class="me-lvl">Seviye {{ myLevel }}</span>
+      </span>
+    </div>
+  </header>
 
-  <main class="relative z-10 p-8 max-w-7xl mx-auto h-full">
-    
-    <!-- Header -->
-    <div class="flex items-center justify-between mb-8">
-      <div>
-        <h2 class="text-3xl font-black tracking-tight text-white flex items-center">
-          <i class="fas fa-user-shield text-[rgb(var(--accent-primary))] mr-3"></i>
-          Administration
-        </h2>
-        <p class="text-[rgb(201,196,186)] mt-1 font-medium text-sm tracking-wide">Manage your workspace, users, and connections</p>
+  <!-- Sekme çubuğu -->
+  <nav class="tab-bar">
+    <button class="tab" *ngIf="showUsersTab" [class.active]="activeTab==='users'" (click)="activeTab='users'">
+      <i class="fas fa-users"></i> Kullanıcılar <span class="tab-count">{{ users.length }}</span>
+    </button>
+    <button class="tab" *ngIf="showRolesTab" [class.active]="activeTab==='roles'" (click)="activeTab='roles'">
+      <i class="fas fa-sitemap"></i> Roller <span class="tab-count">{{ roles.length }}</span>
+    </button>
+    <button class="tab" *ngIf="showSharingTab" [class.active]="activeTab==='sharing'" (click)="activeTab='sharing'">
+      <i class="fas fa-share-nodes"></i> Yetkilendirme
+    </button>
+    <button class="tab" *ngIf="showDatasourcesTab" [class.active]="activeTab==='datasources'" (click)="activeTab='datasources'">
+      <i class="fas fa-database"></i> Veri Kaynakları
+    </button>
+  </nav>
+
+  <!-- ================= KULLANICILAR ================= -->
+  <section *ngIf="activeTab==='users' && showUsersTab" class="tab-panel">
+    <div class="toolbar">
+      <div class="search-wrap">
+        <i class="fas fa-search search-icon"></i>
+        <input class="input" type="text" placeholder="Kullanıcı ara (ad, kullanıcı adı, e-posta)..." [(ngModel)]="userSearch">
       </div>
-      
-      <!-- Quick Action -->
-      <button (click)="openResourceModal()" class="px-5 py-2.5 bg-gradient-to-r from-[rgb(var(--accent-primary))] to-[rgb(var(--accent-secondary))] text-[rgb(var(--on-accent))] rounded-xl font-bold shadow-[0_0_15px_rgb(var(--accent-primary)/0.2)] hover:shadow-[0_0_25px_rgb(var(--accent-primary)/0.4)] transition-all">
-        <i class="fas fa-plus mr-2"></i> New Resource
+      <select class="input select" [(ngModel)]="userRoleFilter">
+        <option value="">Tüm roller</option>
+        <option *ngFor="let r of roles" [value]="r.key">{{ r.name }} ({{ r.level }})</option>
+      </select>
+      <button class="btn-primary" (click)="openUserCreate()" *ngIf="can('user:create')">
+        <i class="fas fa-plus"></i> Yeni Kullanıcı
       </button>
     </div>
 
-    <div class="flex space-x-6 h-[calc(100vh-180px)]">
-      <!-- Sidebar Navigation -->
-      <div class="w-64 flex flex-col space-y-2">
-        <button (click)="setTab('users')" [class.bg-[rgb(47,41,52)]]="activeTab === 'users'" [class.border-[rgb(var(--accent-primary))]]="activeTab === 'users'" class="flex items-center px-4 py-3 rounded-xl border border-transparent text-left hover:bg-[rgb(31,27,38)] transition-colors text-[rgb(201,196,186)] hover:text-white font-medium">
-          <i class="fas fa-users w-6 text-center mr-2 text-[rgb(var(--accent-primary))]"></i> User Management
-        </button>
-        <button (click)="setTab('datasources')" [class.bg-[rgb(47,41,52)]]="activeTab === 'datasources'" [class.border-[rgb(var(--accent-primary))]]="activeTab === 'datasources'" class="flex items-center px-4 py-3 rounded-xl border border-transparent text-left hover:bg-[rgb(31,27,38)] transition-colors text-[rgb(201,196,186)] hover:text-white font-medium">
-          <i class="fas fa-database w-6 text-center mr-2 text-indigo-400"></i> Data Sources
-        </button>
-        <button (click)="setTab('settings')" [class.bg-[rgb(47,41,52)]]="activeTab === 'settings'" [class.border-[rgb(var(--accent-primary))]]="activeTab === 'settings'" class="flex items-center px-4 py-3 rounded-xl border border-transparent text-left hover:bg-[rgb(31,27,38)] transition-colors text-[rgb(201,196,186)] hover:text-white font-medium">
-          <i class="fas fa-cog w-6 text-center mr-2 text-slate-400"></i> Global Settings
-        </button>
-      </div>
-
-      <!-- Main Content Area -->
-      <div class="flex-1 bg-[rgb(31,27,38)]/60 backdrop-blur-xl border border-[rgb(82,74,90)] rounded-3xl p-6 shadow-2xl overflow-y-auto custom-scrollbar relative">
-        
-        <!-- Users Tab -->
-        <div *ngIf="activeTab === 'users'" class="animate-fade-in">
-          <div class="flex justify-between items-center mb-6 border-b border-[rgb(58,52,64)] pb-4">
-            <h3 class="text-xl font-bold text-white">Users</h3>
-            <div class="relative">
-              <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-[rgb(163,154,137)]"></i>
-              <input type="text" placeholder="Search users..." class="pl-9 pr-4 py-2 bg-[rgb(20,17,27)] border border-[rgb(58,52,64)] rounded-lg text-sm focus:outline-none focus:border-[rgb(var(--accent-primary))] text-white placeholder-[rgb(163,154,137)]">
-            </div>
-          </div>
-          
-          <div class="overflow-x-auto">
-            <table class="w-full text-left border-collapse">
-              <thead>
-                <tr class="border-b border-[rgb(58,52,64)] text-[rgb(163,154,137)] text-xs uppercase tracking-wider">
-                  <th class="py-3 px-4 font-semibold">User</th>
-                  <th class="py-3 px-4 font-semibold">Role</th>
-                  <th class="py-3 px-4 font-semibold">Status</th>
-                  <th class="py-3 px-4 font-semibold">Last Login</th>
-                  <th class="py-3 px-4 font-semibold text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr *ngFor="let user of users" class="border-b border-[rgb(58,52,64)]/50 hover:bg-[rgb(47,41,52)]/30 transition-colors">
-                  <td class="py-4 px-4">
-                    <div class="flex items-center">
-                      <div class="w-8 h-8 rounded-full bg-[rgb(47,41,52)] flex items-center justify-center mr-3 font-bold text-[rgb(var(--accent-primary))]">
-                        {{ user.name.charAt(0) }}
-                      </div>
-                      <div>
-                        <div class="text-sm font-semibold text-white">{{ user.name }}</div>
-                        <div class="text-xs text-[rgb(163,154,137)]">{{ user.email }}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td class="py-4 px-4">
-                    <span class="px-2 py-1 bg-[rgb(47,41,52)] border border-[rgb(82,74,90)] text-xs rounded-md text-[rgb(201,196,186)] capitalize">
-                      {{ user.role }}
-                    </span>
-                  </td>
-                  <td class="py-4 px-4">
-                    <div class="flex items-center text-xs">
-                      <i class="fas fa-circle text-[8px] mr-1.5" [ngClass]="user.status === 'active' ? 'text-emerald-400' : 'text-slate-500'"></i>
-                      <span [ngClass]="user.status === 'active' ? 'text-emerald-400' : 'text-slate-400'" class="capitalize font-medium">{{ user.status }}</span>
-                    </div>
-                  </td>
-                  <td class="py-4 px-4 text-sm text-[rgb(163,154,137)]">{{ user.lastLogin }}</td>
-                  <td class="py-4 px-4 text-right">
-                    <button class="w-8 h-8 rounded-lg hover:bg-[rgb(58,52,64)] text-[rgb(163,154,137)] hover:text-white transition-colors mr-1">
-                      <i class="fas fa-edit"></i>
-                    </button>
-                    <button (click)="deleteUser(user.id)" class="w-8 h-8 rounded-lg hover:bg-red-500/20 text-[rgb(163,154,137)] hover:text-red-400 transition-colors">
-                      <i class="fas fa-trash"></i>
-                    </button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- Data Sources Tab -->
-        <div *ngIf="activeTab === 'datasources'" class="animate-fade-in">
-          <div class="flex justify-between items-center mb-6 border-b border-[rgb(58,52,64)] pb-4">
-            <h3 class="text-xl font-bold text-white">Data Sources</h3>
-          </div>
-          
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            <div *ngFor="let ds of dataSources" class="bg-[rgb(20,17,27)]/80 rounded-2xl border border-[rgb(58,52,64)] p-5 relative overflow-hidden group hover:border-indigo-500/50 transition-colors">
-              <div class="flex justify-between items-start mb-4">
-                <div class="w-10 h-10 rounded-xl bg-[rgb(31,27,38)] border border-[rgb(82,74,90)] flex items-center justify-center">
-                  <i class="fas fa-database" [ngClass]="{'text-blue-400': ds.db_type === 'postgres', 'text-orange-400': ds.db_type === 'mysql', 'text-emerald-400': ds.db_type === 'oracle', 'text-slate-400': ds.db_type === 'sqlite'}"></i>
+    <div class="table-card">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Kullanıcı</th><th>Rol</th><th>Durum</th><th>Seviye</th><th class="col-actions">İşlem</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let u of filteredUsers" (click)="selectUser(u.id)" class="row" [class.unmanaged]="!u.canManage">
+            <td>
+              <div class="user-cell">
+                <div class="avatar" [style.background]="'linear-gradient(135deg, '+levelColor(u.level)+', rgb(var(--accent-secondary)))'">{{ initials(u.displayName || u.username) }}</div>
+                <div>
+                  <div class="user-name">{{ u.displayName || u.username }}</div>
+                  <div class="user-sub">{{ u.username }} · {{ u.email }}</div>
                 </div>
-                <div class="px-2 py-1 rounded bg-[rgb(47,41,52)] text-[10px] uppercase font-bold text-[rgb(163,154,137)]">{{ ds.db_type }}</div>
               </div>
-              <h4 class="font-bold text-white mb-1">{{ ds.name }}</h4>
-              <p class="text-xs text-[rgb(163,154,137)] mb-4">
-                <ng-container *ngIf="ds.db_type === 'sqlite'">Local DB: {{ ds.database_name }}</ng-container>
-                <ng-container *ngIf="ds.db_type !== 'sqlite'">Host: {{ ds.host }}:{{ ds.port }}</ng-container>
-              </p>
-              
-              <div class="flex items-center justify-between pt-4 border-t border-[rgb(58,52,64)]/50 mt-auto">
-                <div class="flex items-center text-[10px] font-bold">
-                  <i class="fas fa-circle mr-1.5" [ngClass]="ds.is_active ? 'text-emerald-400' : 'text-red-400'"></i>
-                  <span [ngClass]="ds.is_active ? 'text-emerald-400' : 'text-red-400'" class="uppercase">{{ ds.is_active ? 'Connected' : 'Error' }}</span>
-                </div>
-                <span class="text-[10px] text-[rgb(163,154,137)]">ID: {{ ds.id }}</span>
-              </div>
-            </div>
-            
-          </div>
-        </div>
+            </td>
+            <td>
+              <span class="role-badge" [style.color]="levelColor(u.level)" [style.background]="levelRgba(u.level)">
+                {{ u.roleName || u.roleKey || u.role }}
+              </span>
+            </td>
+            <td>
+              <span class="status-pill" [class.on]="u.isActive" [class.off]="!u.isActive">
+                <span class="dot"></span>{{ u.isActive ? 'Aktif' : 'Pasif' }}
+              </span>
+            </td>
+            <td><span class="lvl">{{ u.level }}</span></td>
+            <td class="col-actions" (click)="$event.stopPropagation()">
+              <button class="icon-btn" title="Detay" (click)="selectUser(u.id)"><i class="fas fa-eye"></i></button>
+              <button class="icon-btn" *ngIf="u.canManage && can('user:edit')" title="Düzenle" (click)="openUserEdit(u)"><i class="fas fa-pen"></i></button>
+              <button class="icon-btn danger" *ngIf="u.canManage && can('user:delete')" title="Sil" (click)="deleteUser(u)"><i class="fas fa-trash"></i></button>
+              <span class="lock-note" *ngIf="!u.canManage" title="Bu kullanıcıyı yönetme yetkiniz yok (seviye sizden yüksek veya kendiniz)"><i class="fas fa-lock"></i></span>
+            </td>
+          </tr>
+          <tr *ngIf="!usersLoading && filteredUsers.length===0">
+            <td colspan="5" class="empty"><i class="fas fa-users-slash"></i> Kullanıcı bulunamadı.</td>
+          </tr>
+          <tr *ngIf="usersLoading"><td colspan="5" class="empty"><i class="fas fa-spinner fa-spin"></i> Yükleniyor…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
 
-        <!-- Global Settings Tab -->
-        <div *ngIf="activeTab === 'settings'" class="animate-fade-in max-w-2xl">
-          <div class="mb-6 border-b border-[rgb(58,52,64)] pb-4">
-            <h3 class="text-xl font-bold text-white">Global Settings</h3>
+  <!-- ================= ROLLER ================= -->
+  <section *ngIf="activeTab==='roles' && showRolesTab" class="tab-panel">
+    <div class="toolbar">
+      <div class="hint"><i class="fas fa-circle-info"></i> Hiyerarşi: sadece sizin seviyenizden (<b>{{ myLevel }}</b>) düşük rolleri yönetebilirsiniz.</div>
+      <button class="btn-primary" (click)="openRoleCreate()" *ngIf="can('role:create')"><i class="fas fa-plus"></i> Yeni Rol</button>
+    </div>
+    <div class="roles-grid">
+      <div class="role-card" *ngFor="let r of roles">
+        <div class="role-card-head">
+          <div class="role-dot" [style.background]="r.color || levelColor(r.level)"></div>
+          <div class="role-info">
+            <div class="role-name">{{ r.name }}
+              <span class="tag system" *ngIf="r.isSystem">Sistem</span>
+              <span class="tag custom" *ngIf="!r.isSystem">Özel</span>
+            </div>
+            <div class="role-meta">{{ r.description || '—' }}</div>
           </div>
-          
-          <div class="space-y-6">
-            <div>
-              <label class="block text-sm font-medium text-[rgb(201,196,186)] mb-2">Platform Name</label>
-              <input type="text" value="Super Nova Reports" class="w-full px-4 py-2 bg-[rgb(20,17,27)] border border-[rgb(58,52,64)] rounded-lg text-sm focus:outline-none focus:border-[rgb(var(--accent-primary))] text-white">
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-[rgb(201,196,186)] mb-2">Theme Preference</label>
-              <select class="w-full px-4 py-2 bg-[rgb(20,17,27)] border border-[rgb(58,52,64)] rounded-lg text-sm focus:outline-none focus:border-[rgb(var(--accent-primary))] text-white">
-                <option>Dark Mode (Super Nova)</option>
-                <option>Light Mode</option>
-                <option>System Default</option>
-              </select>
-            </div>
-            <div class="flex items-center justify-between p-4 bg-[rgb(20,17,27)] rounded-xl border border-[rgb(58,52,64)]">
-              <div>
-                <h5 class="text-white font-medium text-sm">Two-Factor Authentication</h5>
-                <p class="text-[rgb(163,154,137)] text-xs mt-1">Require 2FA for all admin accounts</p>
-              </div>
-              <div class="w-12 h-6 bg-emerald-500 rounded-full relative cursor-pointer">
-                <div class="w-4 h-4 bg-white rounded-full absolute right-1 top-1 shadow-sm"></div>
-              </div>
-            </div>
-            <button class="px-5 py-2.5 bg-[rgb(47,41,52)] hover:bg-[rgb(58,52,64)] border border-[rgb(82,74,90)] text-white rounded-xl font-medium transition-all w-full mt-4">
-              Save Settings
-            </button>
-          </div>
+          <div class="role-level" [style.color]="r.color || levelColor(r.level)">{{ r.level }}</div>
         </div>
-
+        <div class="role-stats">
+          <span><i class="fas fa-user-group"></i> {{ r.memberCount }} üye</span>
+          <span><i class="fas fa-key"></i> {{ r.permissions.length }} izin</span>
+        </div>
+        <div class="role-actions">
+          <button class="btn-ghost" [disabled]="!r.canManage || !can('role:edit')" (click)="openRoleEdit(r)"><i class="fas fa-pen"></i> Düzenle</button>
+          <button class="btn-ghost danger" [disabled]="!r.canManage || r.isSystem || !can('role:delete')" (click)="deleteRole(r)"><i class="fas fa-trash"></i> Sil</button>
+        </div>
       </div>
     </div>
-  </main>
+  </section>
 
-  <!-- New Resource Modal -->
-  <div *ngIf="showResourceModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in">
-    <div class="bg-[rgb(31,27,38)] border border-[rgb(82,74,90)] rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-      <div class="flex justify-between items-center px-6 py-4 border-b border-[rgb(58,52,64)]">
-        <h3 class="text-lg font-bold text-white">Add New Data Source</h3>
-        <button (click)="closeResourceModal()" class="text-[rgb(163,154,137)] hover:text-white transition-colors">
-          <i class="fas fa-times"></i>
-        </button>
+  <!-- ================= YETKİLENDİRME ================= -->
+  <section *ngIf="activeTab==='sharing' && showSharingTab" class="tab-panel">
+    <div class="toolbar">
+      <div class="share-tabs">
+        <button [class.active]="sharingType==='templates'" *ngIf="canShareType('templates')" (click)="switchSharingType('templates')"><i class="fas fa-file-spreadsheet"></i> Template'ler</button>
+        <button [class.active]="sharingType==='paths'" *ngIf="canShareType('paths')" (click)="switchSharingType('paths')"><i class="fas fa-diagram-project"></i> Network Map'ler</button>
+        <button [class.active]="sharingType==='queries'" *ngIf="canShareType('queries')" (click)="switchSharingType('queries')"><i class="fas fa-code"></i> Sorgular</button>
+        <button [class.active]="sharingType==='scripts'" *ngIf="canShareType('scripts')" (click)="switchSharingType('scripts')"><i class="fas fa-python"></i> Script'ler</button>
+        <button [class.active]="sharingType==='dashboards'" *ngIf="canShareType('dashboards')" (click)="switchSharingType('dashboards')"><i class="fas fa-meteor"></i> Dashboard'lar</button>
       </div>
-      
-      <div class="p-6 space-y-4">
-        <div>
-          <label class="block text-sm font-medium text-[rgb(201,196,186)] mb-1">Connection Name</label>
-          <input type="text" [(ngModel)]="newResource.name" placeholder="e.g. Production Oracle DB" class="w-full px-4 py-2 bg-[rgb(20,17,27)] border border-[rgb(58,52,64)] rounded-lg text-sm focus:outline-none focus:border-[rgb(var(--accent-primary))] text-white">
+      <div class="search-wrap small">
+        <i class="fas fa-search search-icon"></i>
+        <input class="input" placeholder="Ara..." [(ngModel)]="sharingSearch">
+      </div>
+    </div>
+    <div class="table-card">
+      <table class="data-table">
+        <thead><tr><th>Ad</th><th>Sahip</th><th>Paylaşım</th><th class="col-actions">İşlem</th></tr></thead>
+        <tbody>
+          <tr *ngFor="let i of filteredSharing" class="row">
+            <td class="obj-name">{{ i.name }}</td>
+            <td>{{ i.ownerName || ownerName(i.owner) }}</td>
+            <td><span class="share-summary">{{ sharedSummary(i) }}</span></td>
+            <td class="col-actions">
+              <button class="icon-btn" (click)="openSharing(i)" *ngIf="can('share:'+sharingType)"><i class="fas fa-share-nodes"></i> Yönet</button>
+            </td>
+          </tr>
+          <tr *ngIf="!sharingLoading && filteredSharing.length===0"><td colspan="4" class="empty"><i class="fas fa-inbox"></i> Kayıt yok.</td></tr>
+          <tr *ngIf="sharingLoading"><td colspan="4" class="empty"><i class="fas fa-spinner fa-spin"></i> Yükleniyor…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ================= VERİ KAYNAKLARI ================= -->
+  <section *ngIf="activeTab==='datasources' && showDatasourcesTab" class="tab-panel">
+    <div class="toolbar">
+      <div class="hint"><i class="fas fa-database"></i> Bağlı veri kaynakları</div>
+      <button class="btn-primary" (click)="openDsCreate()" *ngIf="can('datasource:manage')"><i class="fas fa-plus"></i> Veri Kaynağı Ekle</button>
+    </div>
+    <div class="ds-grid">
+      <div class="ds-card" *ngFor="let ds of dataSources">
+        <div class="ds-head">
+          <i class="fas fa-database ds-icon" [style.color]="ds.db_type==='oracle'?'#FF7A1A':ds.db_type==='postgres'?'#7C8DB5':ds.db_type==='mysql'?'#34D399':'#F5B301'"></i>
+          <div>
+            <div class="ds-name">{{ ds.name }}</div>
+            <div class="ds-sub">{{ ds.db_type }} · <span *ngIf="ds.db_type!=='sqlite'">{{ ds.host }}:{{ ds.port }}</span><span *ngIf="ds.db_type==='sqlite'">{{ ds.database_name }}</span></div>
+          </div>
+          <span class="status-pill" [class.on]="ds.is_active" [class.off]="!ds.is_active"><span class="dot"></span>{{ ds.is_active ? 'Bağlı' : 'Hata' }}</span>
         </div>
-        
-        <div>
-          <label class="block text-sm font-medium text-[rgb(201,196,186)] mb-1">Database Type</label>
-          <select [(ngModel)]="newResource.db_type" class="w-full px-4 py-2 bg-[rgb(20,17,27)] border border-[rgb(58,52,64)] rounded-lg text-sm focus:outline-none focus:border-[rgb(var(--accent-primary))] text-white">
-            <option *ngFor="let t of dbTypes" [value]="t.id">{{ t.name }}</option>
+      </div>
+      <div class="ds-card empty-card" *ngIf="dataSources.length===0"><i class="fas fa-plug"></i> Henüz veri kaynağı yok.</div>
+    </div>
+  </section>
+
+  <!-- ============ TOAST ============ -->
+  <div class="toast" *ngIf="toast" [class.success]="toast.type==='success'" [class.error]="toast.type==='error'" [class.info]="toast.type==='info'">
+    <i class="fas" [ngClass]="toast.type==='success'?'fa-circle-check':toast.type==='error'?'fa-circle-exclamation':'fa-circle-info'"></i>
+    {{ toast.msg }}
+  </div>
+
+  <!-- ============ KULLANICI MODAL (oluştur/düzenle) ============ -->
+  <div class="overlay" *ngIf="showUserModal" (click)="showUserModal=false">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-head">
+        <h3><i class="fas" [ngClass]="userModalMode==='create'?'fa-user-plus':'fa-user-pen'"></i> {{ userModalMode==='create' ? 'Yeni Kullanıcı' : 'Kullanıcıyı Düzenle' }}</h3>
+        <button class="icon-btn" (click)="showUserModal=false"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="modal-body grid-2">
+        <label class="field"><span>Kullanıcı Adı *</span>
+          <input class="input" [(ngModel)]="userForm.username" [disabled]="userModalMode==='edit'" placeholder="kullanici.adi">
+        </label>
+        <label class="field"><span>Görünen Ad</span>
+          <input class="input" [(ngModel)]="userForm.displayName" placeholder="Ad Soyad">
+        </label>
+        <label class="field"><span>E-posta</span>
+          <input class="input" [(ngModel)]="userForm.email" placeholder="ad@firma.com">
+        </label>
+        <label class="field"><span>Rol *</span>
+          <select class="input select" [(ngModel)]="userForm.roleId">
+            <option *ngFor="let r of assignableRoles()" [value]="r.id">{{ r.name }} — Seviye {{ r.level }}</option>
           </select>
+        </label>
+        <label class="field" *ngIf="userModalMode==='create'"><span>Şifre *</span>
+          <input class="input" type="password" [(ngModel)]="userForm.password" placeholder="••••••••">
+        </label>
+        <label class="field check"><input type="checkbox" [(ngModel)]="userForm.isActive"><span>Aktif</span></label>
+      </div>
+      <div class="modal-foot">
+        <button class="btn-ghost" (click)="showUserModal=false">İptal</button>
+        <button class="btn-primary" (click)="saveUser()"><i class="fas fa-check"></i> Kaydet</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ KULLANICI DETAY DRAWER ============ -->
+  <div class="overlay drawer-overlay" *ngIf="selectedUser" (click)="closeDetail()">
+    <div class="drawer" (click)="$event.stopPropagation()">
+      <div class="drawer-head">
+        <div class="user-cell big">
+          <div class="avatar lg" [style.background]="'linear-gradient(135deg, '+levelColor(selectedUser.level)+', rgb(var(--accent-secondary)))'">{{ initials(selectedUser.displayName || selectedUser.username) }}</div>
+          <div>
+            <div class="user-name lg">{{ selectedUser.displayName || selectedUser.username }}</div>
+            <div class="user-sub">{{ selectedUser.username }} · {{ selectedUser.email }}</div>
+            <span class="role-badge mt" [style.color]="levelColor(selectedUser.level)" [style.background]="levelRgba(selectedUser.level)">{{ selectedUser.roleName }} · Seviye {{ selectedUser.level }}</span>
+          </div>
+        </div>
+        <button class="icon-btn" (click)="closeDetail()"><i class="fas fa-times"></i></button>
+      </div>
+
+      <div class="drawer-tabs">
+        <button [class.active]="detailTab==='general'" (click)="detailTab='general'">Genel</button>
+        <button [class.active]="detailTab==='permissions'" (click)="detailTab='permissions'">Rol & İzinler</button>
+        <button [class.active]="detailTab==='security'" (click)="detailTab='security'">Güvenlik</button>
+        <button [class.active]="detailTab==='activity'" (click)="detailTab='activity'">Aktivite</button>
+      </div>
+
+      <div class="drawer-body">
+        <!-- Genel -->
+        <div *ngIf="detailTab==='general'" class="detail-section">
+          <div class="kv"><span>Kullanıcı Adı</span><b>{{ selectedUser.username }}</b></div>
+          <div class="kv"><span>Görünen Ad</span><b>{{ selectedUser.displayName || '—' }}</b></div>
+          <div class="kv"><span>E-posta</span><b>{{ selectedUser.email || '—' }}</b></div>
+          <div class="kv"><span>Rol</span><b>{{ selectedUser.roleName }} ({{ selectedUser.roleKey }})</b></div>
+          <div class="kv"><span>Durum</span>
+            <span class="status-pill" [class.on]="selectedUser.isActive" [class.off]="!selectedUser.isActive"><span class="dot"></span>{{ selectedUser.isActive ? 'Aktif' : 'Pasif' }}</span>
+          </div>
+          <div class="kv"><span>Oluşturulma</span><b>{{ selectedUser.createdAt || '—' }}</b></div>
+          <div class="drawer-actions" *ngIf="selectedUser.canManage && can('user:edit')">
+            <button class="btn-ghost" (click)="openUserEdit(selectedUser); closeDetail()"><i class="fas fa-pen"></i> Düzenle</button>
+            <button class="btn-ghost" (click)="toggleActive(selectedUser)"><i class="fas" [ngClass]="selectedUser.isActive?'fa-toggle-off':'fa-toggle-on'"></i> {{ selectedUser.isActive ? 'Pasifleştir' : 'Aktifleştir' }}</button>
+          </div>
+          <div class="hint warn" *ngIf="!selectedUser.canManage"><i class="fas fa-lock"></i> Bu kullanıcıyı düzenleme yetkiniz yok.</div>
         </div>
 
-        <div *ngIf="newResource.db_type !== 'sqlite'" class="grid grid-cols-3 gap-4">
-          <div class="col-span-2">
-            <label class="block text-sm font-medium text-[rgb(201,196,186)] mb-1">Host</label>
-            <input type="text" [(ngModel)]="newResource.host" placeholder="localhost" class="w-full px-4 py-2 bg-[rgb(20,17,27)] border border-[rgb(58,52,64)] rounded-lg text-sm focus:outline-none focus:border-[rgb(var(--accent-primary))] text-white">
+        <!-- Rol & İzinler -->
+        <div *ngIf="detailTab==='permissions'" class="detail-section">
+          <h4 class="sec-title">Efektif İzinler</h4>
+          <div class="perm-groups">
+            <div class="perm-group" *ngFor="let g of groupedEffective()">
+              <div class="pg-head">{{ permGroupLabel(g.group) }}</div>
+              <div class="chip-row">
+                <span class="chip" *ngFor="let k of g.items">{{ permLabel(k) }}</span>
+              </div>
+            </div>
+            <div class="perm-group" *ngIf="groupedEffective().length===0"><i>İzin yok.</i></div>
           </div>
-          <div>
-            <label class="block text-sm font-medium text-[rgb(201,196,186)] mb-1">Port</label>
-            <input type="number" [(ngModel)]="newResource.port" placeholder="1521" class="w-full px-4 py-2 bg-[rgb(20,17,27)] border border-[rgb(58,52,64)] rounded-lg text-sm focus:outline-none focus:border-[rgb(var(--accent-primary))] text-white">
+
+          <h4 class="sec-title" *ngIf="selectedUser.canManage && can('user:edit')">Kullanıcı Bazlı İzin Üstü Yazımı</h4>
+          <p class="muted small" *ngIf="selectedUser.canManage && can('user:edit')">Rolün izinlerinin üzerine bu kullanıcı için ekstra izin ver (İzin) veya reddet (Reddet). Kalıt = rol ne diyorsa o.</p>
+          <div class="override-matrix" *ngIf="selectedUser.canManage && can('user:edit')">
+            <div class="override-group" *ngFor="let g of catalog">
+              <div class="og-head">{{ permGroupLabel(g.group) }}</div>
+              <div class="override-row" *ngFor="let p of g.permissions">
+                <span class="override-label">{{ p.label }}</span>
+                <div class="tri">
+                  <button [class.active]="overrideState[p.key]==='inherit'" (click)="overrideState[p.key]='inherit'">Kalıt</button>
+                  <button class="grant" [class.active]="overrideState[p.key]==='grant'" (click)="overrideState[p.key]='grant'">İzin</button>
+                  <button class="deny" [class.active]="overrideState[p.key]==='deny'" (click)="overrideState[p.key]='deny'">Reddet</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <button class="btn-primary mt" *ngIf="selectedUser.canManage && can('user:edit')" (click)="saveOverrides()"><i class="fas fa-check"></i> Üstü Yazımları Kaydet</button>
+        </div>
+
+        <!-- Güvenlik -->
+        <div *ngIf="detailTab==='security'" class="detail-section">
+          <div class="sec-title">Şifre</div>
+          <button class="btn-ghost" *ngIf="!showResetPwd && selectedUser.canManage && can('user:reset-password')" (click)="showResetPwd=true"><i class="fas fa-key"></i> Şifre Sıfırla</button>
+          <div class="reset-box" *ngIf="showResetPwd">
+            <input class="input" type="password" placeholder="Yeni şifre (en az 4 karakter)" [(ngModel)]="resetPwdValue">
+            <button class="btn-primary" (click)="resetPassword()"><i class="fas fa-check"></i> Kaydet</button>
+            <button class="btn-ghost" (click)="showResetPwd=false; resetPwdValue=''">İptal</button>
+          </div>
+          <div class="kv mt"><span>Hesap Durumu</span>
+            <span class="status-pill" [class.on]="selectedUser.isActive" [class.off]="!selectedUser.isActive"><span class="dot"></span>{{ selectedUser.isActive ? 'Aktif' : 'Pasif' }}</span>
           </div>
         </div>
 
-        <div *ngIf="newResource.db_type !== 'sqlite'" class="grid grid-cols-2 gap-4">
-          <div>
-            <label class="block text-sm font-medium text-[rgb(201,196,186)] mb-1">Username</label>
-            <input type="text" [(ngModel)]="newResource.username" placeholder="admin" class="w-full px-4 py-2 bg-[rgb(20,17,27)] border border-[rgb(58,52,64)] rounded-lg text-sm focus:outline-none focus:border-[rgb(var(--accent-primary))] text-white">
+        <!-- Aktivite -->
+        <div *ngIf="detailTab==='activity'" class="detail-section">
+          <h4 class="sec-title">Sahip Olduğu Nesneler</h4>
+          <div class="owned-grid">
+            <div class="owned-box"><i class="fas fa-file-spreadsheet"></i><div class="n">{{ selectedUser.ownedCounts?.templates || 0 }}</div><div class="l">Template</div></div>
+            <div class="owned-box"><i class="fas fa-diagram-project"></i><div class="n">{{ selectedUser.ownedCounts?.paths || 0 }}</div><div class="l">Network Map</div></div>
+            <div class="owned-box"><i class="fas fa-code"></i><div class="n">{{ selectedUser.ownedCounts?.queries || 0 }}</div><div class="l">Sorgu</div></div>
+            <div class="owned-box"><i class="fas fa-python"></i><div class="n">{{ selectedUser.ownedCounts?.scripts || 0 }}</div><div class="l">Script</div></div>
           </div>
-          <div>
-            <label class="block text-sm font-medium text-[rgb(201,196,186)] mb-1">Password</label>
-            <div class="relative">
-              <input [type]="showPassword ? 'text' : 'password'" [(ngModel)]="newResource.password" placeholder="••••••••" class="w-full px-4 py-2 bg-[rgb(20,17,27)] border border-[rgb(58,52,64)] rounded-lg text-sm focus:outline-none focus:border-[rgb(var(--accent-primary))] text-white pr-10">
-              <button (click)="showPassword = !showPassword" class="absolute right-3 top-1/2 transform -translate-y-1/2 text-[rgb(163,154,137)] hover:text-white transition-colors">
-                <i class="fas" [ngClass]="showPassword ? 'fa-eye-slash' : 'fa-eye'"></i>
-              </button>
+          <div class="kv mt"><span>Son Güncelleme</span><b>{{ selectedUser.updatedAt || '—' }}</b></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ ROL MODAL (oluştur/düzenle + izin matrisi) ============ -->
+  <div class="overlay" *ngIf="showRoleModal" (click)="showRoleModal=false">
+    <div class="modal wide" (click)="$event.stopPropagation()">
+      <div class="modal-head">
+        <h3><i class="fas fa-sitemap"></i> {{ roleModalMode==='create' ? 'Yeni Rol' : 'Rolü Düzenle' }}</h3>
+        <button class="icon-btn" (click)="showRoleModal=false"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="grid-2">
+          <label class="field"><span>Rol Adı *</span><input class="input" [(ngModel)]="roleForm.name" placeholder="Örn: Denetçi"></label>
+          <label class="field"><span>Açıklama</span><input class="input" [(ngModel)]="roleForm.description" placeholder="Kısa açıklama"></label>
+          <label class="field" *ngIf="roleModalMode==='create'"><span>Anahtar (opsiyonel)</span><input class="input" [(ngModel)]="roleForm.key" placeholder="boş bırakılırsa otomatik"></label>
+          <label class="field" *ngIf="!roleForm.isSystem"><span>Seviye (0–{{ myLevel - 1 }})</span>
+            <input class="input" type="number" [min]="0" [max]="myLevel - 1" [(ngModel)]="roleForm.level">
+          </label>
+          <label class="field" *ngIf="roleForm.isSystem"><span>Seviye (sistem rolü — kilitli)</span><input class="input" [ngModel]="roleForm.level" disabled></label>
+          <label class="field"><span>Renk</span><input class="input color" type="color" [(ngModel)]="roleForm.color"></label>
+        </div>
+
+        <div class="perm-matrix">
+          <div class="pm-head">
+            <span>İzin Matrisi</span>
+            <span class="muted small">{{ rolePerms.size }} izin seçili</span>
+          </div>
+          <div class="pm-group" *ngFor="let g of catalog">
+            <div class="pmg-head">
+              <span>{{ permGroupLabel(g.group) }}</span>
+              <div class="quick">
+                <button type="button" (click)="toggleGroupAll(g.group, true)">Tümü</button>
+                <button type="button" (click)="toggleGroupAll(g.group, false)">Hiçbiri</button>
+              </div>
+            </div>
+            <div class="pm-items">
+              <label class="pm-item" *ngFor="let p of g.permissions">
+                <input type="checkbox" [checked]="permChecked(p.key)" (change)="togglePerm(p.key)">
+                <span>{{ p.label }}</span>
+              </label>
             </div>
           </div>
         </div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn-ghost" (click)="showRoleModal=false">İptal</button>
+        <button class="btn-primary" (click)="saveRole()"><i class="fas fa-check"></i> Kaydet</button>
+      </div>
+    </div>
+  </div>
 
-        <div>
-          <label class="block text-sm font-medium text-[rgb(201,196,186)] mb-1">
-            {{ newResource.db_type === 'oracle' ? 'SID / Service Name' : 'Database Name' }}
-          </label>
-          <input type="text" [(ngModel)]="newResource.database_name" [placeholder]="newResource.db_type === 'sqlite' ? 'db/supernova_reports.db' : 'ORCL'" class="w-full px-4 py-2 bg-[rgb(20,17,27)] border border-[rgb(58,52,64)] rounded-lg text-sm focus:outline-none focus:border-[rgb(var(--accent-primary))] text-white">
-        </div>
-        
-        <div *ngIf="testResult" class="p-3 rounded-lg text-sm font-medium" [ngClass]="testResult.success ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'">
-          <i class="fas mr-2" [ngClass]="testResult.success ? 'fa-check-circle' : 'fa-exclamation-circle'"></i>
-          {{ testResult.message }}
+  <!-- ============ PAYLAŞIM MODAL ============ -->
+  <div class="overlay" *ngIf="showSharingModal" (click)="showSharingModal=false">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-head">
+        <h3><i class="fas fa-share-nodes"></i> Paylaşımı Yönet — {{ sharingItem?.name }}</h3>
+        <button class="icon-btn" (click)="showSharingModal=false"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <p class="muted small">Bu nesneyi hangi roller ve kullanıcılar görebilir. Sahip ve yöneticiler her zaman erişebilir. Boş = sadece sahip / admin.</p>
+        <div class="share-cols">
+          <div class="share-col">
+            <div class="share-col-head"><i class="fas fa-sitemap"></i> Roller</div>
+            <div class="share-list">
+              <label class="share-item" *ngFor="let r of roles">
+                <input type="checkbox" [checked]="shareSelectedRoles.includes(r.key)" (change)="toggleShareRole(r.key)">
+                <span class="role-dot sm" [style.background]="r.color || levelColor(r.level)"></span>
+                <span>{{ r.name }} ({{ r.level }})</span>
+              </label>
+            </div>
+          </div>
+          <div class="share-col">
+            <div class="share-col-head"><i class="fas fa-users"></i> Kullanıcılar</div>
+            <div class="share-list">
+              <label class="share-item" *ngFor="let u of pickerUsers">
+                <input type="checkbox" [checked]="shareSelectedUsers.includes(u.username)" (change)="toggleShareUser(u.username)">
+                <span>{{ u.display_name || u.username }}</span>
+                <span class="muted small">{{ u.role_key || u.role }}</span>
+              </label>
+              <div class="muted small" *ngIf="pickerUsers.length===0">Kullanıcı yok.</div>
+            </div>
+          </div>
         </div>
       </div>
-      
-      <div class="px-6 py-4 border-t border-[rgb(58,52,64)] bg-[rgb(20,17,27)] flex justify-end items-center">
-        <div class="flex items-center space-x-3">
-          <button (click)="closeResourceModal()" class="px-4 py-2 text-[rgb(163,154,137)] hover:text-white text-sm font-medium transition-colors">Cancel</button>
-          <button (click)="saveResource()" [disabled]="isSaving || !newResource.name" class="px-5 py-2 bg-[rgb(var(--accent-primary))] hover:bg-[rgb(var(--accent-secondary))] text-[rgb(var(--on-accent))] rounded-lg text-sm font-bold shadow-md transition-colors flex items-center">
-            <i *ngIf="isSaving" class="fas fa-spinner fa-spin mr-2"></i>
-            Test & Save
-          </button>
-        </div>
+      <div class="modal-foot">
+        <button class="btn-ghost" (click)="showSharingModal=false">İptal</button>
+        <button class="btn-primary" (click)="saveSharing()"><i class="fas fa-check"></i> Kaydet</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ VERİ KAYNAĞI MODAL ============ -->
+  <div class="overlay" *ngIf="showDsModal" (click)="showDsModal=false">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-head">
+        <h3><i class="fas fa-database"></i> Yeni Veri Kaynağı</h3>
+        <button class="icon-btn" (click)="showDsModal=false"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="modal-body grid-2">
+        <label class="field"><span>Ad *</span><input class="input" [(ngModel)]="dsForm.name" placeholder="Örn: Üretim DB"></label>
+        <label class="field"><span>Tür</span>
+          <select class="input select" [(ngModel)]="dsForm.db_type">
+            <option *ngFor="let t of dbTypes" [value]="t.id">{{ t.name }}</option>
+          </select>
+        </label>
+        <label class="field" *ngIf="dsForm.db_type!=='sqlite'"><span>Host</span><input class="input" [(ngModel)]="dsForm.host"></label>
+        <label class="field" *ngIf="dsForm.db_type!=='sqlite'"><span>Port</span><input class="input" type="number" [(ngModel)]="dsForm.port"></label>
+        <label class="field" *ngIf="dsForm.db_type!=='sqlite'"><span>Kullanıcı</span><input class="input" [(ngModel)]="dsForm.username"></label>
+        <label class="field" *ngIf="dsForm.db_type!=='sqlite'"><span>Şifre</span>
+          <div class="pwd-wrap">
+            <input class="input" [type]="showDsPassword?'text':'password'" [(ngModel)]="dsForm.password">
+            <i class="fas" [ngClass]="showDsPassword?'fa-eye-slash':'fa-eye'" (click)="showDsPassword=!showDsPassword"></i>
+          </div>
+        </label>
+        <label class="field"><span>Veritabanı / Yol</span><input class="input" [(ngModel)]="dsForm.database_name" placeholder="örn: db/supernova_reports.db"></label>
+      </div>
+      <div class="test-banner" *ngIf="dsTestResult" [class.ok]="dsTestResult.success" [class.fail]="!dsTestResult.success">
+        <i class="fas" [ngClass]="dsTestResult.success?'fa-circle-check':'fa-circle-exclamation'"></i> {{ dsTestResult.message }}
+      </div>
+      <div class="modal-foot">
+        <button class="btn-ghost" (click)="showDsModal=false">İptal</button>
+        <button class="btn-ghost" (click)="testDs()" [disabled]="dsTesting"><i class="fas" [ngClass]="dsTesting?'fa-spinner fa-spin':'fa-plug'"></i> Test Et</button>
+        <button class="btn-primary" (click)="saveDs()" [disabled]="dsSaving"><i class="fas fa-check"></i> Kaydet</button>
       </div>
     </div>
   </div>

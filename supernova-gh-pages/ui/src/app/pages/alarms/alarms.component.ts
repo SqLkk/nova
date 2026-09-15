@@ -1,13 +1,6 @@
 import { Component, OnInit } from '@angular/core';
-
-export interface SystemLog {
-  id: string;
-  severity: 'Critical' | 'Warning' | 'Info';
-  source: string;
-  message: string;
-  timestamp: string;
-  status: 'Active' | 'Resolved' | 'Acknowledged';
-}
+import { AlarmsService, AlarmItem } from '../../services/alarms.service';
+import { AuthService } from '../../services/auth.service';
 
 @Component({
   standalone: false,
@@ -16,93 +9,124 @@ export interface SystemLog {
   styleUrls: ['./alarms.component.scss']
 })
 export class AlarmsComponent implements OnInit {
-  logs: SystemLog[] = [
-    {
-      id: 'log_1',
-      severity: 'Critical',
-      source: 'CNC Lathe E1',
-      message: 'Spindle motor temperature critical limit exceeded (95°C). Machine enters safe halt.',
-      timestamp: new Date(Date.now() - 5 * 60000).toISOString(),
-      status: 'Active'
-    },
-    {
-      id: 'log_2',
-      severity: 'Critical',
-      source: 'Paint Robot Spray 1',
-      message: 'Pressure line drop detected. Paint thickness variation exceeds quality tolerances.',
-      timestamp: new Date(Date.now() - 12 * 60000).toISOString(),
-      status: 'Active'
-    },
-    {
-      id: 'log_3',
-      severity: 'Warning',
-      source: 'Reflow Oven',
-      message: 'Zone 3 heater element showing minor thermal deviation (+3.2°C).',
-      timestamp: new Date(Date.now() - 25 * 60000).toISOString(),
-      status: 'Acknowledged'
-    },
-    {
-      id: 'log_4',
-      severity: 'Warning',
-      source: 'Conveyor Belt C-Main',
-      message: 'Belt speed deviation detected. Motor current high.',
-      timestamp: new Date(Date.now() - 40 * 60000).toISOString(),
-      status: 'Active'
-    },
-    {
-      id: 'log_5',
-      severity: 'Info',
-      source: 'Stretch Wrapper',
-      message: 'Film roll replacement completed successfully.',
-      timestamp: new Date(Date.now() - 60 * 60000).toISOString(),
-      status: 'Resolved'
-    },
-    {
-      id: 'log_6',
-      severity: 'Info',
-      source: 'SQL Sync Service',
-      message: 'Database synchronization complete. 21 machines metrics updated.',
-      timestamp: new Date(Date.now() - 75 * 60000).toISOString(),
-      status: 'Resolved'
-    },
-    {
-      id: 'log_7',
-      severity: 'Warning',
-      source: 'Drying Oven 1',
-      message: 'Pre-heating cycle took longer than expected baseline.',
-      timestamp: new Date(Date.now() - 120 * 60000).toISOString(),
-      status: 'Acknowledged'
-    }
-  ];
-
-  filteredLogs: SystemLog[] = [];
+  alarms: AlarmItem[] = [];
+  filteredAlarms: AlarmItem[] = [];
+  
+  // Filters
   searchTerm = '';
-  severityFilter = 'All';
+  selectedSeverity = 'all'; // all, critical, warning, info
+  selectedStatus = 'all'; // all, active, acknowledged, resolved
+  selectedLocation = 'all';
 
-  constructor() {}
+  // Counts
+  totalCount = 0;
+  criticalCount = 0;
+  warningCount = 0;
+  infoCount = 0;
+  activeCount = 0;
+  acknowledgedCount = 0;
+  resolvedCount = 0;
+
+  currentUserRole = 'Operatör';
+
+  constructor(
+    private alarmsService: AlarmsService,
+    private authService: AuthService
+  ) {}
 
   ngOnInit(): void {
-    this.applyFilters();
+    this.authService.currentUser$.subscribe(u => {
+      if (u?.displayName) {
+        this.currentUserRole = u.displayName;
+      }
+    });
+    this.loadAlarms();
   }
 
-  applyFilters(): void {
-    this.filteredLogs = this.logs.filter(log => {
-      const matchesSearch = log.source.toLowerCase().includes(this.searchTerm.toLowerCase()) || 
-                            log.message.toLowerCase().includes(this.searchTerm.toLowerCase());
-      
-      const matchesSeverity = this.severityFilter === 'All' || log.severity === this.severityFilter;
-      
-      return matchesSearch && matchesSeverity;
+  loadAlarms(): void {
+    this.alarmsService.getAlarms().subscribe(data => {
+      this.alarms = data;
+      this.calculateCounts();
+      this.applyFilters();
     });
   }
 
-  acknowledgeLog(log: SystemLog): void {
-    log.status = 'Acknowledged';
+  calculateCounts(): void {
+    this.totalCount = this.alarms.length;
+    this.criticalCount = this.alarms.filter(a => a.severity === 'critical' && a.status !== 'resolved').length;
+    this.warningCount = this.alarms.filter(a => a.severity === 'warning' && a.status !== 'resolved').length;
+    this.infoCount = this.alarms.filter(a => a.severity === 'info').length;
+    this.activeCount = this.alarms.filter(a => a.status === 'active').length;
+    this.acknowledgedCount = this.alarms.filter(a => a.status === 'acknowledged').length;
+    this.resolvedCount = this.alarms.filter(a => a.status === 'resolved').length;
+  }
+
+  applyFilters(): void {
+    this.filteredAlarms = this.alarms.filter(a => {
+      const matchesSearch = 
+        !this.searchTerm ||
+        a.source.toLowerCase().includes(this.searchTerm.toLowerCase()) ||
+        a.message.toLowerCase().includes(this.searchTerm.toLowerCase()) ||
+        a.location.toLowerCase().includes(this.searchTerm.toLowerCase());
+
+      const matchesSeverity = 
+        this.selectedSeverity === 'all' || a.severity === this.selectedSeverity;
+
+      const matchesStatus = 
+        this.selectedStatus === 'all' || a.status === this.selectedStatus;
+
+      const matchesLocation =
+        this.selectedLocation === 'all' || a.location.toLowerCase().includes(this.selectedLocation.toLowerCase());
+
+      return matchesSearch && matchesSeverity && matchesStatus && matchesLocation;
+    });
+  }
+
+  setSeverityFilter(sev: string): void {
+    this.selectedSeverity = sev;
     this.applyFilters();
   }
 
-  resolveLog(log: SystemLog): void {
-    log.status = 'Resolved';
+  setStatusFilter(status: string): void {
+    this.selectedStatus = status;
     this.applyFilters();
+  }
+
+  setLocationFilter(loc: string): void {
+    this.selectedLocation = loc;
+    this.applyFilters();
+  }
+
+  acknowledge(alarm: AlarmItem): void {
+    this.alarmsService.acknowledgeAlarm(alarm.id, this.currentUserRole).subscribe(() => {
+      alarm.status = 'acknowledged';
+      alarm.acknowledgedBy = this.currentUserRole;
+      this.calculateCounts();
+      this.applyFilters();
+    });
+  }
+
+  resolve(alarm: AlarmItem): void {
+    this.alarmsService.resolveAlarm(alarm.id, this.currentUserRole).subscribe(() => {
+      alarm.status = 'resolved';
+      alarm.resolvedBy = this.currentUserRole;
+      this.calculateCounts();
+      this.applyFilters();
+    });
+  }
+
+  triggerSimulatedAlarm(): void {
+    this.alarmsService.triggerRandomAlarm();
+    this.loadAlarms();
+  }
+
+  getTimeAgo(dateStr: string): string {
+    const diffMs = Date.now() - new Date(dateStr).getTime();
+    const diffMin = Math.floor(diffMs / (1000 * 60));
+    if (diffMin < 1) return 'Az önce';
+    if (diffMin < 60) return `${diffMin} dk önce`;
+    const diffHours = Math.floor(diffMin / 60);
+    if (diffHours < 24) return `${diffHours} sa önce`;
+    return `${Math.floor(diffHours / 24)} gün önce`;
   }
 }

@@ -1,4 +1,5 @@
 import { Component, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { Subscription } from 'rxjs';
 import { environment } from '../../../environments/environment';
@@ -54,17 +55,29 @@ export class TableExplorerComponent implements OnInit, OnDestroy {
 
   private selSub?: Subscription;
   private statusSub?: Subscription;
+  private queryParamsSub?: Subscription;
 
   constructor(
     private http: HttpClient,
     public dss: DataSourceSelectionService,
     private confirmService: ConfirmService,
-    private cdr: ChangeDetectorRef
+    private cdr: ChangeDetectorRef,
+    private route: ActivatedRoute
   ) {}
 
   ngOnInit(): void {
     this.dss.load();
     this.dss.ensureValidSelection();
+
+    this.queryParamsSub = this.route.queryParams.subscribe(params => {
+      if (params['pathDefiner'] === 'true' || params['pathDefiner'] === true) {
+        this.showPathDefiner = true;
+      }
+      if (params['dataSourceId'] && params['dataSourceId'] !== this.selectedId) {
+        this.dss.select(params['dataSourceId']);
+      }
+      this.cdr.markForCheck();
+    });
 
     this.selSub = this.dss.selectedId$.subscribe(id => {
       if (id !== this.selectedId) {
@@ -83,6 +96,7 @@ export class TableExplorerComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.selSub?.unsubscribe();
     this.statusSub?.unsubscribe();
+    this.queryParamsSub?.unsubscribe();
   }
 
   /** Seçili DB değişince tablo listesini yükle. dss.select() çağırmaz (loop). */

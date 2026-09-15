@@ -1,149 +1,632 @@
-// Professional animations and transitions
-@keyframes fadeInDown {
-  from {
-    opacity: 0;
-    transform: translateY(-30px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+// ============================================================================
+// Reports & Templates — temalı (gold/flare/lunar tokenları, light+dark otomatik)
+// Tüm renkler anlamsal CSS değişkenlerinden (styles.scss :root) gelir.
+// ============================================================================
+
+.reports-page {
+  padding: 24px clamp(16px, 4vw, 40px) 48px;
+  max-width: 1280px;
+  margin: 0 auto;
 }
 
-@keyframes slideInLeft {
-  from {
-    opacity: 0;
-    transform: translateX(-50px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
+// ---- Toast ----
+.toast {
+  position: fixed;
+  top: 80px;
+  right: 24px;
+  z-index: 200;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 18px;
+  border-radius: 12px;
+  background: rgb(var(--bg-elevated));
+  border: 1px solid rgb(var(--accent-primary) / 0.4);
+  color: rgb(var(--text-primary));
+  box-shadow: 0 12px 40px rgb(var(--shadow-color) / calc(var(--shadow-strength) * 1.4));
+  cursor: pointer;
+  animation: rt-slide 0.25s ease-out;
 
-@keyframes slideInRight {
-  from {
-    opacity: 0;
-    transform: translateX(50px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
+  i { color: rgb(var(--success)); font-size: 16px; }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
+  @keyframes rt-slide {
+    from { opacity: 0; transform: translateX(20px); }
+    to { opacity: 1; transform: translateX(0); }
   }
 }
 
-.animate-fade-in-down {
-  animation: fadeInDown 0.6s ease-out;
+// ---- Başlık ----
+.page-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-bottom: 22px;
 }
 
-.animate-slide-in-left {
-  animation: slideInLeft 0.4s ease-out;
-}
+.title-block {
+  display: flex;
+  align-items: center;
+  gap: 16px;
 
-.animate-slide-in-right {
-  animation: slideInRight 0.4s ease-out;
-}
+  .title-icon {
+    display: grid;
+    place-items: center;
+    width: 52px;
+    height: 52px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, rgb(var(--accent-primary)), rgb(var(--accent-secondary)));
+    color: rgb(var(--on-accent));
+    font-size: 22px;
+    box-shadow: 0 8px 24px rgb(var(--accent-primary) / 0.3);
+  }
 
-.animate-fade-in-down {
-  animation: fadeIn 0.3s ease-out;
-}
+  h1 {
+    margin: 0;
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: rgb(var(--text-primary));
+  }
 
-// Responsive design improvements
-@media (max-width: 1280px) {
-  .w-1\/2 {
-    width: 45% !important;
+  p {
+    margin: 4px 0 0;
+    color: rgb(var(--text-muted));
+    font-size: 13.5px;
+    max-width: 560px;
   }
 }
 
-@media (max-width: 1024px) {
-  .w-1\/2 {
-    width: 100% !important;
+.head-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+// Global btn-ghost burada da tanımlı (admin.component.scss ile aynı — bileşene scoped).
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: 1px solid rgb(var(--border-color));
+  background: rgb(var(--bg-secondary));
+  color: rgb(var(--text-secondary));
+  font-weight: 600;
+  font-size: 13.5px;
+  cursor: pointer;
+  transition: background .15s, color .15s, border-color .15s;
+
+  &:hover:not(:disabled) {
+    background: rgb(var(--bg-tertiary));
+    color: rgb(var(--text-primary));
+    border-color: rgb(var(--border-strong));
+  }
+  &:disabled { opacity: .5; cursor: not-allowed; }
+}
+
+.btn-primary, .btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  white-space: nowrap;
+}
+
+.spinning { animation: rt-spin 0.9s linear infinite; }
+@keyframes rt-spin { to { transform: rotate(360deg); } }
+
+// ---- Araç çubuğu ----
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.search {
+  position: relative;
+  flex: 1;
+  min-width: 240px;
+  max-width: 420px;
+
+  i {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: rgb(var(--text-muted));
+    font-size: 13px;
+    pointer-events: none;
+  }
+  .input-field { width: 100%; padding-left: 38px; }
+}
+
+.seg {
+  display: inline-flex;
+  padding: 4px;
+  gap: 2px;
+  background: rgb(var(--bg-secondary));
+  border: 1px solid rgb(var(--border-color));
+  border-radius: 12px;
+}
+
+.seg-btn {
+  padding: 8px 16px;
+  border: none;
+  background: transparent;
+  color: rgb(var(--text-muted));
+  font-weight: 600;
+  font-size: 13px;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: all .15s;
+
+  &:hover { color: rgb(var(--text-secondary)); }
+  &.active {
+    background: linear-gradient(135deg, rgb(var(--accent-primary)), rgb(var(--accent-secondary)));
+    color: rgb(var(--on-accent));
+    box-shadow: 0 2px 8px rgb(var(--accent-primary) / 0.25);
+  }
+}
+
+// ---- İçerik kartı ----
+.table-card { overflow: hidden; }
+
+.state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 72px 24px;
+  color: rgb(var(--text-muted));
+  text-align: center;
+
+  > i { font-size: 36px; color: rgb(var(--text-muted) / 0.6); }
+  .state-title { color: rgb(var(--text-secondary)); font-weight: 700; font-size: 15px; }
+  .state-desc { font-size: 13px; max-width: 360px; }
+  .btn-primary { margin-top: 6px; }
+
+  &.error > i { color: rgb(var(--danger)); }
+}
+
+.spinner {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 3px solid rgb(var(--border-color));
+  border-top-color: rgb(var(--accent-primary));
+  animation: rt-spin 0.9s linear infinite;
+}
+
+// ---- Tablo ----
+.table-scroll { overflow-x: auto; }
+
+.rtable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+
+  thead th {
+    text-align: left;
+    padding: 14px 18px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: rgb(var(--text-muted));
+    border-bottom: 1px solid rgb(var(--border-color));
+    background: rgb(var(--bg-secondary) / 0.5);
+    white-space: nowrap;
   }
 
-  .flex-row {
-    flex-direction: column !important;
+  tbody td {
+    padding: 14px 18px;
+    border-bottom: 1px solid rgb(var(--border-color) / 0.6);
+    color: rgb(var(--text-secondary));
+    vertical-align: middle;
+  }
+
+  tbody tr { transition: background .12s; }
+  tbody tr:hover { background: rgb(var(--bg-tertiary) / 0.5); }
+  tbody tr:last-child td { border-bottom: none; }
+}
+
+.ta-right { text-align: right; }
+
+.col-name {
+  .name {
+    font-weight: 700;
+    color: rgb(var(--text-primary));
+    max-width: 320px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .desc {
+    margin-top: 2px;
+    font-size: 12px;
+    color: rgb(var(--text-muted));
+    max-width: 320px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 }
 
-// Custom scrollbar for better UX
-::-webkit-scrollbar {
-  width: 6px;
+.owner-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  background: rgb(var(--bg-tertiary));
+  border: 1px solid rgb(var(--border-color));
+  color: rgb(var(--text-secondary));
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+
+  &.me {
+    background: rgb(var(--accent-primary) / 0.14);
+    border-color: rgb(var(--accent-primary) / 0.4);
+    color: rgb(var(--accent-primary));
+  }
+  i { font-size: 10px; }
 }
 
-::-webkit-scrollbar-track {
-  background: rgb(var(--border-color) / 0.3);
-  border-radius: 3px;
+// Görünürlük rozetleri
+.col-vis { min-width: 150px; }
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  i { font-size: 10px; }
+}
+.b-private {
+  background: rgb(var(--bg-tertiary));
+  color: rgb(var(--text-muted));
+  border: 1px solid rgb(var(--border-color));
+}
+.b-users {
+  background: rgb(var(--info) / 0.14);
+  color: rgb(var(--info));
+  border: 1px solid rgb(var(--info) / 0.3);
+}
+.b-shared {
+  background: rgb(var(--accent-tertiary) / 0.16);
+  color: rgb(var(--accent-tertiary));
+  border: 1px solid rgb(var(--accent-tertiary) / 0.35);
 }
 
-::-webkit-scrollbar-thumb {
-  background: rgb(var(--text-muted) / 0.5);
-  border-radius: 3px;
+.vis-roles {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.chip {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgb(var(--accent-primary) / 0.14);
+  border: 1px solid rgb(var(--accent-primary) / 0.35);
+  color: rgb(var(--accent-primary));
+  font-size: 11.5px;
+  font-weight: 700;
+}
+.chip-users {
+  background: rgb(var(--info) / 0.14);
+  border-color: rgb(var(--info) / 0.3);
+  color: rgb(var(--info));
+}
 
-  &:hover {
-    background: rgb(var(--text-muted) / 0.7);
+.col-updated {
+  color: rgb(var(--text-muted));
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+// Aksiyon butonları
+.col-actions { white-space: nowrap; }
+.act {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 34px;
+  min-width: 34px;
+  padding: 0 10px;
+  margin-left: 6px;
+  border-radius: 9px;
+  border: 1px solid rgb(var(--border-color));
+  background: rgb(var(--bg-secondary));
+  color: rgb(var(--text-secondary));
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .15s;
+
+  &:hover:not(:disabled) {
+    background: rgb(var(--bg-tertiary));
+    color: rgb(var(--text-primary));
+    border-color: rgb(var(--border-strong));
+  }
+  &:disabled { opacity: .55; cursor: not-allowed; }
+
+  // Generate: altın vurgulu
+  &.act-primary {
+    border-color: rgb(var(--accent-primary) / 0.45);
+    color: rgb(var(--accent-primary));
+    background: rgb(var(--accent-primary) / 0.1);
+    &:hover:not(:disabled) {
+      background: rgb(var(--accent-primary) / 0.18);
+      color: rgb(var(--accent-primary));
+      border-color: rgb(var(--accent-primary));
+    }
+  }
+  &.act-danger {
+    &:hover:not(:disabled) {
+      background: rgb(var(--danger) / 0.14);
+      color: rgb(var(--danger));
+      border-color: rgb(var(--danger) / 0.45);
+    }
   }
 }
 
-// Glass effect for modern look
-.backdrop-blur-sm {
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+// ---- Modal ----
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgb(0 0 0 / 0.55);
+  backdrop-filter: blur(6px);
+  animation: rt-fade .18s ease-out;
 }
 
-// Enhanced focus states
-input:focus,
-button:focus {
-  outline: none;
-  box-shadow: 0 0 0 3px rgb(var(--accent-primary) / 0.1);
+.modal {
+  width: 100%;
+  max-width: 540px;
+  max-height: 86vh;
+  display: flex;
+  flex-direction: column;
+  background: rgb(var(--bg-secondary));
+  border: 1px solid rgb(var(--border-color));
+  border-radius: 18px;
+  box-shadow: 0 24px 80px rgb(0 0 0 / 0.5);
+  overflow: hidden;
+  animation: rt-pop .2s ease-out;
 }
 
-// Professional hover effects
-.group:hover .group-hover\:opacity-100 {
-  opacity: 1;
+@keyframes rt-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes rt-pop {
+  from { opacity: 0; transform: translateY(12px) scale(.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-// Loading animation
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
+.modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 20px 22px;
+  border-bottom: 1px solid rgb(var(--border-color));
+  background: rgb(var(--bg-tertiary) / 0.4);
+
+  .mh-title {
+    display: flex;
+    gap: 13px;
+    i {
+      font-size: 18px;
+      color: rgb(var(--accent-primary));
+      margin-top: 3px;
+    }
+    h3 { margin: 0; font-size: 16px; color: rgb(var(--text-primary)); font-weight: 700; }
+    p { margin: 3px 0 0; font-size: 12.5px; color: rgb(var(--text-muted)); }
+  }
+  .x {
+    border: none;
+    background: transparent;
+    color: rgb(var(--text-muted));
+    font-size: 16px;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 8px;
+    transition: all .15s;
+    &:hover { background: rgb(var(--bg-elevated)); color: rgb(var(--text-primary)); }
   }
 }
 
-.animate-spin {
-  animation: spin 1s linear infinite;
+.modal-body {
+  padding: 20px 22px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
 }
 
-// Pulse animation for status indicators
-@keyframes pulse {
-  0%, 100% {
-    opacity: 1;
+.section {
+  .section-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: rgb(var(--text-secondary));
+    margin-bottom: 4px;
   }
-  50% {
-    opacity: 0.5;
+  .section-hint {
+    margin: 0 0 12px;
+    font-size: 12px;
+    color: rgb(var(--text-muted));
   }
 }
 
-.animate-pulse {
-  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+// Rol checklist'i
+.role-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+}
+.role-opt {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 11px;
+  border: 1px solid rgb(var(--border-color));
+  background: rgb(var(--bg-tertiary) / 0.4);
+  color: rgb(var(--text-secondary));
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .15s;
+  text-align: left;
+
+  .role-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: rgb(var(--text-muted) / 0.5);
+    transition: background .15s;
+  }
+  .role-name { flex: 1; }
+  .role-check { color: rgb(var(--accent-primary)); font-size: 12px; }
+
+  &:hover { border-color: rgb(var(--border-strong)); color: rgb(var(--text-primary)); }
+
+  &.on {
+    background: rgb(var(--accent-primary) / 0.14);
+    border-color: rgb(var(--accent-primary) / 0.5);
+    color: rgb(var(--accent-primary));
+    .role-dot { background: rgb(var(--accent-primary)); }
+  }
 }
 
-// Professional transitions
-.transition-all {
-  transition-property: all;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  transition-duration: 300ms;
+// Kullanıcı: sahip username girişi
+.user-input-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  .input-field { flex: 1; }
+  .btn-secondary { padding: 0 14px; }
+}
+.tag-list { display: flex; flex-wrap: wrap; gap: 7px; }
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 6px 5px 12px;
+  border-radius: 999px;
+  background: rgb(var(--info) / 0.14);
+  border: 1px solid rgb(var(--info) / 0.3);
+  color: rgb(var(--info));
+  font-size: 12.5px;
+  font-weight: 600;
+
+  .tag-x {
+    display: grid;
+    place-items: center;
+    width: 18px;
+    height: 18px;
+    border: none;
+    border-radius: 50%;
+    background: rgb(var(--info) / 0.2);
+    color: rgb(var(--info));
+    cursor: pointer;
+    font-size: 9px;
+    &:hover { background: rgb(var(--info) / 0.35); }
+  }
 }
 
-// Rotate effect for dropdown arrows
-.rotate-180 {
-  transform: rotate(180deg);
+// Kullanıcı: admin checklist'i
+.user-list {
+  max-height: 260px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border: 1px solid rgb(var(--border-color));
+  border-radius: 12px;
+  padding: 8px;
+  background: rgb(var(--bg-tertiary) / 0.3);
+}
+.user-list-empty {
+  padding: 18px;
+  text-align: center;
+  color: rgb(var(--text-muted));
+  font-size: 13px;
+}
+.user-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  transition: all .12s;
+  text-align: left;
+
+  .ur-info { display: flex; flex-direction: column; gap: 1px; }
+  .ur-name { font-size: 13px; font-weight: 600; color: rgb(var(--text-primary)); }
+  .ur-meta { font-size: 11px; color: rgb(var(--text-muted)); }
+  .ur-check {
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 7px;
+    border: 1.5px solid rgb(var(--border-strong));
+    color: transparent;
+    transition: all .15s;
+    i { font-size: 11px; }
+    &.on {
+      background: rgb(var(--accent-primary));
+      border-color: rgb(var(--accent-primary));
+      color: rgb(var(--on-accent));
+    }
+  }
+
+  &:hover { background: rgb(var(--bg-secondary)); }
+}
+
+.modal-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 22px;
+  border-top: 1px solid rgb(var(--border-color));
+  background: rgb(var(--bg-tertiary) / 0.4);
+}
+
+// ---- Responsive ----
+@media (max-width: 720px) {
+  .title-block h1 { font-size: 21px; }
+  .rtable thead { display: none; }
+  .rtable, .rtable tbody, .rtable tr, .rtable td { display: block; width: 100%; }
+  .rtable tr {
+    padding: 12px 0;
+    border-bottom: 1px solid rgb(var(--border-color));
+  }
+  .rtable td {
+    border: none;
+    padding: 4px 18px;
+  }
+  .col-actions { text-align: left; .act { margin-left: 0; margin-right: 6px; } }
+  .ta-right { text-align: left; }
 }

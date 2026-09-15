@@ -1,0 +1,122 @@
+[
+  {
+    "step_id": "PRC-STEP-010",
+    "step_order": 10,
+    "next_step_id": "PRC-STEP-020",
+    "step_name": "Raw Coil Laser Profiling & Destacking",
+    "assigned_line_id": "LINE-MUC-PRESS-01",
+    "workstation_name": "Schuler Destacker Station",
+    "std_cycle_time_sec": 12.5,
+    "quality_gate_required": 0,
+    "target_tolerance_um": 50.0,
+    "process_description": "Laser thickness measurement of electrical steel sheet coils and robot destack."
+  },
+  {
+    "step_id": "PRC-STEP-020",
+    "step_order": 20,
+    "next_step_id": "PRC-STEP-030",
+    "step_name": "High-Speed Tandem Servo Stamping",
+    "assigned_line_id": "LINE-MUC-PRESS-01",
+    "workstation_name": "MCH-SCHULER-2500",
+    "std_cycle_time_sec": 4.8,
+    "quality_gate_required": 1,
+    "target_tolerance_um": 15.0,
+    "process_description": "Progressive die stamping of rotor/stator laminations with interlock embossing."
+  },
+  {
+    "step_id": "PRC-STEP-030",
+    "step_order": 30,
+    "next_step_id": "PRC-STEP-040",
+    "step_name": "5-Axis CNC Precision Shaft Machining",
+    "assigned_line_id": "LINE-STG-CNC-01",
+    "workstation_name": "MCH-DMG-DMC-85",
+    "std_cycle_time_sec": 65.0,
+    "quality_gate_required": 1,
+    "target_tolerance_um": 5.0,
+    "process_description": "High-precision turning, spline hobbing, and bearing journal grinding on rotor shaft."
+  },
+  {
+    "step_id": "PRC-STEP-040",
+    "step_order": 40,
+    "next_step_id": "PRC-STEP-050",
+    "step_name": "Multi-Stage Ultrasonic Vapor Degreasing",
+    "assigned_line_id": "LINE-STG-CNC-01",
+    "workstation_name": "Ecoclean Solvent Bath Station",
+    "std_cycle_time_sec": 45.0,
+    "quality_gate_required": 0,
+    "target_tolerance_um": 0.0,
+    "process_description": "Acoustic cavitation solvent bath eliminating residual cutting fluids and micro-swarf."
+  },
+  {
+    "step_id": "PRC-STEP-050",
+    "step_order": 50,
+    "next_step_id": "PRC-STEP-060",
+    "step_name": "Robotic Fiber Laser Seam Welding",
+    "assigned_line_id": "LINE-MUC-WELD-04",
+    "workstation_name": "MCH-TRUMPF-LASER-01",
+    "std_cycle_time_sec": 28.0,
+    "quality_gate_required": 1,
+    "target_tolerance_um": 12.0,
+    "process_description": "Continuous keyhole laser welding of laminated rotor core stacks under inert argon shield."
+  },
+  {
+    "step_id": "PRC-STEP-060",
+    "step_order": 60,
+    "next_step_id": "PRC-STEP-070",
+    "step_name": "Automated Optical 3D Profilometry (AOI)",
+    "assigned_line_id": "LINE-MUC-WELD-04",
+    "workstation_name": "Cognex In-Sight 3D Vision Cell",
+    "std_cycle_time_sec": 8.5,
+    "quality_gate_required": 1,
+    "target_tolerance_um": 2.5,
+    "process_description": "Multi-camera structured light inspection for weld bead geometry and surface flaws."
+  },
+  {
+    "step_id": "PRC-STEP-070",
+    "step_order": 70,
+    "next_step_id": "PRC-STEP-080",
+    "step_name": "Hairpin Copper Winding & Impregnation",
+    "assigned_line_id": "LINE-STG-CNC-01",
+    "workstation_name": "MCH-SIEMENS-HAIRPIN",
+    "std_cycle_time_sec": 52.0,
+    "quality_gate_required": 1,
+    "target_tolerance_um": 8.0,
+    "process_description": "Automated rectangular hairpin copper insertion, twisting, laser tip stripping and welding."
+  },
+  {
+    "step_id": "PRC-STEP-080",
+    "step_order": 80,
+    "next_step_id": "PRC-STEP-090",
+    "step_name": "High-Voltage Dielectric & Partial Discharge Test",
+    "assigned_line_id": "LINE-STG-CNC-01",
+    "workstation_name": "Schleich E-Mobility HiPot Stand",
+    "std_cycle_time_sec": 18.0,
+    "quality_gate_required": 1,
+    "target_tolerance_um": 0.0,
+    "process_description": "3.5 kV dielectric withstand, surge voltage, and partial discharge inception testing."
+  },
+  {
+    "step_id": "PRC-STEP-090",
+    "step_order": 90,
+    "next_step_id": "PRC-STEP-100",
+    "step_name": "Full-Speed Dynamic Balancing & Dyno Test",
+    "assigned_line_id": "LINE-STG-DYNO-01",
+    "workstation_name": "MCH-AVL-DYNO-400",
+    "std_cycle_time_sec": 90.0,
+    "quality_gate_required": 1,
+    "target_tolerance_um": 1.0,
+    "process_description": "24,000 RPM dynamometer run-up, ISO 1940 G1.0 balancing, back-EMF map and vibration check."
+  },
+  {
+    "step_id": "PRC-STEP-100",
+    "step_order": 100,
+    "next_step_id": null,
+    "step_name": "Laser DataMatrix QR Engraving & Final Packaging",
+    "assigned_line_id": "LINE-STG-DYNO-01",
+    "workstation_name": "Keyence MD-X Laser Marking Cell",
+    "std_cycle_time_sec": 14.0,
+    "quality_gate_required": 0,
+    "target_tolerance_um": 0.0,
+    "process_description": "Direct part marking of UID/EPC QR code, digital twin cloud sync, and robotic box palletizing."
+  }
+]
