@@ -18,4 +18,4 @@ npm start
 
 ## 👥 Contributors
 
-See [CONTRIBUTORS.md](file:///Users/utkukaraca/Library/CloudStorage/OneDrive-SiemensAG/Masa%C3%BCst%C3%BC/Development/super_nov4/supernova-gh-pages/CONTRIBUTORS.md) for the list of contributors.
+See [CONTRIBUTORS.md](file:///Users/utkukaraca/Library/CloudStorage/OneDrive-ApexAG/Masa%C3%BCst%C3%BC/Development/super_nov4/supernova-gh-pages/CONTRIBUTORS.md) for the list of contributors.

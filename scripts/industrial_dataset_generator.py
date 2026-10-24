@@ -12,7 +12,7 @@ Generates high-fidelity, professional, multi-dimensional manufacturing data for:
 - Facility Energy & Sustainability Telemetry (ESG)
 - SCADA compatibility tables (C_PATH_ELEMENT, C_POINT, C_POINT_PATH_ELEMENT)
 
-Author: Antigravity AI / Siemens Industrial SCADA & Data Analytics Platform
+Author: SuperNova Enterprise Industrial Intelligence & Data Analytics Platform
 Language of Dataset: English (Enterprise Standard)
 """
 
@@ -53,7 +53,7 @@ ASSET_HIERARCHY_DATA = [
         "level": 1,
         "area": "Munich Plant",
         "criticality": "Tier 1 (Mission-Critical)",
-        "manufacturer": "Siemens Building X",
+        "manufacturer": "Apex Building Systems",
         "model": "Smart-Site-4.0",
         "status": "ONLINE",
         "description": "Next-Gen E-Mobility & Battery Pack Production Facility"
@@ -66,7 +66,7 @@ ASSET_HIERARCHY_DATA = [
         "level": 1,
         "area": "Stuttgart Plant",
         "criticality": "Tier 1 (Mission-Critical)",
-        "manufacturer": "Siemens Building X",
+        "manufacturer": "Apex Building Systems",
         "model": "Smart-Site-4.0",
         "status": "ONLINE",
         "description": "High-Precision 800V E-Axle & Stator Manufacturing Facility"
@@ -120,7 +120,7 @@ ASSET_HIERARCHY_DATA = [
         "level": 2,
         "area": "Battery Shop",
         "criticality": "Tier 1 (Mission-Critical)",
-        "manufacturer": "Siemens & Comau",
+        "manufacturer": "Apex & Comau",
         "model": "Giga-Pack-Flex",
         "status": "ONLINE",
         "description": "Prismatic cell stacking, ultrasonic busbar welding, cold plate bonding"
@@ -133,8 +133,8 @@ ASSET_HIERARCHY_DATA = [
         "level": 2,
         "area": "Powertrain Shop",
         "criticality": "Tier 1 (Mission-Critical)",
-        "manufacturer": "Siemens Digital Industries",
-        "model": "SINUMERIK-Integrated",
+        "manufacturer": "Apex Industrial Automation",
+        "model": "MotionPro-Integrated",
         "status": "ONLINE",
         "description": "5-axis CNC machining, stator hairpin winding, dyno testing"
     },
@@ -200,8 +200,8 @@ ASSET_HIERARCHY_DATA = [
         "level": 3,
         "area": "Battery Shop",
         "criticality": "Tier 1 (Mission-Critical)",
-        "manufacturer": "Siemens & Festo",
-        "model": "S7-1500-Motion-Line",
+        "manufacturer": "Apex & Festo",
+        "model": "AX-1500-Motion-Line",
         "status": "ONLINE",
         "description": "Automated high-speed prismatic cell picker, gluing, and laser busbar joining"
     },
@@ -309,18 +309,18 @@ ASSET_HIERARCHY_DATA = [
         "manufacturer": "DMG MORI",
         "model": "DMC-85-FD-duoBLOCK",
         "status": "ONLINE",
-        "description": "Simultaneous 5-axis precision machining with Siemens SINUMERIK ONE CNC"
+        "description": "Simultaneous 5-axis precision machining with Apex MotionPro ONE CNC"
     },
     {
-        "id": "MCH-SIEMENS-HAIRPIN",
+        "id": "MCH-APEX-HAIRPIN",
         "parent": "LINE-STG-CNC-01",
-        "name": "Siemens Continuous Hairpin Stator Inserter",
+        "name": "Apex Continuous Hairpin Stator Inserter",
         "type": "Machine",
         "level": 4,
         "area": "Powertrain Shop",
         "criticality": "Tier 1 (Mission-Critical)",
-        "manufacturer": "Siemens Digital Industries",
-        "model": "SIMATIC-StatorFlex-400",
+        "manufacturer": "Apex Industrial Automation",
+        "model": "ApexFlex-Stator-400",
         "status": "ONLINE",
         "description": "High-speed rectangular copper hairpin bending and stator insertion cell"
     },
@@ -453,7 +453,7 @@ ASSET_HIERARCHY_DATA = [
         "level": 6,
         "area": "Body Shop",
         "criticality": "Tier 1 (Mission-Critical)",
-        "manufacturer": "Siemens SIPLUS CMS",
+        "manufacturer": "Apex VibSense CMS",
         "model": "CMS-VIB-1000",
         "status": "ONLINE",
         "description": "Piezoelectric accelerometer measuring velocity RMS on cycloidal gearbox"
@@ -466,8 +466,8 @@ ASSET_HIERARCHY_DATA = [
         "level": 6,
         "area": "Body Shop",
         "criticality": "Tier 2 (Core Production)",
-        "manufacturer": "Siemens SINAMICS",
-        "model": "S120-LEM-Sensor",
+        "manufacturer": "Apex DriveTech",
+        "model": "AX120-LEM-Sensor",
         "status": "ONLINE",
         "description": "Hall-effect true RMS current transducer on inverter drive bus"
     },
@@ -660,7 +660,7 @@ MANUFACTURING_PROCESS_SEQUENCE = [
         "next_step_id": "PRC-STEP-080",
         "step_name": "Hairpin Copper Winding & Impregnation",
         "assigned_line_id": "LINE-STG-CNC-01",
-        "workstation": "MCH-SIEMENS-HAIRPIN",
+        "workstation": "MCH-APEX-HAIRPIN",
         "std_cycle_time_sec": 52.0,
         "quality_gate": 1,
         "target_tolerance_um": 8.0,

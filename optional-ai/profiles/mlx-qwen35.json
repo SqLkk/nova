@@ -1,0 +1,26 @@
+{
+  "id": "mlx-qwen35",
+  "label": "Qwen3.5 9B · MLX 4-bit",
+  "optional": true,
+  "enabled_by_default": false,
+  "platforms": ["darwin-arm64"],
+  "python": ">=3.12",
+  "requirements": "optional-ai/requirements-mlx.txt",
+  "model": "mlx-community/Qwen3.5-9B-MLX-4bit",
+  "runtime_environment": ".venv-ai",
+  "launch_command": ["python3", "scripts/local_ai.py", "serve"],
+  "download_at_runtime": false,
+  "environment": {
+    "AI_ENABLED": "true",
+    "AI_PROVIDER": "openai",
+    "AI_BASE_URL": "http://127.0.0.1:8085/v1",
+    "AI_MODEL_NAME": "mlx-community/Qwen3.5-9B-MLX-4bit",
+    "AI_API_KEY": "",
+    "AI_TEMPERATURE": "0.2",
+    "AI_TIMEOUT_SECONDS": "120",
+    "AI_MAX_TOKENS": "2048",
+    "AI_MAX_CONCURRENT": "1",
+    "AI_TOOLS_ENABLED": "true",
+    "AI_MOCK_MODE": "false"
+  }
+}

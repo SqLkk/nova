@@ -1,0 +1,56 @@
+{
+  "passed": true,
+  "model": "/Users/utkukaraca/.cache/huggingface/hub/models--mlx-community--Qwen3.5-9B-MLX-4bit/snapshots/938d8919941c6e7efd3c7150eff7fe9d12afa631",
+  "max_seq_length": 1024,
+  "enable_thinking": false,
+  "mask_prompt": true,
+  "lengths": {
+    "train": {
+      "count": 2400,
+      "min": 393,
+      "max": 1005,
+      "mean": 580.81,
+      "min_target": 18,
+      "max_target": 258
+    },
+    "valid": {
+      "count": 300,
+      "min": 392,
+      "max": 1000,
+      "mean": 581.38,
+      "min_target": 18,
+      "max_target": 258
+    },
+    "test": {
+      "count": 300,
+      "min": 395,
+      "max": 1005,
+      "mean": 580.55,
+      "min_target": 18,
+      "max_target": 258
+    },
+    "valid_fixed": {
+      "count": 80,
+      "min": 395,
+      "max": 982,
+      "mean": 581.04,
+      "min_target": 18,
+      "max_target": 258
+    }
+  },
+  "sha256": {
+    "data/train.jsonl": "f759aefdd1743c2fd5f5e83ad66ec999d1ec18df0666c16c06af03921a7d4dc6",
+    "data/train.meta.jsonl": "45249f4738fe83cee91987cdef2186448650adeef240ae852e14be8fe0b17464",
+    "data/valid.jsonl": "a4f187a616d0629bf1a3da098c730d28e7d227759a61dffc6a99b8588d1e69fe",
+    "data/valid.meta.jsonl": "f45f301617cbe3dfd7669ade05297dcd1951ced440d3572414eb931993367584",
+    "data/test.jsonl": "002c69c1a0ee9c6c9e05c97bbdccdb051f277f79f8b7ce5a5620ca0ae2604f9e",
+    "data/test.meta.jsonl": "72756c77c9dcb2283099298cf801489a7df2f7a18c2ac55a3a9cdabe654af8e9",
+    "data/valid_fixed.jsonl": "b3a363a224a833c9d85f581f10911b31df713ef1a0d4dcdc260063c81da5cc3d"
+  },
+  "tokenizer_sha256": {
+    "tokenizer.json": "87a7830d63fcf43bf241c3c5242e96e62dd3fdc29224ca26fed8ea333db72de4",
+    "tokenizer_config.json": "e98f1901ac6f0adff67b1d540bfa0c36ac1a0cf59eb72ed78146ef89aafa1182",
+    "chat_template.jinja": "a4aee8afcf2e0711942cf848899be66016f8d14a889ff9ede07bca099c28f715"
+  },
+  "errors": []
+}

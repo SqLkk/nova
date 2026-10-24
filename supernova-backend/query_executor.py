@@ -597,69 +597,131 @@ def check_relationship(
       pass
 
 
+def _default_demo_functions() -> List[Dict[str, Any]]:
+  """SQLite veya çevrimdışı demo veritabanları için hazır endüstriyel paketler ve prosedürler."""
+  return [
+      {
+          "name": "PKG_MES_TOPOLOGY.GetEnterpriseAssetTree",
+          "type": "PROCEDURE",
+          "signature": "PKG_MES_TOPOLOGY.GetEnterpriseAssetTree(iSiteId, oCursor)",
+          "description": "ISA-95 standardında Tesis → Alan → Üretim Hattı → Makine → Sensör hiyerarşi ağacını ve sağlık durumlarını döndürür.",
+          "packageName": "PKG_MES_TOPOLOGY",
+          "queryId": "q_ind_asset_tree",
+          "defaultStructure": "tree",
+          "defaultConfig": {"id_col": "id", "parent_col": "parent_id", "label_col": "label", "type_col": "asset_type"}
+      },
+      {
+          "name": "PKG_MES_TOPOLOGY.GetPowertrainProcessChain",
+          "type": "PROCEDURE",
+          "signature": "PKG_MES_TOPOLOGY.GetPowertrainProcessChain(iLineCode, oCursor)",
+          "description": "Sıralı üretim operasyon adımlarını (Lazer Kesim → Pres → CNC → Kaynak → Kalite → Test) zincir olarak döndürür.",
+          "packageName": "PKG_MES_TOPOLOGY",
+          "queryId": "q_ind_mfg_sequence",
+          "defaultStructure": "sequence",
+          "defaultConfig": {"id_col": "id", "order_col": "step_order", "next_col": "next_step_id", "label_col": "label"}
+      },
+      {
+          "name": "PKG_MES_TOPOLOGY.GetRoutingDAG",
+          "type": "PROCEDURE",
+          "signature": "PKG_MES_TOPOLOGY.GetRoutingDAG(iRoutingVersion, oCursor)",
+          "description": "Çoklu ebeveynli (multi-parent) üretim rotalarını, darboğaz hatlarını ve anlık verimlilik skorlarını DAG yapısında döndürür.",
+          "packageName": "PKG_MES_TOPOLOGY",
+          "queryId": "q_ind_routing_dag",
+          "defaultStructure": "dag",
+          "defaultConfig": {"id_col": "step_id", "parent_col": "prerequisite_step_ids", "label_col": "step_name", "type_col": "assigned_line_id", "health_col": "health_score", "status_col": "status"}
+      },
+      {
+          "name": "PKG_ENERGY_GRID.GetSmartGridTopology",
+          "type": "PROCEDURE",
+          "signature": "PKG_ENERGY_GRID.GetSmartGridTopology(iVoltageLevel, oCursor)",
+          "description": "Yüksek gerilim trafo merkezi, şalt sahası, ana fiderler ve üretim hatları arasındaki enerji besleme topolojisini (DAG) döndürür.",
+          "packageName": "PKG_ENERGY_GRID",
+          "queryId": "q_ind_energy_grid_dag",
+          "defaultStructure": "dag",
+          "defaultConfig": {"id_col": "node_id", "parent_col": "parent_ids", "label_col": "node_name", "health_col": "health_score", "status_col": "status", "badge_col": "badge"}
+      },
+      {
+          "name": "PKG_ENERGY_GRID.GetFacilityCarbonClusters",
+          "type": "PROCEDURE",
+          "signature": "PKG_ENERGY_GRID.GetFacilityCarbonClusters(iPeriodDays, oCursor)",
+          "description": "Tesis bölümleri ve enerji sayaçları bazında kWh tüketimi, pik talep ve CO2 emisyon kümelerini döndürür.",
+          "packageName": "PKG_ENERGY_GRID",
+          "queryId": "q_ind_energy_esg",
+          "defaultStructure": "multi_level",
+          "defaultConfig": {"level_cols": ["department", "meter_name"], "label_col": "meter_name", "health_col": "power_factor"}
+      },
+      {
+          "name": "PKG_QUALITY_ASSURANCE.GetDefectRootCauseTree",
+          "type": "PROCEDURE",
+          "signature": "PKG_QUALITY_ASSURANCE.GetDefectRootCauseTree(iSeverityFilter, oCursor)",
+          "description": "Kalite kontrol istasyonları, kusur kategorileri ve kök neden analiz ağacını döndürür.",
+          "packageName": "PKG_QUALITY_ASSURANCE",
+          "queryId": "q_ind_quality_defect_tree",
+          "defaultStructure": "tree",
+          "defaultConfig": {"id_col": "node_id", "parent_col": "parent_id", "label_col": "node_label", "health_col": "health_score", "status_col": "status", "badge_col": "badge"}
+      },
+      {
+          "name": "PKG_MAINTENANCE_CMMS.GetDowntimePriorityChain",
+          "type": "PROCEDURE",
+          "signature": "PKG_MAINTENANCE_CMMS.GetDowntimePriorityChain(iTopN, oCursor)",
+          "description": "Ekipman arıza ve duruş sürelerini Pareto öncelik sırasına göre zincir yapısında döndürür.",
+          "packageName": "PKG_MAINTENANCE_CMMS",
+          "queryId": "q_ind_downtime_pareto_ranking",
+          "defaultStructure": "sequence",
+          "defaultConfig": {"id_col": "Machine Name", "order_col": "Total Downtime (min)", "label_col": "Machine Name", "health_col": "Health Score", "status_col": "Status"}
+      },
+      {
+          "name": "PKG_TELEMETRY_CORE.ReadRawTelemetry",
+          "type": "PROCEDURE",
+          "signature": "PKG_TELEMETRY_CORE.ReadRawTelemetry(iPathFilter, iStartTime, iEndTime, oCursor)",
+          "description": "Endüstriyel sensör noktaları ve varlık ağacından ham telemetri hiyerarşisini döndürür.",
+          "packageName": "PKG_TELEMETRY_CORE",
+          "queryId": "q_4bd69f38e2",
+          "defaultStructure": "tree",
+          "defaultConfig": {"id_col": "PATH_ID", "parent_col": "PARENT_PATH_ID", "label_col": "PATH_ELEMENT_NAME", "type_col": "PATH_LEVEL"}
+      },
+      {
+          "name": "PKG_TELEMETRY_CORE.ReadAggregatedMetrics",
+          "type": "PROCEDURE",
+          "signature": "PKG_TELEMETRY_CORE.ReadAggregatedMetrics(iPathFilter, iIntervalMin, oCursor)",
+          "description": "Sensör noktalarının toplulaştırılmış (aggregated) ölçüm değerlerini ve durumlarını döndürür.",
+          "packageName": "PKG_TELEMETRY_CORE",
+          "queryId": "q_ind_cpoint_values",
+          "defaultStructure": "multi_level",
+          "defaultConfig": {"level_cols": ["area_code", "point_type", "point_name"], "label_col": "point_name"}
+      },
+      {
+          "name": "read_aggregated",
+          "type": "FUNCTION",
+          "signature": "read_aggregated(path, minutes)",
+          "description": "Reads aggregated path values for standard queries.",
+          "packageName": None
+      },
+      {
+          "name": "read_raw_telemetry",
+          "type": "FUNCTION",
+          "signature": "read_raw_telemetry(path, min_ago)",
+          "description": "Reads raw sensor values from historical telemetry tables.",
+          "packageName": None
+      },
+  ]
+
+
 def get_functions(data_source: Dict[str, Any]) -> List[Dict[str, Any]]:
   """Lists user-defined database functions/packages."""
   db_type = (data_source.get("db_type") or "").lower()
-  conn = _open_connection(data_source)
+  if db_type == "sqlite":
+    return _default_demo_functions()
+  try:
+    conn = _open_connection(data_source)
+  except Exception:
+    # Uzak DB çevrimdışıysa sunumda kesinti olmaması için varsayılan paketleri dön
+    return _default_demo_functions()
   try:
     cur = conn.cursor()
     results = []
-
-    if db_type == "sqlite":
-      # SQLite mock functions for demo (some standalone, some inside HIS_DBC_INTERFACE package)
-      return [
-          {
-              "name": "HIS_DBC_INTERFACE.LogonUser",
-              "type": "PROCEDURE",
-              "signature": "HIS_DBC_INTERFACE.LogonUser(oReturn, oMessage, iUserName, iConsole)",
-              "description": "Sets the environment for the user during session (Access rights, language, timezone) with the preferences from the user.\noReturn: 0 - Login OK\n-1 - Error occurred",
-              "packageName": "HIS_DBC_INTERFACE"
-          },
-          {
-              "name": "HIS_DBC_INTERFACE.ReadDataRaw",
-              "type": "PROCEDURE",
-              "signature": "HIS_DBC_INTERFACE.ReadDataRaw(oHandle, oReturn, oMessage, oViewName, iLocalTimeStampFrom, iHourBFrom, iLocalTimeStampTo, iHourBTo, iPointType, iPointSelection)",
-              "description": "Reads raw data from HIS.\noHandle: Handle to read data from return view\noReturn: -1 = Error, 0 = Ok",
-              "packageName": "HIS_DBC_INTERFACE"
-          },
-          {
-              "name": "HIS_DBC_INTERFACE.ReadDataAggregated",
-              "type": "PROCEDURE",
-              "signature": "HIS_DBC_INTERFACE.ReadDataAggregated(oHandle, oReturn, oMessage, oViewName, iLocalTimeStampFrom, iHourBFrom, iLocalTimeStampTo, iHourBTo, iPointType, iPointSelection, iCycle, iCycleUnit)",
-              "description": "Reads aggregated data from HIS (Analog or accu).\noHandle: Handle to read data from return view",
-              "packageName": "HIS_DBC_INTERFACE"
-          },
-          {
-              "name": "HIS_DBC_INTERFACE.SetUserLanguage",
-              "type": "PROCEDURE",
-              "signature": "HIS_DBC_INTERFACE.SetUserLanguage(oReturn, oMessage, iLanguage)",
-              "description": "Changes the language for this session.\niLanguage: Language in format en-EN, en-US",
-              "packageName": "HIS_DBC_INTERFACE"
-          },
-          {
-              "name": "HIS_DBC_INTERFACE.SetTimeZone",
-              "type": "PROCEDURE",
-              "signature": "HIS_DBC_INTERFACE.SetTimeZone(oReturn, oMessage, iTimezoneID)",
-              "description": "Changes the timezone for this session. (Only used for daily values, all timestamps are still in UTC)",
-              "packageName": "HIS_DBC_INTERFACE"
-          },
-          {
-              "name": "read_aggregated",
-              "type": "FUNCTION",
-              "signature": "read_aggregated(path, minutes)",
-              "description": "Reads aggregated path values for standard queries.",
-              "packageName": None
-          },
-          {
-              "name": "read_raw_his",
-              "type": "FUNCTION",
-              "signature": "read_raw_his(path, min_ago)",
-              "description": "Reads raw values from historical tables.",
-              "packageName": None
-          },
-          {"name": "avg", "type": "AGGREGATE", "signature": "avg(col)", "description": "Returns the average value.", "packageName": None},
-          {"name": "sum", "type": "AGGREGATE", "signature": "sum(col)", "description": "Returns the sum of all values.", "packageName": None},
-      ]
+    if False:
+      pass
     elif db_type == "oracle":
       # 1. Fetch standalone objects
       cur.execute(

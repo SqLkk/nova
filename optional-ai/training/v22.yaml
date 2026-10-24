@@ -1,0 +1,19 @@
+# Explicitly invoked optional runtime; never loaded by Flask/Angular startup.
+fine_tune_type: lora
+num_layers: 1
+batch_size: 1
+grad_accumulation_steps: 1
+max_seq_length: 1024
+grad_checkpoint: true
+mask_prompt: true
+iters: 150
+learning_rate: 0.00001
+steps_per_report: 10
+steps_per_eval: 50
+val_batches: -1
+save_every: 50
+seed: 42
+lora_parameters:
+  rank: 4
+  dropout: 0.0
+  scale: 8.0

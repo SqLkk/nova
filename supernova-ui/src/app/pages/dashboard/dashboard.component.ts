@@ -595,18 +595,91 @@ export class DashboardComponent implements OnInit, OnDestroy {
       })
     );
 
-    if (this.configuringWidget!.assignedQueryId) {
+    if (this.configuringWidget!.dataSourceType === 'python' && this.configuringWidget!.assignedPythonId) {
+      this.loadPythonColumns(this.configuringWidget!.assignedPythonId);
+    } else if (this.configuringWidget!.assignedQueryId) {
       this.loadQueryColumns(this.configuringWidget!.assignedQueryId);
     } else {
       this.availableQueryColumns = [];
     }
   }
 
+  get selectedQueryDescription(): string {
+    const qid = this.configuringWidget?.assignedQueryId;
+    if (!qid) return '';
+    return this.availableSqlQueries.find(q => q.id === qid)?.description || '';
+  }
+
+  get selectedPythonDescription(): string {
+    const pid = this.configuringWidget?.assignedPythonId;
+    if (!pid) return '';
+    return this.availablePythonScripts.find(p => p.id === pid)?.description || '';
+  }
+
   onQueryChange(queryId: string): void {
     if (this.configuringWidget) {
       this.configuringWidget.assignedQueryId = queryId;
+      if (this.configuringWidget.config) {
+        this.configuringWidget.config.sqlValueColumn = undefined;
+        this.configuringWidget.config.sqlLabelColumn = undefined;
+      }
     }
     this.loadQueryColumns(queryId);
+  }
+
+  onPythonChange(scriptId: string): void {
+    if (this.configuringWidget) {
+      this.configuringWidget.assignedPythonId = scriptId;
+      if (this.configuringWidget.config) {
+        this.configuringWidget.config.sqlValueColumn = undefined;
+        this.configuringWidget.config.sqlLabelColumn = undefined;
+      }
+    }
+    this.loadPythonColumns(scriptId);
+  }
+
+  loadPythonColumns(scriptId: string): void {
+    if (!scriptId) {
+      this.availableQueryColumns = [];
+      return;
+    }
+    this.loadingColumns = true;
+    this.subs.push(
+      this.dashEdit.getAvailablePythonColumns(scriptId).subscribe({
+        next: (res) => {
+          this.loadingColumns = false;
+          this.availableQueryColumns = res.data || [];
+          this.applyDefaultColumnMapping();
+          this.cdr.detectChanges();
+        },
+        error: () => {
+          this.loadingColumns = false;
+          this.cdr.detectChanges();
+        }
+      })
+    );
+  }
+
+  private applyDefaultColumnMapping(): void {
+    if (!this.configuringWidget) return;
+    if (!this.configuringWidget.config) this.configuringWidget.config = {};
+    if (!this.configuringWidget.config.sqlValueColumn && this.availableQueryColumns.length > 0) {
+      const numCol = this.availableQueryColumns.find(c =>
+        c.includes('pct') || c.includes('rate') || c.includes('qty') || c.includes('oee') ||
+        c.includes('val') || c.includes('minutes') || c.includes('hours') || c.includes('cost') ||
+        c.includes('kwh') || c.includes('pressure') || c.includes('speed') || c.includes('temp') ||
+        c.includes('torque') || c.includes('total') || c.includes('avg') || c.includes('score')
+      );
+      this.configuringWidget.config.sqlValueColumn = numCol || this.availableQueryColumns[0];
+    }
+    if (!this.configuringWidget.config.sqlLabelColumn && this.availableQueryColumns.length > 0) {
+      const lblCol = this.availableQueryColumns.find(c =>
+        c.includes('name') || c.includes('time') || c.includes('date') || c.includes('id') ||
+        c.includes('code') || c.includes('area') || c.includes('category') || c.includes('step') ||
+        c.includes('line') || c.includes('shift') || c.includes('machine') || c.includes('point')
+      );
+      this.configuringWidget.config.sqlLabelColumn = lblCol || this.availableQueryColumns[0];
+    }
   }
 
   loadQueryColumns(queryId: string): void {
@@ -620,24 +693,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
         next: (res) => {
           this.loadingColumns = false;
           this.availableQueryColumns = res.data || [];
-          if (this.configuringWidget) {
-            if (!this.configuringWidget.config) this.configuringWidget.config = {};
-            if (!this.configuringWidget.config.sqlValueColumn && this.availableQueryColumns.length > 0) {
-              const numCol = this.availableQueryColumns.find(c =>
-                c.includes('pct') || c.includes('rate') || c.includes('qty') || c.includes('oee') ||
-                c.includes('val') || c.includes('minutes') || c.includes('hours') || c.includes('cost') ||
-                c.includes('kwh') || c.includes('pressure') || c.includes('speed') || c.includes('temp') || c.includes('torque')
-              );
-              this.configuringWidget.config.sqlValueColumn = numCol || this.availableQueryColumns[0];
-            }
-            if (!this.configuringWidget.config.sqlLabelColumn && this.availableQueryColumns.length > 0) {
-              const lblCol = this.availableQueryColumns.find(c =>
-                c.includes('name') || c.includes('time') || c.includes('date') || c.includes('id') ||
-                c.includes('code') || c.includes('area') || c.includes('category') || c.includes('step')
-              );
-              this.configuringWidget.config.sqlLabelColumn = lblCol || this.availableQueryColumns[0];
-            }
-          }
+          this.applyDefaultColumnMapping();
           this.cdr.detectChanges();
         },
         error: () => {

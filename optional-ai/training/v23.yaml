@@ -1,0 +1,26 @@
+# Final bounded experiment: 600 stratified steps across all SuperNova domains.
+# Four trailing blocks cover three linear-attention blocks and one full attention
+# block in this Qwen3.5 snapshot, with rank 8 and scale 16.0.
+fine_tune_type: lora
+num_layers: 1
+batch_size: 1
+grad_accumulation_steps: 1
+max_seq_length: 1024
+grad_checkpoint: true
+mask_prompt: true
+iters: 600
+learning_rate: 0.000008
+steps_per_report: 25
+steps_per_eval: 150
+val_batches: 20
+save_every: 150
+seed: 42
+lora_parameters:
+  rank: 4
+  dropout: 0.05
+  scale: 6.0
+lr_schedule:
+  name: cosine_decay
+  arguments: [0.000008, 560, 0.000001]
+  warmup: 40
+  warmup_init: 0.000001

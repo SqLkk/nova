@@ -64,13 +64,13 @@ def create_factory_db():
         (1, 'KUKA Robot Arm C1', 'Robot', 1, 'online'),
         (2, 'KUKA Robot Arm C2', 'Robot', 1, 'online'),
         (3, 'Conveyor Belt C-Main', 'Conveyor', 1, 'warning'),
-        (4, 'Siemens S7 PLC C1', 'Controller', 1, 'online'),
+        (4, 'Apex AX-7 PLC C1', 'Controller', 1, 'online'),
         # Engine
         (5, 'CNC Lathe E1', 'CNC', 2, 'alarm'),
         (6, 'CNC Lathe E2', 'CNC', 2, 'offline'),
         (7, 'Torque Station E1', 'Tool', 2, 'online'),
         (8, 'Engine Testing Rig', 'Test', 2, 'online'),
-        (9, 'Siemens S7 PLC E1', 'Controller', 2, 'online'),
+        (9, 'Apex AX-7 PLC E1', 'Controller', 2, 'online'),
         # Electronics
         (10, 'Pick and Place M1', 'Robot', 3, 'online'),
         (11, 'Reflow Oven', 'Heater', 3, 'warning'),

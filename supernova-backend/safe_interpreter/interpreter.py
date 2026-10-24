@@ -50,7 +50,7 @@ def _apply_resource_limits():
 # Güvenlik sabitleri.
 # ---------------------------------------------------------------------------
 
-MAX_STATEMENTS = 300_000
+MAX_STATEMENTS = 2_500_000
 MAX_OUTPUT_ITEMS = 100_000
 MAX_RANGE = 1_000_000          # range(...) üst sınırı
 MAX_SEQ_MULT = 100_000         # "a" * n / [x] * n üst sınırı
@@ -84,7 +84,7 @@ class OutHelper:
         self._max_items = max_items
         self._total_items = 0
 
-    def __call__(self, name):
+    def __call__(self, name, rows=None):
         if name not in self._columns:
             self._columns[name] = []
         outer = self
@@ -94,6 +94,9 @@ class OutHelper:
                 self._lst = lst
 
             def append(self, val):
+                if isinstance(val, list) and all(isinstance(item, dict) for item in val):
+                    self.extend(val)
+                    return
                 if outer._total_items >= outer._max_items:
                     raise SecurityError("Maximum output limit exceeded.")
                 self._lst.append(val)
@@ -112,7 +115,13 @@ class OutHelper:
             def __getitem__(self, i):
                 return self._lst[i]
 
-        return SafeList(self._columns[name])
+        safe_list = SafeList(self._columns[name])
+        if rows is not None:
+            if isinstance(rows, list):
+                safe_list.extend(rows)
+            else:
+                safe_list.append(rows)
+        return safe_list
 
     def get_results(self):
         return self._columns
@@ -280,6 +289,12 @@ class SafeASTInterpreter:
     def eval_Pass(self, node):
         return None
 
+    def eval_Import(self, node):
+        for alias in node.names:
+            if alias.name not in ('math', 'json', 'datetime') or alias.asname is not None:
+                raise SecurityError("Operation 'Import' is disabled in this secure environment.")
+        return None
+
     # --- Atama ---
     def eval_Assign(self, node):
         val = self.evaluate(node.value)
@@ -412,13 +427,17 @@ class SafeASTInterpreter:
                 left = (left in right)
             elif t == ast.NotIn:
                 left = (left not in right)
+            elif t == ast.Is:
+                left = (left is right)
+            elif t == ast.IsNot:
+                left = (left is not right)
             else:
                 raise SecurityError(f"Comparison {t.__name__} is disabled.")
             if not left:
                 return False
         return left
 
-    # --- Kolleksiyon literalleri ---
+    # --- Kolleksiyon literalleri & Comprehensions ---
     def eval_List(self, node):
         return [self.evaluate(e) for e in node.elts]
 
@@ -430,6 +449,72 @@ class SafeASTInterpreter:
 
     def eval_Dict(self, node):
         return {self.evaluate(k): self.evaluate(v) for k, v in zip(node.keys, node.values)}
+
+    def eval_JoinedStr(self, node):
+        parts = []
+        for v in node.values:
+            val = self.evaluate(v)
+            parts.append(str(val) if not isinstance(val, str) else val)
+        return ''.join(parts)
+
+    def eval_FormattedValue(self, node):
+        val = self.evaluate(node.value)
+        if node.format_spec is not None:
+            spec = self.evaluate(node.format_spec)
+            try:
+                return format(val, str(spec))
+            except Exception:
+                return str(val)
+        return str(val)
+
+    def _iter_comprehension_generators(self, generators, idx=0):
+        if idx >= len(generators):
+            yield
+            return
+        gen = generators[idx]
+        iterable = self.evaluate(gen.iter)
+        for item in iterable:
+            self.assign_to_target(gen.target, item)
+            if all(bool(self.evaluate(cond)) for cond in gen.ifs):
+                yield from self._iter_comprehension_generators(generators, idx + 1)
+
+    def eval_ListComp(self, node):
+        saved = self.locals
+        self.locals = dict(saved)
+        try:
+            res = []
+            for _ in self._iter_comprehension_generators(node.generators):
+                res.append(self.evaluate(node.elt))
+            return res
+        finally:
+            self.locals = saved
+
+    def eval_SetComp(self, node):
+        saved = self.locals
+        self.locals = dict(saved)
+        try:
+            res = set()
+            for _ in self._iter_comprehension_generators(node.generators):
+                res.add(self.evaluate(node.elt))
+            return res
+        finally:
+            self.locals = saved
+
+    def eval_GeneratorExp(self, node):
+        return self.eval_ListComp(node)
+
+    def eval_DictComp(self, node):
+        saved = self.locals
+        self.locals = dict(saved)
+        try:
+            res = {}
+            for _ in self._iter_comprehension_generators(node.generators):
+                k = self.evaluate(node.key)
+                v = self.evaluate(node.value)
+                res[k] = v
+            return res
+        finally:
+            self.locals = saved
 
     # --- Alt indis ---
     def _slice(self, node):
@@ -465,6 +550,9 @@ class SafeASTInterpreter:
             for s in node.orelse:
                 self.evaluate(s)
         return None
+
+    def eval_IfExp(self, node):
+        return self.evaluate(node.body) if self.evaluate(node.test) else self.evaluate(node.orelse)
 
     def eval_For(self, node):
         iterable = self.evaluate(node.iter)
@@ -530,6 +618,24 @@ class SafeASTInterpreter:
 
         self.locals[node.name] = user_func
         return None
+
+    def eval_Lambda(self, node):
+        interp = self
+
+        def lambda_func(*args, **kwargs):
+            saved = interp.locals
+            interp.locals = dict(saved)
+            try:
+                for arg, val in zip(node.args.args, args):
+                    interp.locals[arg.arg] = val
+                for kw in node.args.kwonlyargs:
+                    if kw.arg in kwargs:
+                        interp.locals[kw.arg] = kwargs[kw.arg]
+                return interp.evaluate(node.body)
+            finally:
+                interp.locals = saved
+
+        return lambda_func
 
     def eval_Return(self, node):
         value = self.evaluate(node.value) if node.value is not None else None

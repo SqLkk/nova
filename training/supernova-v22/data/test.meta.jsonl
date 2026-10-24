@@ -1,0 +1,300 @@
+{"category": "path", "subtype": "dag", "scenario": "sc18_pack_line", "checks": ["schema", "exact_structure"]}
+{"category": "py_basic", "subtype": "average", "scenario": "sc18_pack_line", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "sql", "subtype": "average", "scenario": "sc18_pack_line", "checks": ["outside_range", "no_events", "null_metric", "exact_aggregate"]}
+{"category": "template", "subtype": "bar", "scenario": "sc19_intralog", "checks": ["schema", "anchors", "binding"]}
+{"category": "template", "subtype": "line", "scenario": "sc19_intralog", "checks": ["schema", "anchors", "binding"]}
+{"category": "sql", "subtype": "sum", "scenario": "sc19_intralog", "checks": ["outside_range", "no_events", "null_metric", "exact_aggregate"]}
+{"category": "path", "subtype": "binary_tree", "scenario": "sc18_pack_line", "checks": ["schema", "exact_structure"]}
+{"category": "py_weighted", "subtype": "scrap", "scenario": "sc19_intralog", "checks": ["unequal_weights", "null_and_missing", "zero_denominator", "all_null", "empty"]}
+{"category": "py_merge", "subtype": "full_difference", "scenario": "sc19_intralog", "checks": ["duplicates_both_sides", "null_and_missing", "right_empty", "left_empty", "both_empty"]}
+{"category": "sql", "subtype": "average", "scenario": "sc18_pack_line", "checks": ["outside_range", "no_events", "null_metric", "exact_aggregate"]}
+{"category": "missing_info", "subtype": "4", "scenario": "sc18_pack_line", "checks": ["specific_missing_information", "no_executable_artifact"]}
+{"category": "py_merge", "subtype": "left_difference", "scenario": "sc19_intralog", "checks": ["duplicates_both_sides", "null_and_missing", "right_empty", "left_empty", "both_empty"]}
+{"category": "py_weighted", "subtype": "scrap", "scenario": "sc18_pack_line", "checks": ["unequal_weights", "null_and_missing", "zero_denominator", "all_null", "empty"]}
+{"category": "template", "subtype": "line", "scenario": "sc18_pack_line", "checks": ["schema", "anchors", "binding"]}
+{"category": "sql", "subtype": "sum", "scenario": "sc18_pack_line", "checks": ["outside_range", "no_events", "null_metric", "exact_aggregate"]}
+{"category": "sql", "subtype": "count", "scenario": "sc18_pack_line", "checks": ["outside_range", "no_events", "null_metric", "exact_aggregate"]}
+{"category": "py_merge", "subtype": "left_difference", "scenario": "sc18_pack_line", "checks": ["duplicates_both_sides", "null_and_missing", "right_empty", "left_empty", "both_empty"]}
+{"category": "path", "subtype": "binary_tree", "scenario": "sc19_intralog", "checks": ["schema", "exact_structure"]}
+{"category": "forbidden", "subtype": "3", "scenario": "sc18_pack_line", "checks": ["refusal", "no_executable_artifact"]}
+{"category": "path", "subtype": "dag", "scenario": "sc18_pack_line", "checks": ["schema", "exact_structure"]}
+{"category": "missing_info", "subtype": "1", "scenario": "sc19_intralog", "checks": ["specific_missing_information", "no_executable_artifact"]}
+{"category": "template", "subtype": "bar", "scenario": "sc19_intralog", "checks": ["schema", "anchors", "binding"]}
+{"category": "py_weighted", "subtype": "availability", "scenario": "sc19_intralog", "checks": ["unequal_weights", "null_and_missing", "zero_denominator", "all_null", "empty"]}
+{"category": "missing_info", "subtype": "8", "scenario": "sc18_pack_line", "checks": ["specific_missing_information", "no_executable_artifact"]}
+{"category": "sql", "subtype": "count", "scenario": "sc19_intralog", "checks": ["outside_range", "no_events", "null_metric", "exact_aggregate"]}
+{"category": "template", "subtype": "line", "scenario": "sc19_intralog", "checks": ["schema", "anchors", "binding"]}
+{"category": "py_basic", "subtype": "average", "scenario": "sc18_pack_line", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "sql", "subtype": "count", "scenario": "sc18_pack_line", "checks": ["outside_range", "no_events", "null_metric", "exact_aggregate"]}
+{"category": "path", "subtype": "tree", "scenario": "sc19_intralog", "checks": ["schema", "exact_structure"]}
+{"category": "sql", "subtype": "count", "scenario": "sc18_pack_line", "checks": ["outside_range", "no_events", "null_metric", "exact_aggregate"]}
+{"category": "template", "subtype": "line", "scenario": "sc19_intralog", "checks": ["schema", "anchors", "binding"]}
+{"category": "sql", "subtype": "sum", "scenario": "sc19_intralog", "checks": ["outside_range", "no_events", "null_metric", "exact_aggregate"]}
+{"category": "py_weighted", "subtype": "scrap", "scenario": "sc18_pack_line", "checks": ["unequal_weights", "null_and_missing", "zero_denominator", "all_null", "empty"]}
+{"category": "py_fix", "subtype": "null_arithmetic", "scenario": "sc19_intralog", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "sql", "subtype": "sum", "scenario": "sc19_intralog", "checks": ["outside_range", "no_events", "null_metric", "exact_aggregate"]}
+{"category": "template", "subtype": "pie", "scenario": "sc18_pack_line", "checks": ["schema", "anchors", "binding"]}
+{"category": "sql", "subtype": "count", "scenario": "sc18_pack_line", "checks": ["outside_range", "no_events", "null_metric", "exact_aggregate"]}
+{"category": "path", "subtype": "tree", "scenario": "sc18_pack_line", "checks": ["schema", "exact_structure"]}
+{"category": "path", "subtype": "dag", "scenario": "sc19_intralog", "checks": ["schema", "exact_structure"]}
+{"category": "path", "subtype": "tree", "scenario": "sc19_intralog", "checks": ["schema", "exact_structure"]}
+{"category": "template", "subtype": "line", "scenario": "sc19_intralog", "checks": ["schema", "anchors", "binding"]}
+{"category": "template", "subtype": "line", "scenario": "sc19_intralog", "checks": ["schema", "anchors", "binding"]}
+{"category": "py_merge", "subtype": "full_difference", "scenario": "sc19_intralog", "checks": ["duplicates_both_sides", "null_and_missing", "right_empty", "left_empty", "both_empty"]}
+{"category": "template", "subtype": "bar", "scenario": "sc19_intralog", "checks": ["schema", "anchors", "binding"]}
+{"category": "sql", "subtype": "sum", "scenario": "sc18_pack_line", "checks": ["outside_range", "no_events", "null_metric", "exact_aggregate"]}
+{"category": "tool_calling", "subtype": "roundtrip", "scenario": "sc19_intralog", "checks": ["structured_call", "roundtrip"]}
+{"category": "missing_info", "subtype": "3", "scenario": "sc18_pack_line", "checks": ["specific_missing_information", "no_executable_artifact"]}
+{"category": "py_fix", "subtype": "null_arithmetic", "scenario": "sc19_intralog", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "template", "subtype": "pie", "scenario": "sc19_intralog", "checks": ["schema", "anchors", "binding"]}
+{"category": "template", "subtype": "pie", "scenario": "sc18_pack_line", "checks": ["schema", "anchors", "binding"]}
+{"category": "py_basic", "subtype": "sum", "scenario": "sc19_intralog", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "py_fix", "subtype": "null_arithmetic", "scenario": "sc18_pack_line", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "py_merge", "subtype": "left_difference", "scenario": "sc19_intralog", "checks": ["duplicates_both_sides", "null_and_missing", "right_empty", "left_empty", "both_empty"]}
+{"category": "py_weighted", "subtype": "availability", "scenario": "sc18_pack_line", "checks": ["unequal_weights", "null_and_missing", "zero_denominator", "all_null", "empty"]}
+{"category": "py_weighted", "subtype": "availability", "scenario": "sc18_pack_line", "checks": ["unequal_weights", "null_and_missing", "zero_denominator", "all_null", "empty"]}
+{"category": "sql", "subtype": "average", "scenario": "sc19_intralog", "checks": ["outside_range", "no_events", "null_metric", "exact_aggregate"]}
+{"category": "sql", "subtype": "average", "scenario": "sc19_intralog", "checks": ["outside_range", "no_events", "null_metric", "exact_aggregate"]}
+{"category": "tool_calling", "subtype": "call", "scenario": "sc18_pack_line", "checks": ["structured_call", "call"]}
+{"category": "py_merge", "subtype": "full_difference", "scenario": "sc18_pack_line", "checks": ["duplicates_both_sides", "null_and_missing", "right_empty", "left_empty", "both_empty"]}
+{"category": "sql", "subtype": "sum", "scenario": "sc19_intralog", "checks": ["outside_range", "no_events", "null_metric", "exact_aggregate"]}
+{"category": "missing_info", "subtype": "0", "scenario": "sc19_intralog", "checks": ["specific_missing_information", "no_executable_artifact"]}
+{"category": "py_merge", "subtype": "left_difference", "scenario": "sc19_intralog", "checks": ["duplicates_both_sides", "null_and_missing", "right_empty", "left_empty", "both_empty"]}
+{"category": "py_basic", "subtype": "sum", "scenario": "sc18_pack_line", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "template", "subtype": "area", "scenario": "sc18_pack_line", "checks": ["schema", "anchors", "binding"]}
+{"category": "template", "subtype": "pie", "scenario": "sc19_intralog", "checks": ["schema", "anchors", "binding"]}
+{"category": "forbidden", "subtype": "10", "scenario": "sc18_pack_line", "checks": ["refusal", "no_executable_artifact"]}
+{"category": "sql", "subtype": "average", "scenario": "sc19_intralog", "checks": ["outside_range", "no_events", "null_metric", "exact_aggregate"]}
+{"category": "path", "subtype": "dag", "scenario": "sc18_pack_line", "checks": ["schema", "exact_structure"]}
+{"category": "py_merge", "subtype": "left_difference", "scenario": "sc19_intralog", "checks": ["duplicates_both_sides", "null_and_missing", "right_empty", "left_empty", "both_empty"]}
+{"category": "missing_info", "subtype": "5", "scenario": "sc19_intralog", "checks": ["specific_missing_information", "no_executable_artifact"]}
+{"category": "py_basic", "subtype": "range", "scenario": "sc18_pack_line", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "forbidden", "subtype": "9", "scenario": "sc19_intralog", "checks": ["refusal", "no_executable_artifact"]}
+{"category": "missing_info", "subtype": "1", "scenario": "sc19_intralog", "checks": ["specific_missing_information", "no_executable_artifact"]}
+{"category": "py_weighted", "subtype": "scrap", "scenario": "sc19_intralog", "checks": ["unequal_weights", "null_and_missing", "zero_denominator", "all_null", "empty"]}
+{"category": "missing_info", "subtype": "8", "scenario": "sc19_intralog", "checks": ["specific_missing_information", "no_executable_artifact"]}
+{"category": "path", "subtype": "sequence", "scenario": "sc19_intralog", "checks": ["schema", "exact_structure"]}
+{"category": "path", "subtype": "grouped", "scenario": "sc19_intralog", "checks": ["schema", "exact_structure"]}
+{"category": "sql", "subtype": "count", "scenario": "sc18_pack_line", "checks": ["outside_range", "no_events", "null_metric", "exact_aggregate"]}
+{"category": "missing_info", "subtype": "2", "scenario": "sc19_intralog", "checks": ["specific_missing_information", "no_executable_artifact"]}
+{"category": "py_weighted", "subtype": "quality", "scenario": "sc18_pack_line", "checks": ["unequal_weights", "null_and_missing", "zero_denominator", "all_null", "empty"]}
+{"category": "tool_calling", "subtype": "roundtrip", "scenario": "sc18_pack_line", "checks": ["structured_call", "roundtrip"]}
+{"category": "py_weighted", "subtype": "scrap", "scenario": "sc19_intralog", "checks": ["unequal_weights", "null_and_missing", "zero_denominator", "all_null", "empty"]}
+{"category": "tool_calling", "subtype": "roundtrip", "scenario": "sc19_intralog", "checks": ["structured_call", "roundtrip"]}
+{"category": "missing_info", "subtype": "4", "scenario": "sc19_intralog", "checks": ["specific_missing_information", "no_executable_artifact"]}
+{"category": "forbidden", "subtype": "19", "scenario": "sc19_intralog", "checks": ["refusal", "no_executable_artifact"]}
+{"category": "py_weighted", "subtype": "availability", "scenario": "sc19_intralog", "checks": ["unequal_weights", "null_and_missing", "zero_denominator", "all_null", "empty"]}
+{"category": "forbidden", "subtype": "21", "scenario": "sc18_pack_line", "checks": ["refusal", "no_executable_artifact"]}
+{"category": "forbidden", "subtype": "20", "scenario": "sc18_pack_line", "checks": ["refusal", "no_executable_artifact"]}
+{"category": "py_merge", "subtype": "full_difference", "scenario": "sc18_pack_line", "checks": ["duplicates_both_sides", "null_and_missing", "right_empty", "left_empty", "both_empty"]}
+{"category": "py_basic", "subtype": "range", "scenario": "sc19_intralog", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "template", "subtype": "bar", "scenario": "sc19_intralog", "checks": ["schema", "anchors", "binding"]}
+{"category": "py_basic", "subtype": "sum", "scenario": "sc19_intralog", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "path", "subtype": "binary_tree", "scenario": "sc19_intralog", "checks": ["schema", "exact_structure"]}
+{"category": "path", "subtype": "dag", "scenario": "sc19_intralog", "checks": ["schema", "exact_structure"]}
+{"category": "tool_calling", "subtype": "call", "scenario": "sc18_pack_line", "checks": ["structured_call", "call"]}
+{"category": "sql", "subtype": "sum", "scenario": "sc19_intralog", "checks": ["outside_range", "no_events", "null_metric", "exact_aggregate"]}
+{"category": "template", "subtype": "line", "scenario": "sc18_pack_line", "checks": ["schema", "anchors", "binding"]}
+{"category": "forbidden", "subtype": "13", "scenario": "sc19_intralog", "checks": ["refusal", "no_executable_artifact"]}
+{"category": "forbidden", "subtype": "4", "scenario": "sc19_intralog", "checks": ["refusal", "no_executable_artifact"]}
+{"category": "sql", "subtype": "sum", "scenario": "sc19_intralog", "checks": ["outside_range", "no_events", "null_metric", "exact_aggregate"]}
+{"category": "py_merge", "subtype": "left_difference", "scenario": "sc19_intralog", "checks": ["duplicates_both_sides", "null_and_missing", "right_empty", "left_empty", "both_empty"]}
+{"category": "py_weighted", "subtype": "availability", "scenario": "sc18_pack_line", "checks": ["unequal_weights", "null_and_missing", "zero_denominator", "all_null", "empty"]}
+{"category": "forbidden", "subtype": "23", "scenario": "sc19_intralog", "checks": ["refusal", "no_executable_artifact"]}
+{"category": "py_weighted", "subtype": "quality", "scenario": "sc19_intralog", "checks": ["unequal_weights", "null_and_missing", "zero_denominator", "all_null", "empty"]}
+{"category": "path", "subtype": "sequence", "scenario": "sc18_pack_line", "checks": ["schema", "exact_structure"]}
+{"category": "forbidden", "subtype": "0", "scenario": "sc18_pack_line", "checks": ["refusal", "no_executable_artifact"]}
+{"category": "sql", "subtype": "count", "scenario": "sc18_pack_line", "checks": ["outside_range", "no_events", "null_metric", "exact_aggregate"]}
+{"category": "template", "subtype": "bar", "scenario": "sc18_pack_line", "checks": ["schema", "anchors", "binding"]}
+{"category": "py_weighted", "subtype": "scrap", "scenario": "sc19_intralog", "checks": ["unequal_weights", "null_and_missing", "zero_denominator", "all_null", "empty"]}
+{"category": "template", "subtype": "area", "scenario": "sc19_intralog", "checks": ["schema", "anchors", "binding"]}
+{"category": "py_weighted", "subtype": "quality", "scenario": "sc19_intralog", "checks": ["unequal_weights", "null_and_missing", "zero_denominator", "all_null", "empty"]}
+{"category": "path", "subtype": "sequence", "scenario": "sc18_pack_line", "checks": ["schema", "exact_structure"]}
+{"category": "sql", "subtype": "average", "scenario": "sc18_pack_line", "checks": ["outside_range", "no_events", "null_metric", "exact_aggregate"]}
+{"category": "missing_info", "subtype": "9", "scenario": "sc19_intralog", "checks": ["specific_missing_information", "no_executable_artifact"]}
+{"category": "sql", "subtype": "count", "scenario": "sc19_intralog", "checks": ["outside_range", "no_events", "null_metric", "exact_aggregate"]}
+{"category": "py_basic", "subtype": "filter", "scenario": "sc19_intralog", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "sql", "subtype": "count", "scenario": "sc18_pack_line", "checks": ["outside_range", "no_events", "null_metric", "exact_aggregate"]}
+{"category": "py_weighted", "subtype": "availability", "scenario": "sc19_intralog", "checks": ["unequal_weights", "null_and_missing", "zero_denominator", "all_null", "empty"]}
+{"category": "tool_calling", "subtype": "roundtrip", "scenario": "sc18_pack_line", "checks": ["structured_call", "roundtrip"]}
+{"category": "path", "subtype": "grouped", "scenario": "sc19_intralog", "checks": ["schema", "exact_structure"]}
+{"category": "py_weighted", "subtype": "availability", "scenario": "sc19_intralog", "checks": ["unequal_weights", "null_and_missing", "zero_denominator", "all_null", "empty"]}
+{"category": "sql", "subtype": "average", "scenario": "sc19_intralog", "checks": ["outside_range", "no_events", "null_metric", "exact_aggregate"]}
+{"category": "py_merge", "subtype": "full_difference", "scenario": "sc18_pack_line", "checks": ["duplicates_both_sides", "null_and_missing", "right_empty", "left_empty", "both_empty"]}
+{"category": "py_merge", "subtype": "left_difference", "scenario": "sc18_pack_line", "checks": ["duplicates_both_sides", "null_and_missing", "right_empty", "left_empty", "both_empty"]}
+{"category": "missing_info", "subtype": "0", "scenario": "sc18_pack_line", "checks": ["specific_missing_information", "no_executable_artifact"]}
+{"category": "missing_info", "subtype": "2", "scenario": "sc18_pack_line", "checks": ["specific_missing_information", "no_executable_artifact"]}
+{"category": "py_merge", "subtype": "left_difference", "scenario": "sc18_pack_line", "checks": ["duplicates_both_sides", "null_and_missing", "right_empty", "left_empty", "both_empty"]}
+{"category": "missing_info", "subtype": "4", "scenario": "sc19_intralog", "checks": ["specific_missing_information", "no_executable_artifact"]}
+{"category": "template", "subtype": "area", "scenario": "sc19_intralog", "checks": ["schema", "anchors", "binding"]}
+{"category": "forbidden", "subtype": "6", "scenario": "sc18_pack_line", "checks": ["refusal", "no_executable_artifact"]}
+{"category": "template", "subtype": "line", "scenario": "sc18_pack_line", "checks": ["schema", "anchors", "binding"]}
+{"category": "sql", "subtype": "sum", "scenario": "sc18_pack_line", "checks": ["outside_range", "no_events", "null_metric", "exact_aggregate"]}
+{"category": "py_basic", "subtype": "range", "scenario": "sc18_pack_line", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "template", "subtype": "area", "scenario": "sc18_pack_line", "checks": ["schema", "anchors", "binding"]}
+{"category": "template", "subtype": "bar", "scenario": "sc18_pack_line", "checks": ["schema", "anchors", "binding"]}
+{"category": "py_basic", "subtype": "average", "scenario": "sc18_pack_line", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "forbidden", "subtype": "8", "scenario": "sc18_pack_line", "checks": ["refusal", "no_executable_artifact"]}
+{"category": "py_merge", "subtype": "full_difference", "scenario": "sc18_pack_line", "checks": ["duplicates_both_sides", "null_and_missing", "right_empty", "left_empty", "both_empty"]}
+{"category": "path", "subtype": "grouped", "scenario": "sc18_pack_line", "checks": ["schema", "exact_structure"]}
+{"category": "template", "subtype": "pie", "scenario": "sc18_pack_line", "checks": ["schema", "anchors", "binding"]}
+{"category": "forbidden", "subtype": "14", "scenario": "sc19_intralog", "checks": ["refusal", "no_executable_artifact"]}
+{"category": "py_weighted", "subtype": "scrap", "scenario": "sc18_pack_line", "checks": ["unequal_weights", "null_and_missing", "zero_denominator", "all_null", "empty"]}
+{"category": "tool_calling", "subtype": "call", "scenario": "sc19_intralog", "checks": ["structured_call", "call"]}
+{"category": "template", "subtype": "pie", "scenario": "sc19_intralog", "checks": ["schema", "anchors", "binding"]}
+{"category": "path", "subtype": "tree", "scenario": "sc18_pack_line", "checks": ["schema", "exact_structure"]}
+{"category": "path", "subtype": "grouped", "scenario": "sc18_pack_line", "checks": ["schema", "exact_structure"]}
+{"category": "sql", "subtype": "sum", "scenario": "sc19_intralog", "checks": ["outside_range", "no_events", "null_metric", "exact_aggregate"]}
+{"category": "path", "subtype": "binary_tree", "scenario": "sc18_pack_line", "checks": ["schema", "exact_structure"]}
+{"category": "py_weighted", "subtype": "quality", "scenario": "sc18_pack_line", "checks": ["unequal_weights", "null_and_missing", "zero_denominator", "all_null", "empty"]}
+{"category": "path", "subtype": "grouped", "scenario": "sc19_intralog", "checks": ["schema", "exact_structure"]}
+{"category": "py_weighted", "subtype": "quality", "scenario": "sc19_intralog", "checks": ["unequal_weights", "null_and_missing", "zero_denominator", "all_null", "empty"]}
+{"category": "path", "subtype": "dag", "scenario": "sc19_intralog", "checks": ["schema", "exact_structure"]}
+{"category": "missing_info", "subtype": "5", "scenario": "sc18_pack_line", "checks": ["specific_missing_information", "no_executable_artifact"]}
+{"category": "py_merge", "subtype": "left_difference", "scenario": "sc18_pack_line", "checks": ["duplicates_both_sides", "null_and_missing", "right_empty", "left_empty", "both_empty"]}
+{"category": "tool_calling", "subtype": "call", "scenario": "sc18_pack_line", "checks": ["structured_call", "call"]}
+{"category": "missing_info", "subtype": "6", "scenario": "sc19_intralog", "checks": ["specific_missing_information", "no_executable_artifact"]}
+{"category": "forbidden", "subtype": "5", "scenario": "sc19_intralog", "checks": ["refusal", "no_executable_artifact"]}
+{"category": "sql", "subtype": "count", "scenario": "sc19_intralog", "checks": ["outside_range", "no_events", "null_metric", "exact_aggregate"]}
+{"category": "template", "subtype": "bar", "scenario": "sc18_pack_line", "checks": ["schema", "anchors", "binding"]}
+{"category": "tool_calling", "subtype": "call", "scenario": "sc18_pack_line", "checks": ["structured_call", "call"]}
+{"category": "py_fix", "subtype": "unsupported_comprehension", "scenario": "sc19_intralog", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "py_weighted", "subtype": "availability", "scenario": "sc19_intralog", "checks": ["unequal_weights", "null_and_missing", "zero_denominator", "all_null", "empty"]}
+{"category": "missing_info", "subtype": "2", "scenario": "sc19_intralog", "checks": ["specific_missing_information", "no_executable_artifact"]}
+{"category": "py_basic", "subtype": "group", "scenario": "sc18_pack_line", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "py_merge", "subtype": "left_difference", "scenario": "sc19_intralog", "checks": ["duplicates_both_sides", "null_and_missing", "right_empty", "left_empty", "both_empty"]}
+{"category": "py_fix", "subtype": "zero_division", "scenario": "sc19_intralog", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "tool_calling", "subtype": "call", "scenario": "sc19_intralog", "checks": ["structured_call", "call"]}
+{"category": "py_fix", "subtype": "zero_division", "scenario": "sc18_pack_line", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "sql", "subtype": "sum", "scenario": "sc18_pack_line", "checks": ["outside_range", "no_events", "null_metric", "exact_aggregate"]}
+{"category": "sql", "subtype": "average", "scenario": "sc19_intralog", "checks": ["outside_range", "no_events", "null_metric", "exact_aggregate"]}
+{"category": "sql", "subtype": "average", "scenario": "sc19_intralog", "checks": ["outside_range", "no_events", "null_metric", "exact_aggregate"]}
+{"category": "py_basic", "subtype": "sum", "scenario": "sc18_pack_line", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "tool_calling", "subtype": "call", "scenario": "sc19_intralog", "checks": ["structured_call", "call"]}
+{"category": "py_merge", "subtype": "left_difference", "scenario": "sc18_pack_line", "checks": ["duplicates_both_sides", "null_and_missing", "right_empty", "left_empty", "both_empty"]}
+{"category": "template", "subtype": "pie", "scenario": "sc18_pack_line", "checks": ["schema", "anchors", "binding"]}
+{"category": "sql", "subtype": "count", "scenario": "sc18_pack_line", "checks": ["outside_range", "no_events", "null_metric", "exact_aggregate"]}
+{"category": "py_merge", "subtype": "left_difference", "scenario": "sc18_pack_line", "checks": ["duplicates_both_sides", "null_and_missing", "right_empty", "left_empty", "both_empty"]}
+{"category": "py_merge", "subtype": "full_difference", "scenario": "sc18_pack_line", "checks": ["duplicates_both_sides", "null_and_missing", "right_empty", "left_empty", "both_empty"]}
+{"category": "template", "subtype": "area", "scenario": "sc19_intralog", "checks": ["schema", "anchors", "binding"]}
+{"category": "py_weighted", "subtype": "quality", "scenario": "sc18_pack_line", "checks": ["unequal_weights", "null_and_missing", "zero_denominator", "all_null", "empty"]}
+{"category": "path", "subtype": "binary_tree", "scenario": "sc19_intralog", "checks": ["schema", "exact_structure"]}
+{"category": "py_merge", "subtype": "full_difference", "scenario": "sc19_intralog", "checks": ["duplicates_both_sides", "null_and_missing", "right_empty", "left_empty", "both_empty"]}
+{"category": "forbidden", "subtype": "7", "scenario": "sc19_intralog", "checks": ["refusal", "no_executable_artifact"]}
+{"category": "path", "subtype": "binary_tree", "scenario": "sc18_pack_line", "checks": ["schema", "exact_structure"]}
+{"category": "tool_calling", "subtype": "roundtrip", "scenario": "sc18_pack_line", "checks": ["structured_call", "roundtrip"]}
+{"category": "py_merge", "subtype": "full_difference", "scenario": "sc19_intralog", "checks": ["duplicates_both_sides", "null_and_missing", "right_empty", "left_empty", "both_empty"]}
+{"category": "sql", "subtype": "count", "scenario": "sc19_intralog", "checks": ["outside_range", "no_events", "null_metric", "exact_aggregate"]}
+{"category": "template", "subtype": "line", "scenario": "sc18_pack_line", "checks": ["schema", "anchors", "binding"]}
+{"category": "py_merge", "subtype": "full_difference", "scenario": "sc19_intralog", "checks": ["duplicates_both_sides", "null_and_missing", "right_empty", "left_empty", "both_empty"]}
+{"category": "forbidden", "subtype": "24", "scenario": "sc18_pack_line", "checks": ["refusal", "no_executable_artifact"]}
+{"category": "template", "subtype": "area", "scenario": "sc18_pack_line", "checks": ["schema", "anchors", "binding"]}
+{"category": "py_merge", "subtype": "left_difference", "scenario": "sc18_pack_line", "checks": ["duplicates_both_sides", "null_and_missing", "right_empty", "left_empty", "both_empty"]}
+{"category": "sql", "subtype": "average", "scenario": "sc18_pack_line", "checks": ["outside_range", "no_events", "null_metric", "exact_aggregate"]}
+{"category": "sql", "subtype": "count", "scenario": "sc18_pack_line", "checks": ["outside_range", "no_events", "null_metric", "exact_aggregate"]}
+{"category": "path", "subtype": "tree", "scenario": "sc19_intralog", "checks": ["schema", "exact_structure"]}
+{"category": "tool_calling", "subtype": "call", "scenario": "sc19_intralog", "checks": ["structured_call", "call"]}
+{"category": "missing_info", "subtype": "1", "scenario": "sc18_pack_line", "checks": ["specific_missing_information", "no_executable_artifact"]}
+{"category": "template", "subtype": "area", "scenario": "sc18_pack_line", "checks": ["schema", "anchors", "binding"]}
+{"category": "template", "subtype": "pie", "scenario": "sc19_intralog", "checks": ["schema", "anchors", "binding"]}
+{"category": "sql", "subtype": "average", "scenario": "sc19_intralog", "checks": ["outside_range", "no_events", "null_metric", "exact_aggregate"]}
+{"category": "forbidden", "subtype": "22", "scenario": "sc19_intralog", "checks": ["refusal", "no_executable_artifact"]}
+{"category": "sql", "subtype": "count", "scenario": "sc19_intralog", "checks": ["outside_range", "no_events", "null_metric", "exact_aggregate"]}
+{"category": "sql", "subtype": "sum", "scenario": "sc18_pack_line", "checks": ["outside_range", "no_events", "null_metric", "exact_aggregate"]}
+{"category": "missing_info", "subtype": "3", "scenario": "sc19_intralog", "checks": ["specific_missing_information", "no_executable_artifact"]}
+{"category": "path", "subtype": "binary_tree", "scenario": "sc19_intralog", "checks": ["schema", "exact_structure"]}
+{"category": "py_basic", "subtype": "group", "scenario": "sc19_intralog", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "missing_info", "subtype": "6", "scenario": "sc18_pack_line", "checks": ["specific_missing_information", "no_executable_artifact"]}
+{"category": "template", "subtype": "bar", "scenario": "sc19_intralog", "checks": ["schema", "anchors", "binding"]}
+{"category": "sql", "subtype": "sum", "scenario": "sc18_pack_line", "checks": ["outside_range", "no_events", "null_metric", "exact_aggregate"]}
+{"category": "missing_info", "subtype": "7", "scenario": "sc19_intralog", "checks": ["specific_missing_information", "no_executable_artifact"]}
+{"category": "py_basic", "subtype": "group", "scenario": "sc18_pack_line", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "missing_info", "subtype": "0", "scenario": "sc18_pack_line", "checks": ["specific_missing_information", "no_executable_artifact"]}
+{"category": "forbidden", "subtype": "17", "scenario": "sc19_intralog", "checks": ["refusal", "no_executable_artifact"]}
+{"category": "py_fix", "subtype": "unsupported_comprehension", "scenario": "sc18_pack_line", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "py_fix", "subtype": "unsupported_comprehension", "scenario": "sc19_intralog", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "forbidden", "subtype": "1", "scenario": "sc18_pack_line", "checks": ["refusal", "no_executable_artifact"]}
+{"category": "py_weighted", "subtype": "quality", "scenario": "sc19_intralog", "checks": ["unequal_weights", "null_and_missing", "zero_denominator", "all_null", "empty"]}
+{"category": "py_fix", "subtype": "unsupported_comprehension", "scenario": "sc18_pack_line", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "sql", "subtype": "average", "scenario": "sc19_intralog", "checks": ["outside_range", "no_events", "null_metric", "exact_aggregate"]}
+{"category": "path", "subtype": "grouped", "scenario": "sc19_intralog", "checks": ["schema", "exact_structure"]}
+{"category": "py_fix", "subtype": "zero_division", "scenario": "sc19_intralog", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "py_merge", "subtype": "full_difference", "scenario": "sc18_pack_line", "checks": ["duplicates_both_sides", "null_and_missing", "right_empty", "left_empty", "both_empty"]}
+{"category": "template", "subtype": "area", "scenario": "sc18_pack_line", "checks": ["schema", "anchors", "binding"]}
+{"category": "forbidden", "subtype": "16", "scenario": "sc19_intralog", "checks": ["refusal", "no_executable_artifact"]}
+{"category": "py_fix", "subtype": "null_arithmetic", "scenario": "sc19_intralog", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "py_fix", "subtype": "zero_division", "scenario": "sc18_pack_line", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "sql", "subtype": "average", "scenario": "sc18_pack_line", "checks": ["outside_range", "no_events", "null_metric", "exact_aggregate"]}
+{"category": "py_weighted", "subtype": "availability", "scenario": "sc18_pack_line", "checks": ["unequal_weights", "null_and_missing", "zero_denominator", "all_null", "empty"]}
+{"category": "template", "subtype": "pie", "scenario": "sc18_pack_line", "checks": ["schema", "anchors", "binding"]}
+{"category": "forbidden", "subtype": "11", "scenario": "sc19_intralog", "checks": ["refusal", "no_executable_artifact"]}
+{"category": "missing_info", "subtype": "9", "scenario": "sc18_pack_line", "checks": ["specific_missing_information", "no_executable_artifact"]}
+{"category": "tool_calling", "subtype": "roundtrip", "scenario": "sc19_intralog", "checks": ["structured_call", "roundtrip"]}
+{"category": "py_fix", "subtype": "zero_division", "scenario": "sc18_pack_line", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "path", "subtype": "grouped", "scenario": "sc18_pack_line", "checks": ["schema", "exact_structure"]}
+{"category": "tool_calling", "subtype": "call", "scenario": "sc19_intralog", "checks": ["structured_call", "call"]}
+{"category": "missing_info", "subtype": "3", "scenario": "sc18_pack_line", "checks": ["specific_missing_information", "no_executable_artifact"]}
+{"category": "forbidden", "subtype": "2", "scenario": "sc18_pack_line", "checks": ["refusal", "no_executable_artifact"]}
+{"category": "path", "subtype": "grouped", "scenario": "sc19_intralog", "checks": ["schema", "exact_structure"]}
+{"category": "path", "subtype": "binary_tree", "scenario": "sc18_pack_line", "checks": ["schema", "exact_structure"]}
+{"category": "py_merge", "subtype": "full_difference", "scenario": "sc19_intralog", "checks": ["duplicates_both_sides", "null_and_missing", "right_empty", "left_empty", "both_empty"]}
+{"category": "sql", "subtype": "count", "scenario": "sc19_intralog", "checks": ["outside_range", "no_events", "null_metric", "exact_aggregate"]}
+{"category": "py_basic", "subtype": "filter", "scenario": "sc18_pack_line", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "tool_calling", "subtype": "roundtrip", "scenario": "sc19_intralog", "checks": ["structured_call", "roundtrip"]}
+{"category": "py_merge", "subtype": "full_difference", "scenario": "sc19_intralog", "checks": ["duplicates_both_sides", "null_and_missing", "right_empty", "left_empty", "both_empty"]}
+{"category": "template", "subtype": "bar", "scenario": "sc18_pack_line", "checks": ["schema", "anchors", "binding"]}
+{"category": "missing_info", "subtype": "7", "scenario": "sc18_pack_line", "checks": ["specific_missing_information", "no_executable_artifact"]}
+{"category": "path", "subtype": "sequence", "scenario": "sc18_pack_line", "checks": ["schema", "exact_structure"]}
+{"category": "sql", "subtype": "sum", "scenario": "sc18_pack_line", "checks": ["outside_range", "no_events", "null_metric", "exact_aggregate"]}
+{"category": "py_basic", "subtype": "average", "scenario": "sc19_intralog", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "tool_calling", "subtype": "roundtrip", "scenario": "sc18_pack_line", "checks": ["structured_call", "roundtrip"]}
+{"category": "py_weighted", "subtype": "scrap", "scenario": "sc19_intralog", "checks": ["unequal_weights", "null_and_missing", "zero_denominator", "all_null", "empty"]}
+{"category": "tool_calling", "subtype": "roundtrip", "scenario": "sc18_pack_line", "checks": ["structured_call", "roundtrip"]}
+{"category": "py_basic", "subtype": "range", "scenario": "sc19_intralog", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "forbidden", "subtype": "15", "scenario": "sc18_pack_line", "checks": ["refusal", "no_executable_artifact"]}
+{"category": "py_weighted", "subtype": "availability", "scenario": "sc18_pack_line", "checks": ["unequal_weights", "null_and_missing", "zero_denominator", "all_null", "empty"]}
+{"category": "path", "subtype": "sequence", "scenario": "sc19_intralog", "checks": ["schema", "exact_structure"]}
+{"category": "sql", "subtype": "sum", "scenario": "sc19_intralog", "checks": ["outside_range", "no_events", "null_metric", "exact_aggregate"]}
+{"category": "py_basic", "subtype": "group", "scenario": "sc19_intralog", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "py_merge", "subtype": "full_difference", "scenario": "sc18_pack_line", "checks": ["duplicates_both_sides", "null_and_missing", "right_empty", "left_empty", "both_empty"]}
+{"category": "sql", "subtype": "average", "scenario": "sc18_pack_line", "checks": ["outside_range", "no_events", "null_metric", "exact_aggregate"]}
+{"category": "py_basic", "subtype": "filter", "scenario": "sc19_intralog", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "path", "subtype": "tree", "scenario": "sc18_pack_line", "checks": ["schema", "exact_structure"]}
+{"category": "sql", "subtype": "sum", "scenario": "sc18_pack_line", "checks": ["outside_range", "no_events", "null_metric", "exact_aggregate"]}
+{"category": "sql", "subtype": "average", "scenario": "sc18_pack_line", "checks": ["outside_range", "no_events", "null_metric", "exact_aggregate"]}
+{"category": "template", "subtype": "area", "scenario": "sc19_intralog", "checks": ["schema", "anchors", "binding"]}
+{"category": "py_basic", "subtype": "group", "scenario": "sc18_pack_line", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "py_basic", "subtype": "filter", "scenario": "sc19_intralog", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "py_weighted", "subtype": "scrap", "scenario": "sc18_pack_line", "checks": ["unequal_weights", "null_and_missing", "zero_denominator", "all_null", "empty"]}
+{"category": "sql", "subtype": "count", "scenario": "sc19_intralog", "checks": ["outside_range", "no_events", "null_metric", "exact_aggregate"]}
+{"category": "py_basic", "subtype": "range", "scenario": "sc19_intralog", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "path", "subtype": "sequence", "scenario": "sc18_pack_line", "checks": ["schema", "exact_structure"]}
+{"category": "path", "subtype": "tree", "scenario": "sc18_pack_line", "checks": ["schema", "exact_structure"]}
+{"category": "tool_calling", "subtype": "call", "scenario": "sc18_pack_line", "checks": ["structured_call", "call"]}
+{"category": "forbidden", "subtype": "18", "scenario": "sc18_pack_line", "checks": ["refusal", "no_executable_artifact"]}
+{"category": "py_merge", "subtype": "left_difference", "scenario": "sc19_intralog", "checks": ["duplicates_both_sides", "null_and_missing", "right_empty", "left_empty", "both_empty"]}
+{"category": "py_fix", "subtype": "unsupported_comprehension", "scenario": "sc18_pack_line", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "template", "subtype": "bar", "scenario": "sc18_pack_line", "checks": ["schema", "anchors", "binding"]}
+{"category": "py_weighted", "subtype": "scrap", "scenario": "sc18_pack_line", "checks": ["unequal_weights", "null_and_missing", "zero_denominator", "all_null", "empty"]}
+{"category": "forbidden", "subtype": "12", "scenario": "sc19_intralog", "checks": ["refusal", "no_executable_artifact"]}
+{"category": "py_basic", "subtype": "filter", "scenario": "sc18_pack_line", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "sql", "subtype": "average", "scenario": "sc18_pack_line", "checks": ["outside_range", "no_events", "null_metric", "exact_aggregate"]}
+{"category": "template", "subtype": "area", "scenario": "sc19_intralog", "checks": ["schema", "anchors", "binding"]}
+{"category": "py_basic", "subtype": "sum", "scenario": "sc19_intralog", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "path", "subtype": "sequence", "scenario": "sc18_pack_line", "checks": ["schema", "exact_structure"]}
+{"category": "template", "subtype": "line", "scenario": "sc18_pack_line", "checks": ["schema", "anchors", "binding"]}
+{"category": "sql", "subtype": "count", "scenario": "sc19_intralog", "checks": ["outside_range", "no_events", "null_metric", "exact_aggregate"]}
+{"category": "path", "subtype": "dag", "scenario": "sc19_intralog", "checks": ["schema", "exact_structure"]}
+{"category": "py_fix", "subtype": "null_arithmetic", "scenario": "sc18_pack_line", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "sql", "subtype": "sum", "scenario": "sc19_intralog", "checks": ["outside_range", "no_events", "null_metric", "exact_aggregate"]}
+{"category": "path", "subtype": "sequence", "scenario": "sc19_intralog", "checks": ["schema", "exact_structure"]}
+{"category": "py_merge", "subtype": "full_difference", "scenario": "sc18_pack_line", "checks": ["duplicates_both_sides", "null_and_missing", "right_empty", "left_empty", "both_empty"]}
+{"category": "path", "subtype": "tree", "scenario": "sc19_intralog", "checks": ["schema", "exact_structure"]}
+{"category": "py_weighted", "subtype": "quality", "scenario": "sc18_pack_line", "checks": ["unequal_weights", "null_and_missing", "zero_denominator", "all_null", "empty"]}
+{"category": "py_weighted", "subtype": "quality", "scenario": "sc19_intralog", "checks": ["unequal_weights", "null_and_missing", "zero_denominator", "all_null", "empty"]}
+{"category": "template", "subtype": "pie", "scenario": "sc19_intralog", "checks": ["schema", "anchors", "binding"]}
+{"category": "py_merge", "subtype": "left_difference", "scenario": "sc19_intralog", "checks": ["duplicates_both_sides", "null_and_missing", "right_empty", "left_empty", "both_empty"]}
+{"category": "py_basic", "subtype": "average", "scenario": "sc19_intralog", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "py_weighted", "subtype": "quality", "scenario": "sc18_pack_line", "checks": ["unequal_weights", "null_and_missing", "zero_denominator", "all_null", "empty"]}
+{"category": "path", "subtype": "dag", "scenario": "sc18_pack_line", "checks": ["schema", "exact_structure"]}
+{"category": "tool_calling", "subtype": "roundtrip", "scenario": "sc19_intralog", "checks": ["structured_call", "roundtrip"]}

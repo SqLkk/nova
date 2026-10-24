@@ -595,6 +595,9 @@ class ExcelTemplateEngine:
             ws = wb.create_sheet(title=title)
             self._render_sheet_from_model(ws, sheet_model, query_results, builtins)
 
+        if not wb.sheetnames:
+            wb.create_sheet(title="Sheet")
+
         buffer = BytesIO()
         wb.save(buffer)
         buffer.seek(0)
@@ -653,6 +656,7 @@ class ExcelTemplateEngine:
                 start_row = int(rng["startRow"])
                 end_row = int(rng["endRow"])
                 tmpl_h = end_row - start_row + 1
+                fmap = band.get("fieldMap") or {}
                 rows = (query_results.get(band.get("queryId")) or {}).get("rows") or []
                 items = rows if rows else [{}]  # boşsa şablon satırı bir kez (boş) yaz
                 for item_idx, item in enumerate(items):
@@ -661,6 +665,17 @@ class ExcelTemplateEngine:
                         target_row = next_final + item_idx * tmpl_h + offset
                         for col in range(1, col_count + 1):
                             cell = cells.get(f"{orig_row},{col}")
+                            mapped_field = fmap.get(str(col)) or fmap.get(col)
+                            if not cell and mapped_field and offset == 0:
+                                cell = {
+                                    "row": orig_row,
+                                    "col": col,
+                                    "binding": {
+                                        "kind": "query_field",
+                                        "queryId": band.get("queryId"),
+                                        "field": mapped_field,
+                                    },
+                                }
                             if cell:
                                 self._write_model_cell(
                                     ws, cell, item if rows else None,
@@ -694,8 +709,8 @@ class ExcelTemplateEngine:
             ws.merge_cells(start_row=fr1, start_column=c1, end_row=fr2, end_column=c2)
 
         for chart in sheet.get("charts") or []:
-            self._place_model_chart(ws, chart, query_results, chart_scratch_col + chart_index * 2)
-            chart_index += 1
+            used_cols = self._place_model_chart(ws, chart, query_results, chart_scratch_col + chart_index * 6)
+            chart_index += max(1, used_cols)
 
     def _resolve_model_value(self, cell, item, query_results, builtins):
         binding = cell.get("binding")
@@ -714,7 +729,183 @@ class ExcelTemplateEngine:
             if kind == "summary":
                 rows = (query_results.get(binding.get("queryId")) or {}).get("rows") or []
                 return _compute_summary(rows, binding.get("field") or "", binding.get("operation", "COUNT"))
-        return cell.get("value", "")
+        raw_val = cell.get("value", "")
+        if isinstance(raw_val, str) and "{{" in raw_val:
+            ctx = dict(builtins or {})
+            if isinstance(item, dict):
+                ctx.update(item)
+            return self._resolve_cell_value(raw_val, ctx)
+        return raw_val
+
+    def evaluate_model_preview(
+        self,
+        model: Dict[str, Any],
+        query_results: Dict[str, Dict[str, Any]],
+        max_band_rows: int = 100,
+    ) -> Dict[str, Any]:
+        """
+        Şablon modelini canlı sorgu/script sonuçlarıyla bellekte değerlendirir
+        ve tarayıcıda (Template Builder Canlı Önizleme) doğrudan gösterilebilecek
+        genişletilmiş hücre/satır/grafik yapısını döndürür.
+        """
+        report_meta = {
+            "report_name": model.get("name", ""),
+            "report_id": model.get("id", ""),
+            "report_type": "template",
+        }
+        builtins = self._builtin_values(report_meta)
+        evaluated_sheets = []
+
+        for sheet in model.get("sheets", []):
+            cells = sheet.get("cells") or {}
+            col_count = int(sheet.get("columnCount", 12))
+            row_count = int(sheet.get("rowCount", 40))
+            bands = sheet.get("bands") or []
+            band_by_start = {int(b["range"]["startRow"]): b for b in bands if b.get("range", {}).get("startRow")}
+
+            out_cells: Dict[str, Any] = {}
+            orig_to_final: Dict[int, int] = {}
+            band_ranges = []
+
+            next_final = 1
+            r = 1
+            while r <= row_count:
+                if r in band_by_start:
+                    band = band_by_start[r]
+                    rng = band["range"]
+                    start_row = int(rng["startRow"])
+                    end_row = int(rng.get("endRow") or start_row)
+                    tmpl_h = max(1, end_row - start_row + 1)
+                    fmap = band.get("fieldMap") or {}
+                    qid = band.get("queryId") or ""
+                    all_rows = (query_results.get(qid) or {}).get("rows") or []
+                    rows = all_rows[:max_band_rows]
+                    items = rows if rows else [{}]
+                    band_out_start = next_final
+
+                    for item_idx, item in enumerate(items):
+                        for offset in range(tmpl_h):
+                            orig_row = start_row + offset
+                            target_row = next_final + item_idx * tmpl_h + offset
+                            for col in range(1, col_count + 1):
+                                cell = cells.get(f"{orig_row},{col}")
+                                mapped_field = fmap.get(str(col)) or fmap.get(col)
+                                if not cell and mapped_field and offset == 0:
+                                    cell = {
+                                        "row": orig_row,
+                                        "col": col,
+                                        "binding": {
+                                            "kind": "query_field",
+                                            "queryId": qid,
+                                            "field": mapped_field,
+                                        },
+                                    }
+                                if cell:
+                                    val = self._resolve_model_value(
+                                        cell, item if rows else None, query_results, builtins
+                                    )
+                                    out_cells[f"{target_row},{col}"] = {
+                                        "row": target_row,
+                                        "col": col,
+                                        "value": "" if val is None else val,
+                                        "style": cell.get("style"),
+                                        "numberFormat": cell.get("numberFormat"),
+                                        "isBandRow": True,
+                                        "bandQueryId": qid,
+                                    }
+                    span_rows = tmpl_h * (len(rows) if rows else 1)
+                    band_ranges.append({
+                        "id": band.get("id", "band"),
+                        "queryId": qid,
+                        "startRow": band_out_start,
+                        "endRow": band_out_start + span_rows - 1,
+                        "totalQueryRows": len(all_rows),
+                        "displayedRows": len(rows),
+                    })
+                    next_final += span_rows
+                    r = end_row + 1
+                else:
+                    orig_to_final[r] = next_final
+                    for col in range(1, col_count + 1):
+                        cell = cells.get(f"{r},{col}")
+                        if cell:
+                            val = self._resolve_model_value(cell, None, query_results, builtins)
+                            out_cell = {
+                                "row": next_final,
+                                "col": col,
+                                "value": "" if val is None else val,
+                                "style": cell.get("style"),
+                                "numberFormat": cell.get("numberFormat"),
+                            }
+                            if cell.get("binding"):
+                                out_cell["bindingKind"] = cell["binding"].get("kind")
+                            out_cells[f"{next_final},{col}"] = out_cell
+                    next_final += 1
+                    r += 1
+
+            # Merge anchor'ları yeni satır numaralarına göre güncelle
+            for orig_key, cell in cells.items():
+                anchor = cell.get("mergeAnchor")
+                if not anchor:
+                    continue
+                try:
+                    r1, c1, r2, c2 = (int(x) for x in str(anchor).split(","))
+                except (ValueError, AttributeError):
+                    continue
+                fr1 = orig_to_final.get(r1)
+                fr2 = orig_to_final.get(r2)
+                if fr1 is not None and fr2 is not None:
+                    target_cell = out_cells.get(f"{fr1},{c1}")
+                    if target_cell:
+                        target_cell["mergeAnchor"] = f"{fr1},{c1},{fr2},{c2}"
+
+            # Grafik önizleme verilerini hazırla
+            eval_charts = []
+            for ch in sheet.get("charts") or []:
+                qid = ch.get("queryId") or ""
+                c_rows = (query_results.get(qid) or {}).get("rows") or []
+                keys = list(c_rows[0].keys()) if c_rows else []
+                x_key = ch.get("xAxis") if ch.get("xAxis") in keys else (keys[0] if keys else "")
+                raw_y = ch.get("yAxis") or []
+                y_keys = [k for k in (raw_y if isinstance(raw_y, list) else [raw_y]) if k in keys]
+                if not y_keys and keys:
+                    y_keys = [keys[-1]]
+                sample_rows = c_rows[:25]
+                labels = [str(row.get(x_key, "")) for row in sample_rows] if x_key else []
+                series = []
+                for yk in y_keys:
+                    pts = []
+                    for row in sample_rows:
+                        rv = row.get(yk)
+                        try:
+                            pts.append(round(float(rv), 2) if rv is not None else 0)
+                        except (ValueError, TypeError):
+                            pts.append(0)
+                    series.append({"name": yk, "values": pts})
+                eval_charts.append({
+                    **ch,
+                    "labels": labels,
+                    "series": series,
+                    "rowCount": len(c_rows),
+                })
+
+            evaluated_sheets.append({
+                "id": sheet.get("id", "s1"),
+                "name": sheet.get("name", "Sheet1"),
+                "rowCount": max(next_final - 1, 20),
+                "columnCount": col_count,
+                "columnWidths": sheet.get("columnWidths") or {},
+                "rowHeights": sheet.get("rowHeights") or {},
+                "cells": out_cells,
+                "bandRanges": band_ranges,
+                "charts": eval_charts,
+            })
+
+        return {
+            "name": model.get("name", ""),
+            "evaluatedAt": builtins["report_datetime"],
+            "sheets": evaluated_sheets,
+        }
 
     def _write_model_cell(self, ws, cell, item, query_results, builtins, target_row, target_col):
         value = self._resolve_model_value(cell, item, query_results, builtins)
@@ -765,23 +956,30 @@ class ExcelTemplateEngine:
 
         rows = (query_results.get(chart.get("queryId")) or {}).get("rows") or []
         if len(rows) < 2:
-            return
+            return 1
         keys = list(rows[0].keys())
         if not keys:
-            return
+            return 1
         cat_key = chart.get("xAxis") or keys[0]
-        val_key = (chart.get("yAxis") or [None])[0] or (keys[1] if len(keys) > 1 else keys[0])
+        raw_y = chart.get("yAxis") or []
+        y_keys = [k for k in (raw_y if isinstance(raw_y, list) else [raw_y]) if k and k in keys]
+        if not y_keys:
+            y_keys = [keys[1] if len(keys) > 1 else keys[0]]
+        if chart.get("type") == "pie":
+            y_keys = y_keys[:1]
 
         ws.cell(row=1, column=scratch_col, value=chart.get("title") or cat_key)
-        ws.cell(row=1, column=scratch_col + 1, value=val_key)
+        for idx, vk in enumerate(y_keys):
+            ws.cell(row=1, column=scratch_col + 1 + idx, value=vk)
         start = 2
         for i, row in enumerate(rows):
             ws.cell(row=start + i, column=scratch_col, value=row.get(cat_key))
-            v = row.get(val_key)
-            try:
-                ws.cell(row=start + i, column=scratch_col + 1, value=float(v))
-            except (TypeError, ValueError):
-                ws.cell(row=start + i, column=scratch_col + 1, value=v)
+            for idx, vk in enumerate(y_keys):
+                v = row.get(vk)
+                try:
+                    ws.cell(row=start + i, column=scratch_col + 1 + idx, value=float(v) if v is not None else 0.0)
+                except (TypeError, ValueError):
+                    ws.cell(row=start + i, column=scratch_col + 1 + idx, value=v)
         end = start + len(rows) - 1
 
         chart_cls = {"bar": BarChart, "line": LineChart, "pie": PieChart}.get(
@@ -789,7 +987,7 @@ class ExcelTemplateEngine:
         )
         ch = chart_cls()
         ch.title = chart.get("title") or chart.get("type", "chart")
-        data_ref = Reference(ws, min_col=scratch_col + 1, min_row=1, max_row=end)
+        data_ref = Reference(ws, min_col=scratch_col + 1, max_col=scratch_col + len(y_keys), min_row=1, max_row=end)
         cats_ref = Reference(ws, min_col=scratch_col, min_row=start, max_row=end)
         ch.add_data(data_ref, titles_from_data=True)
         ch.set_categories(cats_ref)
@@ -798,6 +996,7 @@ class ExcelTemplateEngine:
         col = int(anchor.get("col", 1))
         row = int(anchor.get("row", 1))
         ws.add_chart(ch, f"{get_column_letter(col)}{row}")
+        return 1
 
 
 # ──────────────────────────────────────────────────────────
@@ -806,10 +1005,30 @@ class ExcelTemplateEngine:
 
 def _compute_summary(rows: List[Dict], column: str, operation: str) -> Any:
     """Compute a summary operation on a list of row dicts."""
+    if not rows:
+        return 0
+    op = (operation or 'COUNT').upper()
+    if op == 'COUNT':
+        if not column or column == '*':
+            return len(rows)
+        return sum(1 for r in rows if r.get(column) is not None and str(r.get(column)) != '')
+    if op == 'FIRST':
+        for r in rows:
+            v = r.get(column)
+            if v is not None and str(v) != '':
+                return v
+        return ''
+    if op == 'LAST':
+        for r in reversed(rows):
+            v = r.get(column)
+            if v is not None and str(v) != '':
+                return v
+        return ''
+
     values = []
     for row in rows:
         v = row.get(column)
-        if isinstance(v, (int, float)):
+        if isinstance(v, (int, float)) and not isinstance(v, bool):
             values.append(float(v))
         elif v is not None:
             try:
@@ -825,7 +1044,6 @@ def _compute_summary(rows: List[Dict], column: str, operation: str) -> Any:
         'AVG': lambda vs: sum(vs) / len(vs),
         'MIN': lambda vs: min(vs),
         'MAX': lambda vs: max(vs),
-        'COUNT': lambda vs: len(vs),
     }
     try:
         import statistics
@@ -835,6 +1053,6 @@ def _compute_summary(rows: List[Dict], column: str, operation: str) -> Any:
     except ImportError:
         pass
 
-    fn = ops.get(operation.upper(), lambda vs: len(vs))
+    fn = ops.get(op, lambda vs: len(vs))
     result = fn(values)
-    return round(result, 4) if isinstance(result, float) else result
+    return round(result, 2) if isinstance(result, float) else result

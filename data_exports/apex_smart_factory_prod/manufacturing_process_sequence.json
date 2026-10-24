@@ -77,7 +77,7 @@
     "next_step_id": "PRC-STEP-080",
     "step_name": "Hairpin Copper Winding & Impregnation",
     "assigned_line_id": "LINE-STG-CNC-01",
-    "workstation_name": "MCH-SIEMENS-HAIRPIN",
+    "workstation_name": "MCH-APEX-HAIRPIN",
     "std_cycle_time_sec": 52.0,
     "quality_gate_required": 1,
     "target_tolerance_um": 8.0,

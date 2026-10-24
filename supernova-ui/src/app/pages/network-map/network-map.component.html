@@ -1,9 +1,9 @@
 <!-- ============================================================================ -->
-<!-- Space Map — sade, otomatik, path-definer beslemeli hiyerarşi görselleştirmesi -->
+<!-- Space Map — Çoklu Harita, Fabrika/SCADA/Kozmik Tema, Canlı Rapor & Sorgu Bağlantılı -->
 <!-- ============================================================================ -->
 <div class="space-map" [class.loading]="isLoading">
 
-  <!-- ===================== TOPBAR (tek satır) ===================== -->
+  <!-- ===================== TOPBAR ===================== -->
   <header class="sm-topbar">
     <div class="sm-brand">
       <div class="sm-brand-icon">
@@ -26,6 +26,7 @@
       <ul class="sm-search-results" *ngIf="searchResults.length">
         <li *ngFor="let r of searchResults" (click)="focusSearchResult(r)">
           <span class="lvl">L{{ r.depth + 1 }}</span>
+          <i class="fas" [ngClass]="getNodeIcon(r)" style="font-size: 0.75rem; color: #38bdf8;"></i>
           <span class="lbl">{{ r.label }}</span>
         </li>
       </ul>
@@ -33,7 +34,7 @@
     </div>
 
     <!-- DB seçimi -->
-    <label class="sm-field">
+    <label class="sm-field" title="Veri Kaynağı (Veritabanı)">
       <i class="fas fa-database"></i>
       <select [(ngModel)]="selectedDataSourceId" (ngModelChange)="onDataSourceChange()">
         <option [ngValue]="null">{{ 'NETWORK_MAP.SELECT_DATASOURCE' | translate }}</option>
@@ -42,7 +43,7 @@
     </label>
 
     <!-- Path seçimi -->
-    <label class="sm-field">
+    <label class="sm-field" title="Aktif Space Map / Path Tanımı">
       <i class="fas fa-route"></i>
       <select [(ngModel)]="selectedPathId" (ngModelChange)="onSelectPath($event)">
         <option [ngValue]="null">{{ 'NETWORK_MAP.SELECT_PATH' | translate }}</option>
@@ -50,21 +51,128 @@
       </select>
     </label>
 
-    <button class="sm-icon-btn" *ngIf="canManage && selectedPathId" (click)="openThemeModal()"
-            [title]="'NETWORK_MAP.CONFIGURE_THEME' | translate">
-      <i class="fas fa-palette"></i>
-    </button>
+    <!-- Layout (Yerleşim) Hızlı Seçici -->
+    <div class="sm-layout-pills" *ngIf="selectedPathId">
+      <button
+        type="button"
+        class="sm-layout-pill"
+        *ngFor="let lay of availableLayouts"
+        [class.active]="layoutMode === lay.id"
+        (click)="setLayoutMode(lay.id)"
+        [title]="lay.label + ' — ' + lay.desc">
+        <i class="fas" [ngClass]="lay.icon"></i>
+        <span class="pill-lbl">{{ lay.label }}</span>
+      </button>
+    </div>
 
-    <button class="sm-icon-btn" *ngIf="canManage" (click)="goToPathDefiner()"
-            [title]="'NETWORK_MAP.GO_TO_PATH_DEFINER' | translate">
-      <i class="fas fa-route"></i>
-    </button>
+    <!-- Hızlı Bağlantı & Araç Butonları -->
+    <div class="sm-actions-group">
+      <button
+        type="button"
+        class="sm-action-chip"
+        (click)="openQueryViewerForNewMap()"
+        title="Query Viewer'dan SQL Sorgusu veya Python Scripti seçerek harita aç">
+        <i class="fas fa-search-plus"></i>
+        <span>Query Viewer</span>
+      </button>
 
-    <button class="sm-icon-btn" (click)="refresh()" [disabled]="!selectedPathId || isLoading"
-            [title]="'NETWORK_MAP.REFRESH' | translate">
-      <i class="fas fa-sync-alt" [class.spinning]="isLoading"></i>
-    </button>
+      <button
+        type="button"
+        class="sm-action-chip"
+        *ngIf="selectedPathId"
+        (click)="openSourceDataPreview()"
+        title="Bu haritayı besleyen canlı SQL / Python veri tablosunu incele">
+        <i class="fas fa-table"></i>
+        <span>Veriyi Gör</span>
+      </button>
+
+      <button
+        type="button"
+        class="sm-action-chip accent"
+        *ngIf="selectedPathId"
+        (click)="createReport(false)"
+        title="Bu Space Map verisiyle Template Builder'da canlı rapor şablonu oluştur">
+        <i class="fas fa-file-invoice"></i>
+        <span>Rapor Oluştur</span>
+      </button>
+
+      <button
+        type="button"
+        class="sm-icon-btn"
+        *ngIf="selectedPathId"
+        [disabled]="isExportingQuickReport"
+        (click)="quickExportReport('xlsx')"
+        title="Harita verisini anında Excel (.XLSX) olarak indir">
+        <i class="fas" [ngClass]="isExportingQuickReport ? 'fa-spinner spinning' : 'fa-file-excel'" style="color: #10b981;"></i>
+      </button>
+
+      <button
+        type="button"
+        class="sm-icon-btn"
+        *ngIf="selectedPathId"
+        (click)="openThemeModal()"
+        title="Harita Teması, Fabrika/Endüstriyel İkonlar ve Yerleşim Ayarları">
+        <i class="fas fa-palette" style="color: #f59e0b;"></i>
+      </button>
+
+      <button
+        type="button"
+        class="sm-icon-btn"
+        *ngIf="canManage"
+        (click)="goToPathDefiner()"
+        [title]="'NETWORK_MAP.GO_TO_PATH_DEFINER' | translate">
+        <i class="fas fa-project-diagram" style="color: #38bdf8;"></i>
+      </button>
+
+      <button
+        type="button"
+        class="sm-icon-btn"
+        (click)="refresh()"
+        [disabled]="!selectedPathId || isLoading"
+        [title]="'NETWORK_MAP.REFRESH' | translate">
+        <i class="fas fa-sync-alt" [class.spinning]="isLoading"></i>
+      </button>
+    </div>
   </header>
+
+  <!-- ===================== ÇOKLU SPACE MAP GEÇİŞ ŞERİDİ (MULTI-MAP BAR) ===================== -->
+  <nav class="sm-map-switcher" *ngIf="paths.length > 0">
+    <div class="sm-switcher-left">
+      <button
+        type="button"
+        class="sm-scope-toggle"
+        [class.active]="showAllMapsAcrossDbs"
+        (click)="toggleAllMapsAcrossDbs()"
+        title="Tüm veritabanlarındaki Space Map'leri listele veya sadece seçili DB'yi göster">
+        <i class="fas fa-globe-americas"></i>
+        <span>{{ showAllMapsAcrossDbs ? 'Tüm Haritalar (' + paths.length + ')' : 'DB Haritaları (' + filteredPaths.length + ')' }}</span>
+      </button>
+    </div>
+
+    <div class="sm-map-tabs">
+      <button
+        type="button"
+        class="sm-map-tab"
+        *ngFor="let p of filteredPaths"
+        [class.active]="p.id === selectedPathId"
+        (click)="onSelectPath(p.id)"
+        [title]="p.description || p.name">
+        <span class="tab-icon" [style.color]="getPathBadgeColor(p)">
+          <i class="fas" [ngClass]="getPathIcon(p)"></i>
+        </span>
+        <span class="tab-name">{{ p.name }}</span>
+        <span class="tab-badge py" *ngIf="isPythonPath(p)">PY</span>
+        <span class="tab-badge sql" *ngIf="!isPythonPath(p)">{{ p.structure === 'multi_level' ? 'N-LVL' : (p.structure === 'parent_child' ? 'TREE' : (p.structure === 'grouped' ? 'GRP' : 'DAG')) }}</span>
+      </button>
+    </div>
+
+    <div class="sm-switcher-right" *ngIf="canManage">
+      <button type="button" class="sm-add-map-btn" (click)="goToPathDefiner()" title="Path Definer ile yeni bir Space Map tanımla">
+        <i class="fas fa-plus"></i>
+        <span>Yeni Harita</span>
+      </button>
+    </div>
+  </nav>
 
   <!-- ===================== CANVAS ALANI ===================== -->
   <main class="sm-canvas-wrap" #mapContainer>
@@ -74,16 +182,39 @@
     <div class="sm-focus-chip" *ngIf="focusTitle && !isLoading && !error">
       <i class="fas fa-crosshairs"></i>
       <span>{{ focusTitle }}</span>
-      <button class="sm-up" *ngIf="focusId" (click)="navigateUp()" [title]="'NETWORK_MAP.UP' | translate">
+      <button class="sm-up" *ngIf="focusId" (click)="navigateUp()" title="Bir Üst Seviyeye Çık">
         <i class="fas fa-arrow-up"></i>
+      </button>
+      <button class="sm-up" *ngIf="focusId" (click)="focusId = null; rebuildRender(); fitView()" title="Kök Görünüme Dön">
+        <i class="fas fa-home"></i>
       </button>
     </div>
 
-    <!-- İstatistik çipi (sağ-üst) -->
+    <!-- İstatistik & Derinlik Çipi (sağ-üst) -->
     <div class="sm-stats-chip" *ngIf="totalNodes">
-      <span><i class="fas fa-sitemap"></i> {{ totalNodes }}</span>
+      <span title="Toplam Düğüm / Varlık Sayısı"><i class="fas fa-sitemap"></i> {{ totalNodes }} düğüm</span>
       <span class="dot">·</span>
-      <span><i class="fas fa-layer-group"></i> {{ maxDepth + 1 }}</span>
+      <span title="Maksimum Hiyerarşi Derinliği"><i class="fas fa-layer-group"></i> {{ maxDepth + 1 }} seviye</span>
+      <span class="dot">·</span>
+      <div class="sm-depth-selector" title="Aynı anda gösterilecek hiyerarşi derinliği">
+        <span>Derinlik:</span>
+        <button type="button" [class.active]="maxVisibleRings === 2" (click)="onMaxRingsChange(2)">2</button>
+        <button type="button" [class.active]="maxVisibleRings === 3" (click)="onMaxRingsChange(3)">3</button>
+        <button type="button" [class.active]="maxVisibleRings === 4" (click)="onMaxRingsChange(4)">4</button>
+        <button type="button" [class.active]="maxVisibleRings >= 6" (click)="onMaxRingsChange(6)">Tümü</button>
+      </div>
+    </div>
+
+    <!-- Sol-Alt: Aktif Tema & İkon Önizleme Rozeti -->
+    <div class="sm-theme-badge" *ngIf="totalNodes && !isLoading" (click)="openThemeModal()" title="Tema ve Fabrika/Varlık İkonlarını Değiştir">
+      <span class="theme-dot" [style.background]="themeConfig.color1"></span>
+      <i class="fas" [ngClass]="themeConfig.level1Icon"></i>
+      <i class="fas fa-chevron-right sep"></i>
+      <i class="fas" [ngClass]="themeConfig.level2Icon"></i>
+      <i class="fas fa-chevron-right sep"></i>
+      <i class="fas" [ngClass]="themeConfig.level3Icon"></i>
+      <span class="theme-lbl">{{ themeConfig.theme | uppercase }} · {{ layoutMode | uppercase }}</span>
+      <i class="fas fa-sliders-h edit-ic"></i>
     </div>
 
     <!-- Zoom kontrolleri (sağ-alt) -->
@@ -104,26 +235,41 @@
     <div class="sm-overlay sm-error" *ngIf="error && !isLoading">
       <i class="fas fa-exclamation-triangle"></i>
       <p>{{ error }}</p>
-      <button class="sm-btn" (click)="refresh()">{{ 'NETWORK_MAP.TRY_AGAIN' | translate }}</button>
+      <div style="display: flex; gap: 0.6rem; margin-top: 0.5rem;">
+        <button class="sm-btn" (click)="refresh()"><i class="fas fa-sync-alt"></i> {{ 'NETWORK_MAP.TRY_AGAIN' | translate }}</button>
+        <button class="sm-btn primary" (click)="goToPathDefiner()"><i class="fas fa-wrench"></i> Path Definer'da Düzenle</button>
+      </div>
     </div>
 
-    <!-- Boş durum: datasource seçili değil veya bu DB'de path yok -->
+    <!-- Boş durum -->
     <div class="sm-overlay sm-empty" *ngIf="!isLoading && !error && !totalNodes">
       <i class="fas fa-network-wired"></i>
       <p *ngIf="!selectedDataSourceId">{{ 'NETWORK_MAP.SELECT_DATASOURCE_HINT' | translate }}</p>
       <p *ngIf="selectedDataSourceId">{{ 'NETWORK_MAP.NO_PATH_FOR_DB' | translate }}</p>
-      <button class="sm-btn primary mt-3" *ngIf="selectedDataSourceId && canManage" (click)="goToPathDefiner()">
-        <i class="fas fa-plus"></i> {{ 'NETWORK_MAP.CREATE_PATH_NOW' | translate }}
-      </button>
+      <div style="display: flex; gap: 0.6rem; margin-top: 0.6rem;">
+        <button class="sm-btn primary" *ngIf="canManage" (click)="goToPathDefiner()">
+          <i class="fas fa-plus"></i> {{ 'NETWORK_MAP.CREATE_PATH_NOW' | translate }}
+        </button>
+        <button class="sm-btn" (click)="openQueryViewerForNewMap()">
+          <i class="fas fa-search"></i> Query Viewer'dan Seç
+        </button>
+      </div>
     </div>
   </main>
 
   <!-- ===================== DETAY PANELİ (sağ, slide-in) ===================== -->
   <aside class="sm-detail" *ngIf="selectedNode">
     <div class="sm-detail-head">
-      <span class="sm-level">{{ selectedLevelLabel }}</span>
-      <button class="sm-close" (click)="closeDetail()" title="×"><i class="fas fa-times"></i></button>
+      <div style="display: flex; align-items: center; gap: 0.4rem;">
+        <span class="sm-level">
+          <i class="fas" [ngClass]="getNodeIcon(selectedNode)" style="margin-right: 4px;"></i>
+          {{ selectedLevelLabel }}
+        </span>
+        <span class="sm-type-tag" *ngIf="selectedNode.type">{{ selectedNode.type }}</span>
+      </div>
+      <button class="sm-close" (click)="closeDetail()" title="Kapat"><i class="fas fa-times"></i></button>
     </div>
+
     <h2 class="sm-detail-title">{{ selectedNode.label }}</h2>
 
     <div class="sm-breadcrumb">
@@ -134,9 +280,31 @@
     </div>
 
     <div class="sm-detail-meta">
-      <div><span>{{ 'NETWORK_MAP.CHILDREN' | translate }}</span><strong>{{ selectedNode.children.length }}</strong></div>
-      <div><span>{{ 'NETWORK_MAP.LEAVES' | translate }}</span><strong>{{ selectedNode.leafCount }}</strong></div>
+      <div>
+        <span>{{ 'NETWORK_MAP.CHILDREN' | translate }}</span>
+        <strong>{{ selectedNode.children.length }}</strong>
+      </div>
+      <div>
+        <span>{{ 'NETWORK_MAP.LEAVES' | translate }}</span>
+        <strong>{{ selectedNode.leafCount }}</strong>
+      </div>
+      <div *ngIf="selectedNode.healthScore !== undefined">
+        <span>SKOR / OEE</span>
+        <strong [style.color]="selectedNode.healthScore >= 85 ? '#10b981' : (selectedNode.healthScore >= 65 ? '#f59e0b' : '#ef4444')">
+          %{{ selectedNode.healthScore | number:'1.0-1' }}
+        </strong>
+      </div>
     </div>
+
+    <!-- Alt Dallara Odaklan (Drill-down) -->
+    <button
+      type="button"
+      class="sm-btn drill-btn"
+      *ngIf="selectedNode.children.length > 0 && focusId !== selectedNode.id"
+      (click)="drillIntoSelected()">
+      <i class="fas fa-compress-arrows-alt"></i>
+      <span>Alt Dallara Odaklan ({{ selectedNode.children.length }} alt düğüm)</span>
+    </button>
 
     <!-- Özellikler (Properties) Tablosu -->
     <div class="sm-detail-props" *ngIf="selectedNodeProperties.length">
@@ -149,30 +317,45 @@
       </div>
     </div>
 
+    <!-- Raporlama, Export & Dashboard Aksiyonları -->
     <div class="sm-detail-actions">
-      <button class="sm-btn primary" (click)="addToDashboard()">
-        <i class="fas fa-tachometer-alt"></i> {{ 'NETWORK_MAP.ADD_TO_DASHBOARD' | translate }}
+      <button class="sm-btn primary full-w" (click)="createReport(true)" title="Seçili düğüm ve bağlı verileriyle Template Builder'da canlı rapor oluştur">
+        <i class="fas fa-file-invoice"></i>
+        <span>Bu Düğümden Rapor Oluştur</span>
       </button>
-      <button class="sm-btn" (click)="createReport()">
-        <i class="fas fa-file-signature"></i> {{ 'NETWORK_MAP.CREATE_REPORT' | translate }}
-      </button>
-      <button class="sm-icon-btn ghost" (click)="copyPath()" [title]="'NETWORK_MAP.COPY_PATH' | translate">
-        <i class="fas fa-copy"></i>
-      </button>
+
+      <div class="sm-detail-row-btns">
+        <button class="sm-btn" (click)="quickExportReport('xlsx')" [disabled]="isExportingQuickReport" title="Excel (.XLSX) İndir">
+          <i class="fas fa-file-excel" style="color: #10b981;"></i> .XLSX İndir
+        </button>
+        <button class="sm-btn" (click)="quickExportReport('pdf')" [disabled]="isExportingQuickReport" title="PDF İndir">
+          <i class="fas fa-file-pdf" style="color: #ef4444;"></i> .PDF İndir
+        </button>
+      </div>
+
+      <div class="sm-detail-row-btns">
+        <button class="sm-btn" (click)="addToDashboard()">
+          <i class="fas fa-tachometer-alt"></i> {{ 'NETWORK_MAP.ADD_TO_DASHBOARD' | translate }}
+        </button>
+        <button class="sm-icon-btn ghost" (click)="copyPath()" [title]="'NETWORK_MAP.COPY_PATH' | translate">
+          <i class="fas fa-copy"></i>
+        </button>
+      </div>
     </div>
   </aside>
 
-  <!-- ===================== TEMA AYAR MODALI ===================== -->
+  <!-- ===================== TEMA, İKON & YERLEŞİM AYAR MODALI ===================== -->
   <div class="sm-modal-backdrop" *ngIf="showThemeModal" (click)="showThemeModal = false">
     <div class="sm-modal sm-theme-modal-lg" (click)="$event.stopPropagation()">
       <div class="sm-modal-head">
-        <h3><i class="fas fa-palette"></i> {{ 'NETWORK_MAP.THEME_MODAL_TITLE' | translate }}</h3>
+        <h3><i class="fas fa-palette"></i> Space Map Görünüm, Fabrika İkonları ve Yerleşim Ayarları</h3>
         <button class="sm-close" (click)="showThemeModal = false"><i class="fas fa-times"></i></button>
       </div>
+
       <div class="sm-modal-body">
-        <!-- Preset Cards -->
+        <!-- 1. Endüstriyel / Görsel Tema Preset Kartları -->
         <div class="sm-form-group">
-          <label>{{ 'NETWORK_MAP.PRESETS' | translate }}</label>
+          <label>1. Görsel Tema Şablonu (Preset)</label>
           <div class="sm-presets-grid">
             <button
               type="button"
@@ -192,88 +375,189 @@
           </div>
         </div>
 
-        <!-- Customizations (2 Columns) -->
+        <!-- 2. Yerleşim Algoritması, Düğüm Şekli ve Renk Paleti -->
         <div class="sm-theme-details-grid">
-          <!-- Sol Sütun: Düğüm Şekli & Renk Paleti -->
           <div class="sm-theme-col">
+            <div class="sm-form-group">
+              <label>2. Harita Yerleşim Düzeni (Layout)</label>
+              <select [(ngModel)]="themeConfig.layout" (ngModelChange)="setLayoutMode($event)">
+                <option *ngFor="let lay of availableLayouts" [value]="lay.id">
+                  {{ lay.label }} — {{ lay.desc }}
+                </option>
+              </select>
+            </div>
+
             <div class="sm-form-group">
               <label>{{ 'NETWORK_MAP.NODE_SHAPE' | translate }}</label>
               <select [(ngModel)]="themeConfig.nodeShape" (ngModelChange)="onThemeChange()">
                 <option *ngFor="let s of availableShapes" [value]="s.id">{{ s.labelKey | translate }}</option>
               </select>
             </div>
+          </div>
 
+          <div class="sm-theme-col">
             <div class="sm-form-group">
-              <label>{{ 'NETWORK_MAP.COLOR_PALETTE' | translate }}</label>
+              <label>{{ 'NETWORK_MAP.COLOR_PALETTE' | translate }} (L1 / L2 / L3)</label>
               <div class="sm-colors-row">
-                <div class="sm-color-field" title="Level 1 / Kök Renk">
+                <div class="sm-color-field" title="Seviye 1 (Kök / Tesis) Rengi">
                   <span>L1</span>
                   <input type="color" [(ngModel)]="themeConfig.color1" (ngModelChange)="onThemeChange()" />
                 </div>
-                <div class="sm-color-field" title="Level 2 / Grup Renk">
+                <div class="sm-color-field" title="Seviye 2 (Hat / Bölüm) Rengi">
                   <span>L2</span>
                   <input type="color" [(ngModel)]="themeConfig.color2" (ngModelChange)="onThemeChange()" />
                 </div>
-                <div class="sm-color-field" title="Level 3 / Varlık Renk">
+                <div class="sm-color-field" title="Seviye 3+ (Makine / Sensör) Rengi">
                   <span>L3</span>
                   <input type="color" [(ngModel)]="themeConfig.color3" (ngModelChange)="onThemeChange()" />
                 </div>
               </div>
             </div>
-          </div>
 
-          <!-- Sağ Sütun: Seviye İkonları -->
-          <div class="sm-theme-col">
+            <!-- Efekt & Rehber Toggles -->
             <div class="sm-form-group">
-              <label>{{ 'NETWORK_MAP.LEVEL_1_ICON' | translate }}</label>
-              <select [(ngModel)]="themeConfig.level1Icon" (ngModelChange)="onThemeChange()">
-                <option *ngFor="let ic of availableIcons" [value]="ic.id">
-                  {{ ic.glyph }} {{ ic.label }}
-                </option>
-              </select>
-            </div>
-
-            <div class="sm-form-group">
-              <label>{{ 'NETWORK_MAP.LEVEL_2_ICON' | translate }}</label>
-              <select [(ngModel)]="themeConfig.level2Icon" (ngModelChange)="onThemeChange()">
-                <option *ngFor="let ic of availableIcons" [value]="ic.id">
-                  {{ ic.glyph }} {{ ic.label }}
-                </option>
-              </select>
-            </div>
-
-            <div class="sm-form-group">
-              <label>{{ 'NETWORK_MAP.LEVEL_3_ICON' | translate }}</label>
-              <select [(ngModel)]="themeConfig.level3Icon" (ngModelChange)="onThemeChange()">
-                <option *ngFor="let ic of availableIcons" [value]="ic.id">
-                  {{ ic.glyph }} {{ ic.label }}
-                </option>
-              </select>
+              <label>Görsel Katmanlar & Akıllı İkonlar</label>
+              <div class="sm-theme-toggles-compact">
+                <label class="sm-toggle-label">
+                  <input type="checkbox" [(ngModel)]="themeConfig.showOrbits" (ngModelChange)="onThemeChange()" />
+                  <span><i class="fas fa-circle-notch"></i> Yörüngeler</span>
+                </label>
+                <label class="sm-toggle-label">
+                  <input type="checkbox" [(ngModel)]="themeConfig.showGrid" (ngModelChange)="onThemeChange()" />
+                  <span><i class="fas fa-border-all"></i> Izgara</span>
+                </label>
+                <label class="sm-toggle-label" title="Açık olduğunda verideki tip/kategori adına göre otomatik ikon seçer; kapalı olduğunda aşağıdaki seviye ikonlarını zorunlu kullanır.">
+                  <input type="checkbox" [(ngModel)]="themeConfig.autoTypeIcons" (ngModelChange)="onThemeChange()" />
+                  <span><i class="fas fa-magic"></i> Tip Bazlı Oto-İkon</span>
+                </label>
+              </div>
             </div>
           </div>
         </div>
 
-        <!-- Efekt & Rehber Toggles -->
-        <div class="sm-theme-toggles">
-          <label class="sm-toggle-label">
-            <input type="checkbox" [(ngModel)]="themeConfig.showOrbits" (ngModelChange)="onThemeChange()" />
-            <span><i class="fas fa-circle-notch"></i> {{ 'NETWORK_MAP.SHOW_ORBITS' | translate }}</span>
-          </label>
-          <label class="sm-toggle-label">
-            <input type="checkbox" [(ngModel)]="themeConfig.showGrid" (ngModelChange)="onThemeChange()" />
-            <span><i class="fas fa-border-all"></i> {{ 'NETWORK_MAP.SHOW_GRID' | translate }}</span>
-          </label>
+        <!-- 3. GÖRSEL İKON SEÇİCİ (Seviye 1, 2, 3, 4+) -->
+        <div class="sm-form-group sm-icon-picker-section">
+          <div class="sm-icon-picker-header">
+            <label>3. Hiyerarşi Seviyesi İkonları (Fabrika, Makine, Enerji, Bilişim, Uzay)</label>
+            <div class="sm-level-tabs">
+              <button
+                type="button"
+                class="sm-level-tab"
+                [class.active]="activeIconPickerLevel === 1"
+                (click)="activeIconPickerLevel = 1">
+                <i class="fas" [ngClass]="themeConfig.level1Icon"></i>
+                <span>L1 (Kök / Tesis)</span>
+              </button>
+              <button
+                type="button"
+                class="sm-level-tab"
+                [class.active]="activeIconPickerLevel === 2"
+                (click)="activeIconPickerLevel = 2">
+                <i class="fas" [ngClass]="themeConfig.level2Icon"></i>
+                <span>L2 (Hat / Bölüm)</span>
+              </button>
+              <button
+                type="button"
+                class="sm-level-tab"
+                [class.active]="activeIconPickerLevel === 3"
+                (click)="activeIconPickerLevel = 3">
+                <i class="fas" [ngClass]="themeConfig.level3Icon"></i>
+                <span>L3 (İstasyon / Ekipman)</span>
+              </button>
+              <button
+                type="button"
+                class="sm-level-tab"
+                [class.active]="activeIconPickerLevel === 4"
+                (click)="activeIconPickerLevel = 4">
+                <i class="fas" [ngClass]="themeConfig.level4Icon"></i>
+                <span>L4+ (Sensör / Uç)</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="sm-icon-grid">
+            <button
+              type="button"
+              class="sm-icon-cell"
+              *ngFor="let ic of availableIcons"
+              [class.selected]="getSelectedIconForActiveLevel() === ic.id"
+              (click)="selectLevelIcon(activeIconPickerLevel, ic.id)"
+              [title]="ic.label + ' (' + ic.category + ')'">
+              <i class="fas" [ngClass]="ic.id"></i>
+              <span>{{ ic.label }}</span>
+            </button>
+          </div>
         </div>
       </div>
 
       <div class="sm-modal-footer">
         <button class="sm-btn" (click)="showThemeModal = false">{{ 'COMMON.CANCEL' | translate }}</button>
         <button class="sm-btn primary" (click)="saveTheme()">
-          <i class="fas fa-save"></i> {{ 'COMMON.SAVE' | translate }}
+          <i class="fas fa-save"></i> Ayarları Haritaya Kaydet
         </button>
       </div>
     </div>
   </div>
+
+  <!-- ===================== KAYNAK VERİ ÖNİZLEME MODALI ===================== -->
+  <div class="sm-modal-backdrop" *ngIf="showDataPreviewModal" (click)="showDataPreviewModal = false">
+    <div class="sm-modal sm-data-modal-xl" (click)="$event.stopPropagation()">
+      <div class="sm-modal-head">
+        <h3>
+          <i class="fas fa-table"></i>
+          Harita Kaynak Verisi — {{ activePath?.name }}
+          <span class="sm-badge-count" *ngIf="!isLoadingDataPreview">({{ previewSourceRows.length }} kayıt)</span>
+        </h3>
+        <button class="sm-close" (click)="showDataPreviewModal = false"><i class="fas fa-times"></i></button>
+      </div>
+
+      <div class="sm-modal-body">
+        <div *ngIf="isLoadingDataPreview" style="padding: 2rem; text-align: center; color: #94a3b8;">
+          <i class="fas fa-spinner spinning" style="font-size: 1.5rem; margin-bottom: 0.5rem;"></i>
+          <p>Canlı sorgu / script sonuçları yükleniyor...</p>
+        </div>
+
+        <div class="sm-data-table-wrap" *ngIf="!isLoadingDataPreview && previewSourceRows.length > 0">
+          <table class="sm-data-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th *ngFor="let col of previewSourceColumns">{{ col }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let row of previewSourceRows | slice:0:100; let idx = index">
+                <td class="row-num">{{ idx + 1 }}</td>
+                <td *ngFor="let col of previewSourceColumns">{{ row[col] }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div *ngIf="!isLoadingDataPreview && previewSourceRows.length === 0" style="padding: 2rem; text-align: center; color: #94a3b8;">
+          Veri bulunamadı.
+        </div>
+      </div>
+
+      <div class="sm-modal-footer">
+        <button class="sm-btn" (click)="quickExportReport('xlsx')" [disabled]="isExportingQuickReport">
+          <i class="fas fa-file-excel" style="color: #10b981;"></i> Excel (.XLSX) İndir
+        </button>
+        <button class="sm-btn primary" (click)="showDataPreviewModal = false; createReport(false)">
+          <i class="fas fa-file-invoice"></i> Template Builder'da Rapor Tasarla
+        </button>
+        <button class="sm-btn" (click)="showDataPreviewModal = false">Kapat</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== QUERY VIEWER DIALOG (Sorgudan Harita Açma / Oluşturma) ===================== -->
+  <app-query-viewer-dialog
+    *ngIf="showQueryViewerModal"
+    [dataSourceId]="selectedDataSourceId || ''"
+    (close)="showQueryViewerModal = false"
+    (selectQuery)="onQueryViewerSelected($event)">
+  </app-query-viewer-dialog>
 
   <!-- Toast -->
   <div class="sm-toast" *ngIf="toast" [class.err]="toastType === 'error'">{{ toast }}</div>

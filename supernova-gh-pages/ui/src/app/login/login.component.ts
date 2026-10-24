@@ -21,11 +21,11 @@ export class LoginComponent implements OnInit {
 
   // Demo credentials gösterimi için
   demoCredentials = [
-    { username: 'admin', password: 'Sp7_Admin#9841', role: 'HARDCODED.ROLE_ADMIN', desc: 'Yönetici (ACL & Roller)', color: 'border-emerald-500/40 text-emerald-400 bg-emerald-500/10' },
-    { username: 'engineer', password: 'Sp7_Engineer#5544', role: 'HARDCODED.ROLE_ENGINEER', desc: 'Mühendis (Space Map & Araçlar)', color: 'border-cyan-500/40 text-cyan-400 bg-cyan-500/10' },
-    { username: 'operator', password: 'Sp7_Operator#1520', role: 'HARDCODED.ROLE_OPERATOR', desc: 'Düz User (İzleme & Alarmlar)', color: 'border-amber-500/40 text-amber-400 bg-amber-500/10' },
+    { username: 'admin', password: 'Nova_Admin#9841', role: 'HARDCODED.ROLE_ADMIN', desc: 'Yönetici (ACL & Roller)', color: 'border-emerald-500/40 text-emerald-400 bg-emerald-500/10' },
+    { username: 'engineer', password: 'Nova_Engineer#5544', role: 'HARDCODED.ROLE_ENGINEER', desc: 'Mühendis (Space Map & Araçlar)', color: 'border-cyan-500/40 text-cyan-400 bg-cyan-500/10' },
+    { username: 'operator', password: 'Nova_Operator#1520', role: 'HARDCODED.ROLE_OPERATOR', desc: 'Düz User (İzleme & Alarmlar)', color: 'border-amber-500/40 text-amber-400 bg-amber-500/10' },
     { username: 'utku', password: 'utku123', role: 'HARDCODED.ROLE_SUPERUSER', desc: 'Geliştirici (Full Yetki)', color: 'border-brand/40 text-brand bg-brand/10' },
-    { username: 'viewer', password: 'Sp7_Viewer#7611', role: 'HARDCODED.ROLE_VIEWER', desc: 'İzleyici (Salt Okunur)', color: 'border-slate-500/40 text-slate-400 bg-slate-500/10' }
+    { username: 'viewer', password: 'Nova_Viewer#7611', role: 'HARDCODED.ROLE_VIEWER', desc: 'İzleyici (Salt Okunur)', color: 'border-slate-500/40 text-slate-400 bg-slate-500/10' }
   ];
 
   constructor(

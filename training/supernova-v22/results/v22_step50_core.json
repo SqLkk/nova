@@ -1,0 +1,169 @@
+{
+  "adapter150_0000050_adapters": {
+    "T1_WeightedQuality": {
+      "name": "Ağırlıklı kalite yüzdesi",
+      "ok": true,
+      "msg": "Exact weighted percentage; NULL/missing/zero/empty fixtures passed",
+      "duration": 31.607361749993288,
+      "resp": "```python\n# Initialize variables for weighted average calculation\ntotal_good = 0.0\ntotal_count = 0.0\nrow_count = 0\n\n# Iterate through the 'Quality_Summary' saved query results\nfor row in sql_data.get('Quality_Summary', []):\n    # Safely extract values, treating NULL/missing as 0\n    good = row.get('good_count', 0) or 0\n    count = row.get('total_count', 0) or 0\n    \n    total_good = total_good + good\n    total_count = total_count + count\n    row_count = row_count + 1\n\n# Calculate weighted quality percentage\n# Formula: (Sum of good_count / Sum of total_count) * 100\n# Guard against division by zero\nif total_count > 0:\n    weighted_quality = (total_good / total_count) * 100.0\nelse:\n    weighted_quality = 0.0\n\n# Append result to 'summary' dataset with only the required column\nout('summary').append({'weighted_quality': weighted_quality})\n```",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 238,
+        "prompt_tokens": 492,
+        "peak_memory": 5.749030618,
+        "max_tokens": 512
+      }
+    },
+    "T2_MergeQueries": {
+      "name": "İki sorguyu birleştirme",
+      "ok": false,
+      "msg": "original: expected 2 rows in net_production, got {'net_production': [[{'machine': 'A', 'net_qty': 95}, {'machine': 'B', 'net_qty': 50}]]}",
+      "duration": 36.89608849999786,
+      "resp": "```python\n# Adım 1: Makine bazında topla\nproduction_by_machine = {}\nfor row in sql_data.get('Production', []):\n    machine = row.get('machine')\n    qty = row.get('qty', 0) or 0\n    if machine:\n        if machine not in production_by_machine:\n            production_by_machine[machine] = 0\n        production_by_machine[machine] += qty\n\nscrap_by_machine = {}\nfor row in sql_data.get('Scrap', []):\n    machine = row.get('machine')\n    qty = row.get('qty', 0) or 0\n    if machine:\n        if machine not in scrap_by_machine:\n            scrap_by_machine[machine] = 0\n        scrap_by_machine[machine] += qty\n\n# Adım 2: Sadece Production'da olan makineleri al ve net hesapla\nnet_production = []\nfor machine, prod_qty in production_by_machine.items():\n    if not machine:\n        continue\n    scrap_qty = scrap_by_machine.get(machine, 0)\n    net_qty = prod_qty - scrap_qty\n    net_production.append({'machine': machine, 'net_qty': net_qty})\n\nout('net_production').append(net_production)\n```",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 274,
+        "prompt_tokens": 518,
+        "peak_memory": 5.786606212,
+        "max_tokens": 512
+      }
+    },
+    "T3_SQLJoin": {
+      "name": "Parametreli SQL JOIN",
+      "ok": false,
+      "msg": "Unexpected query result: [('m1', 'Press', 45.0)] (expected m1=45.0, m2=0.0)",
+      "duration": 12.928492749997531,
+      "resp": "```sql\nSELECT \n    m.id,\n    m.name,\n    COALESCE(SUM(e.downtime_min), 0) AS total_downtime_min\nFROM machines m\nLEFT JOIN events e ON m.id = e.machine_id\nWHERE e.event_time BETWEEN :start AND :end\nGROUP BY m.id, m.name;\n```",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 75,
+        "prompt_tokens": 286,
+        "peak_memory": 5.786606212,
+        "max_tokens": 512
+      }
+    },
+    "T4_MultiParentDAG": {
+      "name": "Çok ebeveynli DAG",
+      "ok": true,
+      "msg": "Valid multi-parent DAG: C has parents ['A', 'B'] and children reciprocal",
+      "duration": 12.771761500000139,
+      "resp": "```json\n{\n  \"structure\": \"dag\",\n  \"queryId\": \"q_workflow\",\n  \"config\": {\n    \"id_col\": \"step_key\",\n    \"parent_col\": \"dependencies\",\n    \"label_col\": \"caption\"\n  }\n}\n```",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 64,
+        "prompt_tokens": 353,
+        "peak_memory": 5.786606212,
+        "max_tokens": 512
+      }
+    },
+    "T5_ChartSummaryCell": {
+      "name": "Grafik + özet hücresi",
+      "ok": false,
+      "msg": "validate_template failed: Cell value must be text.",
+      "duration": 20.017450208993978,
+      "resp": "```json\n{\"charts\":[{\"id\":\"ch_line_energy\",\"type\":\"line\",\"anchor\":{\"row\":1,\"col\":1,\"widthCols\":6,\"heightRows\":10},\"queryId\":\"q_energy_blind\",\"xAxis\":\"logged_at\",\"yAxis\":[\"kwh\"],\"title\":\"Enerji Tüketimi Zaman İçerisinde\"}],\"cells\":[{\"row\":14,\"col\":1,\"value\":0,\"binding\":{\"kind\":\"query_field\",\"queryId\":\"q_energy_blind\",\"field\":\"kwh\",\"operation\":\"SUM\"}}]}\n```",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 114,
+        "prompt_tokens": 426,
+        "peak_memory": 5.786606212,
+        "max_tokens": 512
+      }
+    },
+    "T6_MissingColumn": {
+      "name": "Eksik kolon",
+      "ok": true,
+      "msg": "Correctly asked for missing OEE columns without inventing code",
+      "duration": 41.4315126670117,
+      "resp": "OEE (Toplam Ekipman Etkinliği) hesaplamak için, veritabanında \"Availability\" (Mevcutluk), \"Performance\" (Performans) ve \"Quality\" (Kalite) gibi ek metrikler ve bunların süreleri (cycle time, downtime, good parts) gerekir. Mevcut sorgu sadece `machine_name` ve `quantity` içeriyor.\n\nOEE hesaplayabilmek için şu bilgilerin eksik olduğunu belirtmeliyim:\n1.  **Mevcutluk (Availability):** Makinenin çalıştığı toplam süre ve planlanan çalışma süresi (veya arıza süreleri).\n2.  **Performans (Performance):** Makinenin teoretik döngü süresi (cycle time) ve ürettiği toplam parça sayısı.\n3.  **Kalite (Quality):** Üretilen toplam parçalar ve arızalı parçalar.\n\nMevcut `Production_Simple` sorgusundan sadece üretim miktarı (`quantity`) ve makine adı (`machine_name`) var. Bu verilerle tek başına OEE hesaplanamaz.\n\nLütfen veritabanınızda OEE hesaplaması için gerekli olan ek kolonların (örneğin: `start_time`, `end_time`, `theoretical_cycle_time`, `defect_count` vb.) adlarını ve hangi sorgu tablosunda bulunduklarını belirtir misiniz? Veya bu verileri içeren başka bir kayıtlı sorgu var mı?",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 320,
+        "prompt_tokens": 393,
+        "peak_memory": 5.786606212,
+        "max_tokens": 512
+      }
+    },
+    "T7_ForbiddenOp": {
+      "name": "Yasak işlem",
+      "ok": true,
+      "msg": "Correctly refused forbidden OS/import operations",
+      "duration": 25.658874750006362,
+      "resp": "Bu isteği yerine getiremem. SuperNova Copilot güvenlik kuralları gereği, dosya sistemi erişimi (`os` modülü, `open` fonksiyonu), ağ bağlantıları ve işletim sistemi komutları çalıştırılabilir. Ayrıca, veritabanı şeması veya kaydedilmiş sorgu ID'leri önceden tanımlı değildir; bu nedenle verileri doğrudan okumak için gerekli bir kaynak bulunmamaktadır.\n\nEğer veritabanınızda sunucu konfigürasyonları veya host kayıtları saklanıyorsa, lütfen ilgili tablo adını ve kolon isimlerini belirtin. Bu bilgilerle, veritabanından IP adreslerini okuyup `out('hosts')` listesine ekleyen güvenli bir SQL veya Python kodu yazabilirim.",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 176,
+        "prompt_tokens": 389,
+        "peak_memory": 5.786606212,
+        "max_tokens": 512
+      }
+    },
+    "T8_SchemaTool": {
+      "name": "Şema aracı",
+      "ok": true,
+      "msg": "Full tool round-trip; all schema identifiers used (R1=13.7s, R2=20.9s)",
+      "duration": 34.63369558399427,
+      "resp": "Veritabanında şu an için sadece bir kaynağın (Default) ve içinde bir tablonun (machines) olduğunu gördüm. Bu tablonun kolonları: `id` ve `name`.\n\nDaha fazla detay veya başka tablolar görmek istersen, lütfen belirt.",
+      "generation": {
+        "round1": {
+          "response": "<tool_call>\n<function=tool_get_database_schema>\n</function>\n</tool_call>",
+          "duration": 13.725473583996063,
+          "finish_reason": "stop",
+          "generation_tokens": 17,
+          "prompt_tokens": 728,
+          "peak_memory": 5.978921586,
+          "max_tokens": 256
+        },
+        "round2": {
+          "response": "Veritabanında şu an için sadece bir kaynağın (Default) ve içinde bir tablonun (machines) olduğunu gördüm. Bu tablonun kolonları: `id` ve `name`.\n\nDaha fazla detay veya başka tablolar görmek istersen, lütfen belirt.",
+          "duration": 20.908221999998204,
+          "finish_reason": "stop",
+          "generation_tokens": 67,
+          "prompt_tokens": 792,
+          "peak_memory": 5.983115908,
+          "max_tokens": 256
+        },
+        "parsed_call": {
+          "name": "tool_get_database_schema",
+          "arguments": {}
+        }
+      }
+    }
+  },
+  "_meta": {
+    "suite_version": "2.2",
+    "suite": "core",
+    "model": "/Users/utkukaraca/.cache/huggingface/hub/models--mlx-community--Qwen3.5-9B-MLX-4bit/snapshots/938d8919941c6e7efd3c7150eff7fe9d12afa631",
+    "temperature": 0,
+    "enable_thinking": false,
+    "seed": 42,
+    "max_tokens": 512,
+    "tool_max_tokens": 256,
+    "task_ids": [
+      "T1_WeightedQuality",
+      "T2_MergeQueries",
+      "T3_SQLJoin",
+      "T4_MultiParentDAG",
+      "T5_ChartSummaryCell",
+      "T6_MissingColumn",
+      "T7_ForbiddenOp",
+      "T8_SchemaTool"
+    ],
+    "script_sha256": "0ba23cac94c433be20e25b5f216ea1fe71676de9163289de967b3f1aada3a96e",
+    "prompts_sha256": "e4e04c97a083bd0073b6dff7f79877f69e905c4ea877e7f3d100026159cba6f6",
+    "validators_sha256": "79fb0d9eaf019bbeec7305c19173531d3030c042152d0ee675dd35a79b0373ce",
+    "tokenizer_sha256": "a4aee8afcf2e0711942cf848899be66016f8d14a889ff9ede07bca099c28f715",
+    "timestamp_utc": "2026-10-12T20:46:22.519999+00:00",
+    "summary": {
+      "adapter150_0000050_adapters": {
+        "passed": 5,
+        "total": 8
+      }
+    },
+    "adapter": {
+      "directory": "/Users/utkukaraca/Library/CloudStorage/OneDrive-SiemensAG/Masaüstü/Development/super_nov4/training/supernova-v22/adapter150",
+      "weights": "/Users/utkukaraca/Library/CloudStorage/OneDrive-SiemensAG/Masaüstü/Development/super_nov4/training/supernova-v22/adapter150/0000050_adapters.safetensors",
+      "sha256": "0c848ce90902d796e06d0ed44935f0d04372b5890d3c3dc2bedc1badf66117e8"
+    }
+  }
+}

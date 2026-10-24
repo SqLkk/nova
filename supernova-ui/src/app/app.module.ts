@@ -36,6 +36,7 @@ import { AdminComponent } from './pages/admin/admin.component';
 import { TemplateBuilderComponent } from './pages/template-builder/template-builder.component';
 import { QueryCreatorComponent } from './pages/query-creator/query-creator.component';
 import { PythonWorkspaceComponent } from './pages/python-workspace/python-workspace.component';
+import { AiCopilotComponent } from './components/ai-copilot/ai-copilot.component';
 
 // Import ngx-translate
 import { TranslateModule, TranslateLoader } from '@ngx-translate/core';
@@ -57,6 +58,7 @@ export function HttpLoaderFactory(http: HttpClient) {
 @NgModule({
   declarations: [
     AppComponent,
+    AiCopilotComponent,
     ConfirmDialogComponent,
     WidgetComponent,
     LoginComponent,

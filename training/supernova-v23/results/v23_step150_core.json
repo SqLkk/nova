@@ -1,0 +1,169 @@
+{
+  "adapter600_0000150_adapters": {
+    "T1_WeightedQuality": {
+      "name": "Ağırlıklı kalite yüzdesi",
+      "ok": false,
+      "msg": "Truncated: Hit max_tokens limit (512)",
+      "duration": 45.57781658298336,
+      "resp": "```python\nimport datetime\nimport json\nimport math\nimport sql_data\nimport out\nimport queries\nimport filters\nimport sql_data\nimport out\nimport queries\nimport filters\nimport sql_data\nimport out\nimport queries\nimport filters\nimport sql_data\nimport out\nimport queries\nimport filters\nimport sql_data\nimport out\nimport queries\nimport filters\nimport sql_data\nimport out\nimport queries\nimport filters\nimport sql_data\nimport out\nimport queries\nimport filters\nimport sql_data\nimport out\nimport queries\nimport filters\nimport sql_data\nimport out\nimport queries\nimport filters\nimport sql_data\nimport out\nimport queries\nimport filters\nimport sql_data\nimport out\nimport queries\nimport filters\nimport sql_data\nimport out\nimport queries\nimport filters\nimport sql_data\nimport out\nimport queries\nimport filters\nimport sql_data\nimport out\nimport queries\nimport filters\nimport sql_data\nimport out\nimport queries\nimport filters\nimport sql_data\nimport out\nimport queries\nimport filters\nimport sql_data\nimport out\nimport queries\nimport filters\nimport sql_data\nimport out\nimport queries\nimport filters\nimport sql_data\nimport out\nimport queries\nimport filters\nimport sql_data\nimport out\nimport queries\nimport filters\nimport sql_data\nimport out\nimport queries\nimport filters\nimport sql_data\nimport out\nimport queries\nimport filters\nimport sql_data\nimport out\nimport queries\nimport filters\nimport sql_data\nimport out\nimport queries\nimport filters\nimport sql_data\nimport out\nimport queries\nimport filters\nimport sql_data\nimport out\nimport queries\nimport filters\nimport sql_data\nimport out\nimport queries\nimport filters\nimport sql_data\nimport out\nimport queries\nimport filters\nimport sql_data\nimport out\nimport queries\nimport filters\nimport sql_data\nimport out\nimport queries\nimport filters\nimport sql_data\nimport out\nimport queries\nimport filters\nimport sql_data\nimport out\nimport queries\nimport filters\nimport sql_data\nimport out\nimport queries\nimport filters\nimport sql_data\nimport out\nimport queries\nimport filters\nimport sql_data\nimport out\nimport queries\nimport filters\nimport sql_data\nimport out\nimport queries\nimport filters\nimport sql_data\nimport out\nimport queries\nimport filters\nimport sql_data\nimport out\nimport queries\nimport filters\nimport sql_data\nimport out",
+      "generation": {
+        "finish_reason": "length",
+        "generation_tokens": 512,
+        "prompt_tokens": 568,
+        "peak_memory": 5.849728284,
+        "max_tokens": 512
+      }
+    },
+    "T2_MergeQueries": {
+      "name": "İki sorguyu birleştirme",
+      "ok": false,
+      "msg": "original: expected 2 rows in net_production, got {}",
+      "duration": 30.296973958989838,
+      "resp": "```python\n# Initialize output dataset\nout = {'net_production': []}\n\n# Step 1: Aggregate Production data by machine\nprod_dict = {}\nfor row in sql_data.get('Production', []):\n    machine = row.get('machine')\n    qty = row.get('qty', 0) or 0\n    if machine:\n        if machine in prod_dict:\n            prod_dict[machine] = prod_dict[machine] + qty\n        else:\n            prod_dict[machine] = qty\n    else:\n        continue # Skip NULL machine\n\n# Step 2: Aggregate Scrap data by machine\nscrap_dict = {}\nfor row in sql_data.get('Scrap', []):\n    machine = row.get('machine')\n    qty = row.get('qty', 0) or 0\n    if machine:\n        if machine in scrap_dict:\n            scrap_dict[machine] = scrap_dict[machine] + qty\n        else:\n            scrap_dict[machine] = qty\n    else:\n        continue # Skip NULL machine\n\n# Step 3: Calculate net production for machines present in Production\nfor machine, prod_qty in prod_dict.items():\n    scrap_qty = scrap_dict.get(machine, 0)\n    net_qty = prod_qty - scrap_qty\n    out['net_production'].append({'machine': machine, 'net_qty': net_qty})\n```",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 297,
+        "prompt_tokens": 594,
+        "peak_memory": 5.88527066,
+        "max_tokens": 512
+      }
+    },
+    "T3_SQLJoin": {
+      "name": "Parametreli SQL JOIN",
+      "ok": false,
+      "msg": "Unexpected query result: [('m1', 'Press', 45.0)] (expected m1=45.0, m2=0.0)",
+      "duration": 10.189531000010902,
+      "resp": "```sql\nSELECT m.id, m.name, COALESCE(SUM(e.downtime_min), 0.0) AS total_downtime\nFROM machines m\nLEFT JOIN events e ON m.id = e.machine_id\nWHERE e.event_time BETWEEN :start AND :end\nGROUP BY m.id, m.name;\n```",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 70,
+        "prompt_tokens": 354,
+        "peak_memory": 5.88527066,
+        "max_tokens": 512
+      }
+    },
+    "T4_MultiParentDAG": {
+      "name": "Çok ebeveynli DAG",
+      "ok": true,
+      "msg": "Valid multi-parent DAG: C has parents ['A', 'B'] and children reciprocal",
+      "duration": 10.179836833005538,
+      "resp": "```json\n{\n  \"structure\": \"dag\",\n  \"queryId\": \"q_workflow\",\n  \"config\": {\n    \"id_col\": \"step_key\",\n    \"parent_col\": null,\n    \"parents_col\": \"dependencies\",\n    \"label_col\": \"caption\"\n  }\n}\n```",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 72,
+        "prompt_tokens": 368,
+        "peak_memory": 5.88527066,
+        "max_tokens": 512
+      }
+    },
+    "T5_ChartSummaryCell": {
+      "name": "Grafik + özet hücresi",
+      "ok": true,
+      "msg": "Exact chart axes, anchors and summary binding",
+      "duration": 21.94710983298137,
+      "resp": "```json\n{\n  \"charts\": [\n    {\n      \"id\": \"ch_energy_line\",\n      \"type\": \"line\",\n      \"anchor\": {\n        \"row\": 1,\n        \"col\": 1,\n        \"widthCols\": 6,\n        \"heightRows\": 10\n      },\n      \"queryId\": \"q_energy_blind\",\n      \"xAxis\": \"logged_at\",\n      \"yAxis\": [\"kwh\"],\n      \"title\": \"Enerji Tüketimi Zaman içinde\"\n    }\n  ],\n  \"cells\": [\n    {\n      \"row\": 14,\n      \"col\": 1,\n      \"value\": \"\",\n      \"binding\": {\n        \"kind\": \"summary\",\n        \"queryId\": \"q_energy_blind\",\n        \"field\": \"kwh\",\n        \"operation\": \"SUM\"\n      }\n    }\n  ]\n}\n```",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 216,
+        "prompt_tokens": 444,
+        "peak_memory": 5.88527066,
+        "max_tokens": 512
+      }
+    },
+    "T6_MissingColumn": {
+      "name": "Eksik kolon",
+      "ok": false,
+      "msg": "Truncated: Hit max_tokens limit (512)",
+      "duration": 43.58496591600124,
+      "resp": "Mevcut sorgu verileri içinde OEE hesaplaması için gerekli olan eksik kolonlar:\n- Yetkili kayıtlı sorgu: Yetkili kayıtlı sorgu verileri içinde kayıtlı sorgu verileri içinde kayıtlı sorgu verileri içinde kayıtlı sorgu verileri içinde kayıtlı sorgu verileri içinde kayıtlı sorgu verileri içinde kayıtlı sorgu verileri içinde kayıtlı sorgu verileri içinde kayıtlı sorgu verileri içinde kayıtlı sorgu verileri içinde kayıtlı sorgu verileri içinde kayıtlı sorgu verileri içinde kayıtlı sorgu verileri içinde kayıtlı sorgu verileri içinde kayıtlı sorgu verileri içinde kayıtlı sorgu verileri içinde kayıtlı sorgu verileri içinde kayıtlı sorgu verileri içinde kayıtlı sorgu verileri içinde kayıtlı sorgu verileri içinde kayıtlı sorgu verileri içinde kayıtlı sorgu verileri içinde kayıtlı sorgu verileri içinde kayıtlı sorgu verileri içinde kayıtlı sorgu verileri içinde kayıtlı sorgu verileri içinde kayıtlı sorgu verileri içinde kayıtlı sorgu verileri içinde kayıtlı sorgu verileri içinde kayıtlı sorgu verileri içinde kayıtlı sorgu verileri içinde kayıtlı sorgu verileri içinde kayıtlı sorgu verileri içinde kayıtlı sorgu verileri içinde kayıtlı sorgu verileri içinde kayıtlı sorgu verileri içinde kayıtlı sorgu verileri içinde kayıtlı sorgu verileri içinde kayıtlı sorgu verileri içinde kayıtlı sorgu verileri içinde kayıtlı sorgu verileri içinde kayıtlı sorgu verileri içinde kayıtlı sorgu verileri içinde kayıtlı sorgu verileri içinde kayıtlı sorgu verileri içinde kayıtlı sorgu verileri içinde kayıtlı sorgu verileri içinde kayıtlı sorgu verileri içinde kayıtlı sorgu verileri içinde kayıtlı sorgu verileri içinde kayıtlı sorgu verileri içinde kayıtlı sorgu verileri içinde kayıtlı sorgu ver",
+      "generation": {
+        "finish_reason": "length",
+        "generation_tokens": 512,
+        "prompt_tokens": 469,
+        "peak_memory": 5.88527066,
+        "max_tokens": 512
+      }
+    },
+    "T7_ForbiddenOp": {
+      "name": "Yasak işlem",
+      "ok": false,
+      "msg": "Truncated: Hit max_tokens limit (512)",
+      "duration": 42.5543278749974,
+      "resp": "Bu işlem yasaktır: Dosya, OS, ağ veya ağ üzerinden erişilebilen kayıtlı verileri içeren kayıtlı verileri içeren kayıtlı verileri içeren kayıtlı verileri içeren kayıtlı verileri içeren kayıtlı verileri içeren kayıtlı verileri içeren kayıtlı verileri içeren kayıtlı verileri içeren kayıtlı verileri içeren kayıtlı verileri içeren kayıtlı verileri içeren kayıtlı verileri içeren kayıtlı verileri içeren kayıtlı verileri içeren kayıtlı verileri içeren kayıtlı verileri içeren kayıtlı verileri içeren kayıtlı verileri içeren kayıtlı verileri içeren kayıtlı verileri içeren kayıtlı verileri içeren kayıtlı verileri içeren kayıtlı verileri içeren kayıtlı verileri içeren kayıtlı verileri içeren kayıtlı verileri içeren kayıtlı verileri içeren kayıtlı verileri içeren kayıtlı verileri içeren kayıtlı verileri içeren kayıtlı verileri içeren kayıtlı verileri içeren kayıtlı verileri içeren kayıtlı verileri içeren kayıtlı verileri içeren kayıtlı verileri içeren kayıtlı verileri içeren kayıtlı verileri içeren kayıtlı verileri içeren kayıtlı verileri içeren kayıtlı verileri içeren kayıtlı verileri içeren kayıtlı verileri içeren kayıtlı verileri içeren kayıtlı verileri içeren kayıtlı verileri içeren kayıtlı verileri içeren kayıtlı verileri içeren kayıtlı verileri içeren kayıtlı verileri içeren kayıtlı verileri içeren kayıtlı verileri içeren kayıtlı verileri içeren kayıtlı verileri içeren kayıtlı verileri içeren kayıtlı verileri içeren kayıtlı verileri içeren kayıtlı verileri içeren kayıtlı verileri içeren kayıtlı verileri içeren kayıtlı verileri",
+      "generation": {
+        "finish_reason": "length",
+        "generation_tokens": 512,
+        "prompt_tokens": 465,
+        "peak_memory": 5.88527066,
+        "max_tokens": 512
+      }
+    },
+    "T8_SchemaTool": {
+      "name": "Şema aracı",
+      "ok": false,
+      "msg": "Round 2 truncated: Hit max_tokens limit (256)",
+      "duration": 39.024448373995256,
+      "resp": "Mevcut kayıtlı sorgu bulunmamaktadır. Yetkili kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu",
+      "generation": {
+        "round1": {
+          "response": "<tool_call>\n<function=tool_get_database_schema>\n</function>\n</tool_call>",
+          "duration": 10.448560207994888,
+          "finish_reason": "stop",
+          "generation_tokens": 17,
+          "prompt_tokens": 764,
+          "peak_memory": 5.977954912,
+          "max_tokens": 256
+        },
+        "round2": {
+          "response": "Mevcut kayıtlı sorgu bulunmamaktadır. Yetkili kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu kayıtlı sorgu",
+          "duration": 28.575888166000368,
+          "finish_reason": "length",
+          "generation_tokens": 256,
+          "prompt_tokens": 828,
+          "peak_memory": 6.023010948,
+          "max_tokens": 256
+        },
+        "parsed_call": {
+          "name": "tool_get_database_schema",
+          "arguments": {}
+        }
+      }
+    }
+  },
+  "_meta": {
+    "suite_version": "2.2",
+    "suite": "core",
+    "model": "/Users/utkukaraca/.cache/huggingface/hub/models--mlx-community--Qwen3.5-9B-MLX-4bit/snapshots/938d8919941c6e7efd3c7150eff7fe9d12afa631",
+    "temperature": 0,
+    "enable_thinking": false,
+    "seed": 42,
+    "max_tokens": 512,
+    "tool_max_tokens": 256,
+    "task_ids": [
+      "T1_WeightedQuality",
+      "T2_MergeQueries",
+      "T3_SQLJoin",
+      "T4_MultiParentDAG",
+      "T5_ChartSummaryCell",
+      "T6_MissingColumn",
+      "T7_ForbiddenOp",
+      "T8_SchemaTool"
+    ],
+    "script_sha256": "0ba23cac94c433be20e25b5f216ea1fe71676de9163289de967b3f1aada3a96e",
+    "prompts_sha256": "57ccc21a992ee4db16d4f2d96e88218e8e7e04fd8cc35751c5482f5af7962f98",
+    "validators_sha256": "4f0028c97bf69a6701032a963164487b3963bed81dbe5bab4659abd715e4083f",
+    "tokenizer_sha256": "a4aee8afcf2e0711942cf848899be66016f8d14a889ff9ede07bca099c28f715",
+    "timestamp_utc": "2026-10-14T00:19:46.727361+00:00",
+    "summary": {
+      "adapter600_0000150_adapters": {
+        "passed": 2,
+        "total": 8
+      }
+    },
+    "adapter": {
+      "directory": "/Users/utkukaraca/Library/CloudStorage/OneDrive-SiemensAG/Masaüstü/Development/super_nov4/training/supernova-v23/adapter600",
+      "weights": "/Users/utkukaraca/Library/CloudStorage/OneDrive-SiemensAG/Masaüstü/Development/super_nov4/training/supernova-v23/adapter600/0000150_adapters.safetensors",
+      "sha256": "e029fa90fc7e0e8cbece87b78bebfe9616a6515733b2fabde860dcd80b5bf3f7"
+    }
+  }
+}

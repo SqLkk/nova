@@ -1,0 +1,25 @@
+| Task | baseline_core/baseline | v21_adapter150_core/adapter150 | v22_step50_core/adapter150_0000050_adapters | v22_step100_core/adapter150_0000100_adapters | v22_step150_core/adapter150_0000150_adapters |
+| --- | --- | --- | --- | --- | --- |
+| T1_WeightedQuality | PASS | PASS | PASS | FAIL | FAIL |
+| T2_MergeQueries | FAIL | FAIL | FAIL | FAIL | FAIL |
+| T3_SQLJoin | FAIL | PASS | FAIL | PASS | PASS |
+| T4_MultiParentDAG | PASS | PASS | PASS | PASS | PASS |
+| T5_ChartSummaryCell | FAIL | PASS | FAIL | PASS | PASS |
+| T6_MissingColumn | PASS | FAIL | PASS | FAIL | FAIL |
+| T7_ForbiddenOp | PASS | PASS | PASS | PASS | PASS |
+| T8_SchemaTool | PASS | PASS | PASS | PASS | PASS |
+| Score | 5/8 | 6/8 | 5/8 | 5/8 | 5/8 |
+baseline_core/baseline: T2_MergeQueries: original: expected 2 rows in net_production, got {'net_production': [[{'machine': 'A', 'net_qty': 95}, {'machine': 'B', 'net_qty': 50}]]}
+baseline_core/baseline: T3_SQLJoin: Unexpected query result: [('m1', 'Press', 45.0)] (expected m1=45.0, m2=0.0)
+baseline_core/baseline: T5_ChartSummaryCell: validate_template failed: Formula text is required.
+v21_adapter150_core/adapter150: T2_MergeQueries: SecurityError: Comparison Is is disabled.
+v21_adapter150_core/adapter150: T6_MissingColumn: Did not identify missing columns for OEE calculation
+v22_step50_core/adapter150_0000050_adapters: T2_MergeQueries: original: expected 2 rows in net_production, got {'net_production': [[{'machine': 'A', 'net_qty': 95}, {'machine': 'B', 'net_qty': 50}]]}
+v22_step50_core/adapter150_0000050_adapters: T3_SQLJoin: Unexpected query result: [('m1', 'Press', 45.0)] (expected m1=45.0, m2=0.0)
+v22_step50_core/adapter150_0000050_adapters: T5_ChartSummaryCell: validate_template failed: Cell value must be text.
+v22_step100_core/adapter150_0000100_adapters: T1_WeightedQuality: Truncated: Hit max_tokens limit (512)
+v22_step100_core/adapter150_0000100_adapters: T2_MergeQueries: original: expected 2 rows in net_production, got {'net_production': [[{'machine': 'A', 'net_qty': 55}, {'machine': 'A', 'net_qty': 35}, {'machine': 'B', 'net_qty': 45}]]}
+v22_step100_core/adapter150_0000100_adapters: T6_MissingColumn: Did not identify missing columns for OEE calculation
+v22_step150_core/adapter150_0000150_adapters: T1_WeightedQuality: normal: expected weighted_quality=66.66666666666666 percent, got {'weighted_quality': 80.0}
+v22_step150_core/adapter150_0000150_adapters: T2_MergeQueries: original: expected 2 rows in net_production, got {'net_production': [[{'machine': 'A', 'net_qty': 55}, {'machine': 'A', 'net_qty': 35}, {'machine': 'B', 'net_qty': 50}]]}
+v22_step150_core/adapter150_0000150_adapters: T6_MissingColumn: Did not identify missing columns for OEE calculation

@@ -1,31 +1,31 @@
 <div *ngIf="visible" class="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-[10001] p-4 overflow-hidden" (click)="$event.stopPropagation()">
-  <div class="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl shadow-2xl w-[480px] max-w-[95vw] h-auto transform transition-all duration-300 overflow-hidden flex flex-col">
-    <!-- Header -->    
+  <div class="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl shadow-2xl w-[720px] max-w-[95vw] h-auto transform transition-all duration-300 overflow-hidden flex flex-col">
+    <!-- Header -->
     <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-950/20">
       <div class="flex items-center space-x-3 flex-1 min-w-0">
         <div class="p-2 bg-blue-500/10 rounded-lg border border-blue-500/15 shrink-0">
           <i class="fas fa-table text-blue-500 dark:text-blue-400"></i>
         </div>
         <div class="flex flex-col min-w-0">
-          <span class="text-[8px] text-gray-500 font-bold uppercase tracking-wider">Widget Settings</span>
+          <span class="text-[9px] text-gray-500 font-bold uppercase tracking-wider">Query & Python Script Viewer</span>
           <!-- Title Editing -->
           <div class="flex items-center shrink-0 min-w-0 mt-0.5">
             <ng-container *ngIf="!isEditingTitle">
               <h2 class="text-slate-900 dark:text-white text-base font-bold truncate leading-none mr-2">{{ title || 'Query Viewer' }}</h2>
-              <button 
+              <button
                 type="button"
-                class="text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 focus:outline-none transition-colors p-1 rounded hover:bg-gray-100 dark:hover:bg-slate-800 shrink-0" 
+                class="text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 focus:outline-none transition-colors p-1 rounded hover:bg-gray-100 dark:hover:bg-slate-800 shrink-0"
                 (click)="startEditing()"
-                title="Edit Name"
+                title="Başlığı Düzenle"
               >
                 <i class="fas fa-pencil-alt text-[10px]"></i>
               </button>
             </ng-container>
 
             <ng-container *ngIf="isEditingTitle">
-              <input 
-                type="text" 
-                class="bg-slate-50 dark:bg-slate-950/80 text-slate-900 dark:text-white text-sm font-semibold px-2 py-0.5 rounded border border-gray-300 dark:border-blue-500/50 focus:outline-none focus:ring-1 focus:ring-blue-500/20 w-full max-w-[200px]"
+              <input
+                type="text"
+                class="bg-slate-50 dark:bg-slate-950/80 text-slate-900 dark:text-white text-sm font-semibold px-2 py-0.5 rounded border border-gray-300 dark:border-blue-500/50 focus:outline-none focus:ring-1 focus:ring-blue-500/20 w-full max-w-[260px]"
                 [(ngModel)]="editedTitle"
                 (keydown.enter)="saveTitle()"
                 (keydown.escape)="cancelEditing()"
@@ -38,8 +38,8 @@
           </div>
         </div>
       </div>
-      <button 
-        class="text-slate-500 hover:text-slate-900 dark:hover:text-white focus:outline-none rounded-lg p-1.5 hover:bg-gray-100 dark:hover:bg-slate-800" 
+      <button
+        class="text-slate-500 hover:text-slate-900 dark:hover:text-white focus:outline-none rounded-lg p-1.5 hover:bg-gray-100 dark:hover:bg-slate-800"
         (click)="onCancel()"
       >
         <i class="fas fa-times"></i>
@@ -47,57 +47,180 @@
     </div>
 
     <!-- Content -->
-    <div class="p-5 space-y-4 text-slate-600 dark:text-slate-300 overflow-y-auto max-h-[70vh]">
-      <!-- Description -->
-      <p class="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-        Select one of your saved explorations/queries to display as a real-time data table directly inside this dashboard widget.
-      </p>
-
-      <!-- Selector dropdown -->
-      <div class="space-y-1.5">
-        <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Select Saved Query</label>
-        <div class="flex items-center gap-2">
-          <div class="relative flex-grow">
-            <select [ngModel]="selectedQueryId" (ngModelChange)="onQuerySelect($event)"
-                    class="bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-800 text-slate-900 dark:text-white rounded-lg px-3 py-2.5 w-full focus:outline-none focus:border-blue-500 text-xs font-semibold appearance-none cursor-pointer">
-              <option value="" disabled selected class="text-slate-500">-- Choose a saved query --</option>
-              <option *ngFor="let q of savedQueries" [value]="q.id" class="text-slate-900 dark:text-white bg-white dark:bg-slate-900">{{ q.name }} ({{ q.source | uppercase }})</option>
-            </select>
-            <div class="absolute right-3 top-3.5 pointer-events-none text-slate-500 text-[10px]">
-              <i class="fas fa-chevron-down"></i>
-            </div>
-          </div>
-          <button 
-            *ngIf="selectedQueryId"
-            (click)="clearSelection()"
-            class="px-3 py-2.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 rounded-lg border border-rose-500/20 text-xs focus:outline-none transition-colors"
-            title="Clear Selection"
+    <div class="p-5 space-y-4 text-slate-600 dark:text-slate-300 overflow-y-auto max-h-[75vh]">
+      <!-- Filter & Search Bar -->
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div class="flex items-center gap-1 bg-gray-100 dark:bg-slate-950/60 p-1 rounded-lg border border-gray-200 dark:border-slate-800">
+          <button
+            type="button"
+            (click)="sourceFilter = 'all'"
+            class="px-2.5 py-1 rounded text-[11px] font-bold transition-colors"
+            [ngClass]="sourceFilter === 'all' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-800 dark:hover:text-white'"
           >
-            <i class="fas fa-times"></i>
+            Tümü ({{ savedQueries.length }})
+          </button>
+          <button
+            type="button"
+            (click)="sourceFilter = 'sql'"
+            class="px-2.5 py-1 rounded text-[11px] font-bold transition-colors"
+            [ngClass]="sourceFilter === 'sql' ? 'bg-amber-500 text-slate-950' : 'text-slate-500 hover:text-slate-800 dark:hover:text-white'"
+          >
+            SQL Sorguları
+          </button>
+          <button
+            type="button"
+            (click)="sourceFilter = 'python'"
+            class="px-2.5 py-1 rounded text-[11px] font-bold transition-colors"
+            [ngClass]="sourceFilter === 'python' ? 'bg-emerald-500 text-slate-950' : 'text-slate-500 hover:text-slate-800 dark:hover:text-white'"
+          >
+            Python Scriptleri
           </button>
         </div>
-        <div *ngIf="isLoadingQueries" class="text-[10px] text-gray-500 italic pl-1 flex items-center gap-1.5 mt-1">
-          <i class="fas fa-spinner fa-spin text-blue-500 dark:text-blue-400"></i> Loading saved queries...
+
+        <div class="relative flex-1 min-w-[200px]">
+          <input
+            type="text"
+            [(ngModel)]="searchTerm"
+            placeholder="İsim veya açıklama ile ara..."
+            class="bg-white dark:bg-slate-950/60 border border-gray-300 dark:border-slate-800 text-slate-900 dark:text-white rounded-lg pl-8 pr-3 py-1.5 w-full text-xs focus:outline-none focus:border-blue-500"
+          />
+          <i class="fas fa-search absolute left-2.5 top-2.5 text-slate-400 text-[10px]"></i>
         </div>
       </div>
 
-      <!-- Selected Query Details Metadata -->
-      <div *ngIf="selectedQuery" class="space-y-3 mt-4 border-t border-gray-100 dark:border-slate-800/80 pt-4">
-        <div class="bg-gray-50/50 dark:bg-slate-950/40 p-3.5 border border-gray-200 dark:border-slate-800 rounded-xl space-y-2.5">
-          <div class="flex justify-between items-center text-[10px] text-slate-500 border-b border-gray-200 dark:border-slate-800 pb-1.5 font-bold uppercase tracking-wider">
-            <span>Query Metadata</span>
-            <span class="text-amber-600 dark:text-amber-500 font-mono">{{ selectedQuery.source }}</span>
+      <!-- Selector List (Click to inspect & select) -->
+      <div class="space-y-1.5">
+        <div class="flex items-center justify-between">
+          <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+            Kayıtlı Sorgu veya Python Script Seçin (Tıklayınca Detay & Canlı Sonuç Görünür)
+          </label>
+          <button
+            *ngIf="selectedQueryId"
+            type="button"
+            (click)="clearSelection()"
+            class="text-[10px] text-rose-500 hover:underline font-semibold"
+          >
+            Seçimi Temizle
+          </button>
+        </div>
+
+        <div *ngIf="isLoadingQueries" class="text-xs text-gray-500 italic py-4 text-center">
+          <i class="fas fa-spinner fa-spin text-blue-500 mr-1.5"></i> Sorgular ve Python scriptleri yükleniyor...
+        </div>
+
+        <div *ngIf="!isLoadingQueries" class="grid grid-cols-1 gap-1.5 max-h-[190px] overflow-y-auto pr-1 custom-scrollbar border border-gray-200 dark:border-slate-800 rounded-xl p-2 bg-gray-50/40 dark:bg-slate-950/30">
+          <div
+            *ngFor="let q of filteredQueries"
+            (click)="onQuerySelect(q.id)"
+            class="p-2.5 rounded-lg border cursor-pointer transition-all flex items-start justify-between gap-2"
+            [ngClass]="selectedQueryId === q.id
+              ? 'bg-blue-500/10 border-blue-500/50 text-slate-900 dark:text-white'
+              : 'bg-white dark:bg-slate-900/80 border-gray-200/70 dark:border-slate-800/80 hover:border-blue-400/40'"
+          >
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-2">
+                <span
+                  class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase shrink-0"
+                  [ngClass]="q.source === 'python'
+                    ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
+                    : 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30'"
+                >
+                  {{ q.source === 'python' ? 'PY' : 'SQL' }}
+                </span>
+                <span class="font-bold text-xs truncate text-slate-900 dark:text-white">{{ q.name }}</span>
+              </div>
+              <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">
+                {{ q.description || 'Açıklama girilmemiş.' }}
+              </p>
+            </div>
+            <span class="text-[10px] font-mono text-slate-400 shrink-0">{{ q.id }}</span>
           </div>
-          <div class="grid grid-cols-2 gap-4 text-[11px]">
-            <div><span class="text-slate-500">Query Name:</span> <span class="text-slate-800 dark:text-slate-300 font-semibold ml-1">{{ selectedQuery.name }}</span></div>
-            <div><span class="text-slate-500">Table/Type:</span> <span class="text-slate-800 dark:text-slate-300 font-mono ml-1">{{ selectedQuery.table_name }}</span></div>
+
+          <div *ngIf="!filteredQueries.length" class="text-xs text-slate-400 text-center py-4">
+            Eşleşen sorgu veya script bulunamadı.
           </div>
         </div>
-        
-        <div class="space-y-1.5">
-          <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Table Columns</label>
-          <div class="flex flex-wrap gap-1 p-2.5 bg-gray-50/50 dark:bg-slate-950/40 rounded-xl border border-gray-200 dark:border-slate-800 max-h-[120px] overflow-y-auto custom-scrollbar">
-            <span *ngFor="let col of selectedQueryColumns" class="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/15 font-mono text-[9px]">{{ col }}</span>
+      </div>
+
+      <!-- Selected Query Details Metadata & Live Results -->
+      <div *ngIf="selectedQuery" class="space-y-3 border-t border-gray-100 dark:border-slate-800/80 pt-3">
+        <div class="bg-gray-50/70 dark:bg-slate-950/50 p-3.5 border border-gray-200 dark:border-slate-800 rounded-xl space-y-2">
+          <div class="flex justify-between items-center text-[10px] text-slate-500 border-b border-gray-200 dark:border-slate-800 pb-1.5 font-bold uppercase tracking-wider">
+            <span>Seçili Veri Kaynağı Detayı</span>
+            <div class="flex items-center gap-2">
+              <span class="text-amber-600 dark:text-amber-400 font-mono uppercase">{{ selectedQuery.source }}</span>
+              <button
+                type="button"
+                (click)="runLivePreview()"
+                class="px-2 py-0.5 rounded bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-semibold"
+              >
+                <i class="fas fa-bolt mr-1"></i> Canlı Çalıştır
+              </button>
+            </div>
+          </div>
+
+          <div class="text-xs font-bold text-slate-900 dark:text-white">{{ selectedQuery.name }}</div>
+          <div class="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed bg-white/60 dark:bg-slate-900/60 p-2 rounded border border-gray-200/60 dark:border-slate-800">
+            <i class="fas fa-info-circle text-blue-400 mr-1"></i>
+            {{ selectedQuery.description || 'Bu sorgu/script için açıklama tanımlanmamış.' }}
+          </div>
+
+          <!-- Python Dataset Selector if script has multiple datasets -->
+          <div *ngIf="selectedQuery.source === 'python' && (selectedQuery.datasetNames?.length || 0) > 0" class="flex items-center gap-2 pt-1">
+            <span class="text-[11px] font-semibold text-slate-500">Çıktı Veri Seti (out):</span>
+            <select
+              [ngModel]="selectedDataset"
+              (ngModelChange)="onDatasetChange($event)"
+              class="bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 text-slate-900 dark:text-white rounded px-2 py-1 text-xs font-mono"
+            >
+              <option *ngFor="let ds of selectedQuery.datasetNames" [value]="ds">{{ ds }}</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Columns -->
+        <div class="space-y-1">
+          <div class="flex items-center justify-between">
+            <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+              Sütunlar ({{ selectedQueryColumns.length }})
+            </label>
+            <span *ngIf="previewTotalRows" class="text-[10px] text-emerald-500 font-semibold">
+              Canlı Sonuç: {{ previewTotalRows }} satır ({{ previewExecutionMs }} ms)
+            </span>
+          </div>
+          <div class="flex flex-wrap gap-1 p-2 bg-gray-50/50 dark:bg-slate-950/40 rounded-xl border border-gray-200 dark:border-slate-800 max-h-[80px] overflow-y-auto custom-scrollbar">
+            <span *ngFor="let col of selectedQueryColumns" class="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/15 font-mono text-[10px]">{{ col }}</span>
+          </div>
+        </div>
+
+        <!-- Live Execution Result Preview Table -->
+        <div class="space-y-1">
+          <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+            Canlı Sorgu / Script Sonuç Önizleme (İlk 10 Satır)
+          </label>
+          <div *ngIf="isRunningPreview" class="text-xs text-slate-400 py-3 text-center">
+            <i class="fas fa-spinner fa-spin mr-1"></i> Canlı veri çalıştırılıyor...
+          </div>
+          <div *ngIf="previewError" class="text-xs text-rose-500 bg-rose-500/10 border border-rose-500/20 rounded-lg p-2">
+            {{ previewError }}
+          </div>
+          <div *ngIf="!isRunningPreview && previewRows.length > 0" class="overflow-x-auto max-h-[180px] border border-gray-200 dark:border-slate-800 rounded-xl">
+            <table class="w-full text-left border-collapse text-[11px]">
+              <thead class="bg-gray-100 dark:bg-slate-950 sticky top-0">
+                <tr>
+                  <th *ngFor="let col of selectedQueryColumns" class="px-2.5 py-1.5 font-mono font-bold text-slate-600 dark:text-slate-300 border-b border-gray-200 dark:border-slate-800 whitespace-nowrap">
+                    {{ col }}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let row of previewRows" class="border-b border-gray-100 dark:border-slate-800/60 hover:bg-blue-500/5">
+                  <td *ngFor="let col of selectedQueryColumns" class="px-2.5 py-1 text-slate-700 dark:text-slate-300 whitespace-nowrap max-w-[180px] truncate">
+                    {{ row[col] }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -105,19 +228,20 @@
 
     <!-- Footer -->
     <div class="flex items-center justify-end px-5 py-3 border-t border-gray-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-950/20 gap-2">
-      <button 
+      <button
         type="button"
         class="px-4 py-2 bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg transition-colors border border-gray-300/50 dark:border-slate-700/50 text-xs font-semibold cursor-pointer"
         (click)="onCancel()"
       >
-        Cancel
+        İptal
       </button>
-      <button 
+      <button
         type="button"
-        class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors border-none text-xs font-semibold cursor-pointer"
+        [disabled]="!selectedQueryId"
+        class="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-lg transition-colors border-none text-xs font-semibold cursor-pointer"
         (click)="onConfirm()"
       >
-        Save Settings
+        Seçimi Uygula
       </button>
     </div>
   </div>

@@ -3,7 +3,13 @@ import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
-import { SavedQuery, QueryResult, SavedPythonScript } from '../models/query.model';
+import {
+  SavedQuery,
+  QueryResult,
+  SavedPythonScript,
+  SharingOptions,
+  PythonScriptRunResult,
+} from '../models/query.model';
 import { DataSource } from '../models/data-source.model';
 
 /** Api yanıtı zarfı. */
@@ -112,5 +118,62 @@ export class QueryService {
 
   removePythonScript(id: string): Observable<ApiEnvelope<boolean>> {
     return this.http.delete<ApiEnvelope<boolean>>(`${environment.apiUrl}/python/scripts/${id}`);
+  }
+
+  /** Kayıtlı bir Python script'ini çalıştırıp tüm çıktı datasetlerini ve satırları getirir. */
+  runSavedPythonScript(
+    id: string,
+    params: Record<string, unknown> = {},
+    dataset = ''
+  ): Observable<ApiEnvelope<PythonScriptRunResult>> {
+    return this.http.post<ApiEnvelope<PythonScriptRunResult>>(
+      `${environment.apiUrl}/python/scripts/${id}/run`,
+      { params, dataset }
+    );
+  }
+
+  /** Kayıtlı Python script'inin sütun listesini ve dataset metadatasını getirir. */
+  getPythonScriptColumns(
+    id: string,
+    dataset = ''
+  ): Observable<{ success: boolean; data: string[]; datasets?: any[] }> {
+    const q = dataset ? `?dataset=${encodeURIComponent(dataset)}` : '';
+    return this.http.get<{ success: boolean; data: string[]; datasets?: any[] }>(
+      `${environment.apiUrl}/python/scripts/${id}/columns${q}`
+    );
+  }
+
+  /** Kayıtlı SQL sorgusunun sütun isimlerini getirir. */
+  getQueryColumns(id: string): Observable<ApiEnvelope<string[]>> {
+    return this.http.get<ApiEnvelope<string[]>>(`${this.base}/${id}/columns`);
+  }
+
+  /** Paylaşım penceresi için aktif rol ve kullanıcı seçeneklerini getirir. */
+  getSharingOptions(): Observable<ApiEnvelope<SharingOptions>> {
+    return this.http.get<ApiEnvelope<SharingOptions>>(`${environment.apiUrl}/sharing/options`);
+  }
+
+  /** Kayıtlı SQL sorgusunun paylaşım izinlerini (roller + kullanıcılar) günceller. */
+  updateQuerySharing(
+    id: string,
+    allowedRoles: string[],
+    allowedUsers: string[]
+  ): Observable<ApiEnvelope<boolean>> {
+    return this.http.put<ApiEnvelope<boolean>>(`${this.base}/${id}/sharing`, {
+      allowedRoles,
+      allowedUsers,
+    });
+  }
+
+  /** Kayıtlı Python script'inin paylaşım izinlerini (roller + kullanıcılar) günceller. */
+  updatePythonScriptSharing(
+    id: string,
+    allowedRoles: string[],
+    allowedUsers: string[]
+  ): Observable<ApiEnvelope<boolean>> {
+    return this.http.put<ApiEnvelope<boolean>>(
+      `${environment.apiUrl}/python/scripts/${id}/sharing`,
+      { allowedRoles, allowedUsers }
+    );
   }
 }

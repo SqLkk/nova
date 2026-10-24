@@ -1,6 +1,6 @@
 # Apex Industrial Technologies — Enterprise Smart Factory Dataset Specification
 > **Domain**: Industrial IoT / Industry 4.0 / SCADA / Discrete & Process Manufacturing  
-> **Target Audience**: Corporate Clients, Enterprise Architects, Plant Directors, Siemens & Automotive Tier-1 Stakeholders  
+> **Target Audience**: Corporate Clients, Enterprise Architects, Plant Directors, Industrial & Automotive Tier-1 Stakeholders  
 > **Language**: 100% English (ISA-95 Standard)  
 > **Platform Integration**: Supernova SCADA, Path Definer & Dynamic Report Studio  
 
@@ -10,7 +10,7 @@
 
 The **Apex Enterprise Smart Factory Dataset** simulates an advanced, high-precision industrial manufacturing ecosystem operating across two flagship European facilities:
 1. **Munich Smart Gigafactory 01 (`PLANT-MUC-01`)**: High-voltage 800V EV battery pack assembly, high-speed servo stamping (Schuler 2,500T), robotic welding cells (KUKA KR-1000 Titan), and automated paint application.
-2. **Stuttgart Precision Powertrain Works (`PLANT-STG-02`)**: 5-axis CNC machining (DMG MORI DMC 85 FD), automated hairpin stator winding (Siemens SIMATIC), and end-of-line high-voltage dynamometer test cells (AVL 400kW, 24,000 RPM).
+2. **Stuttgart Precision Powertrain Works (`PLANT-STG-02`)**: 5-axis CNC machining (DMG MORI DMC 85 FD), automated hairpin stator winding (Apex Industrial Automation), and end-of-line high-voltage dynamometer test cells (AVL 400kW, 24,000 RPM).
 
 The dataset features realistic statistical distributions, physics-grounded telemetry with harmonic sine loads and Gaussian white noise, realistic anomaly injection, standard manufacturing KPIs (**OEE, Availability, Performance, Quality, MTTR, MTBF, Scrap Rate, Cpk**), and full compliance with **ISA-95 equipment hierarchy models**.
 
@@ -175,7 +175,7 @@ File: `data_exports/enterprise_smart_factory/Apex_Smart_Factory_Executive_Dashbo
 
 ## 6. Guide for Presenting to Corporate Clients
 
-When demonstrating Supernova to enterprise clients (e.g. Siemens, automotive OEMs, aerospace suppliers):
+When demonstrating Supernova to enterprise clients (e.g. manufacturing groups, automotive OEMs, aerospace suppliers):
 1. **Open the HTML Executive Dashboard**: Walk through the C-level KPIs, Fleet OEE (85%+ benchmark), MTTR, and downtime cost savings.
 2. **Open Supernova UI -> Query Studio**: Show the pre-registered `[Smart Factory]` queries. Run `q_ind_telemetry_recent` to demonstrate high-frequency sensor streams and instant query performance.
 3. **Open Supernova UI -> Path Definer**:

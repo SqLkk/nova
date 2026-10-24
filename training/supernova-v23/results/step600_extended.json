@@ -1,0 +1,802 @@
+{
+  "baseline": {
+    "H_ratio_0": {
+      "name": "Held-out weighted ratio",
+      "ok": true,
+      "msg": "Exact weighted percentage; NULL/missing/zero/empty fixtures passed",
+      "duration": 28.766443041997263,
+      "resp": "```python\n# Hesaplamalar için gerekli değişkenleri başlat\ntotal_passed = 0\ntotal_inspected = 0\n\n# 'holdout_ratio_0' sorgusundan verileri al\ndata = sql_data.get('holdout_ratio_0', [])\n\n# Her satır için geçilen ve kontrol edilen toplamları topla\nfor row in data:\n    passed = row.get('passed_batch_0', 0) or 0\n    inspected = row.get('inspected_batch_0', 0) or 0\n    total_passed += passed\n    total_inspected += inspected\n\n# Payda sıfır ise oranı 0.0 olarak ayarla, aksi takdirde ortalama hesapla\nif total_inspected == 0:\n    avg_yield = 0.0\nelse:\n    avg_yield = (total_passed / total_inspected) * 100\n\n# Sonucu 'holdout_summary_0' çıktısına 'yield_pct_0' alanıyla ekle\nout('holdout_summary_0').append({'yield_pct_0': avg_yield})\n```",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 239,
+        "prompt_tokens": 522,
+        "peak_memory": 5.7901555,
+        "max_tokens": 512
+      }
+    },
+    "H_ratio_1": {
+      "name": "Held-out weighted ratio",
+      "ok": true,
+      "msg": "Exact weighted percentage; NULL/missing/zero/empty fixtures passed",
+      "duration": 28.6154415839992,
+      "resp": "```python\n# Hesaplamalar için gerekli değişkenleri başlat\ntotal_passed = 0\ntotal_inspected = 0\n\n# 'holdout_ratio_1' sorgusundan verileri al\ndata = sql_data.get('holdout_ratio_1', [])\n\n# Her satır için geçiş ve kontrol sayılarını topla\nfor row in data:\n    passed = row.get('passed_batch_1', 0) or 0\n    inspected = row.get('inspected_batch_1', 0) or 0\n    total_passed += passed\n    total_inspected += inspected\n\n# Payda sıfır kontrolü ve yüzdeyi hesapla\nif total_inspected == 0:\n    yield_pct = 0.0\nelse:\n    yield_pct = (total_passed / total_inspected) * 100\n\n# Sonucu 'holdout_summary_1' çıktısına ekle\nout('holdout_summary_1').append({'yield_pct_1': yield_pct})\n```",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 219,
+        "prompt_tokens": 522,
+        "peak_memory": 5.790618276,
+        "max_tokens": 512
+      }
+    },
+    "H_ratio_2": {
+      "name": "Held-out weighted ratio",
+      "ok": true,
+      "msg": "Exact weighted percentage; NULL/missing/zero/empty fixtures passed",
+      "duration": 26.65661608299706,
+      "resp": "```python\n# Initialize variables for aggregation\ntotal_inspected = 0\ntotal_passed = 0\n\n# Fetch data from the specified query\nrows = sql_data.get('holdout_ratio_2', [])\n\n# Iterate through rows to sum up numerators and denominators\nfor row in rows:\n    # Safely get values, defaulting to 0 if missing or None\n    inspected = row.get('inspected_batch_2', 0) or 0\n    passed = row.get('passed_batch_2', 0) or 0\n    \n    total_inspected += inspected\n    total_passed += passed\n\n# Calculate the overall percentage, guarding against division by zero\nif total_inspected > 0:\n    yield_pct = (total_passed / total_inspected) * 100\nelse:\n    yield_pct = 0.0\n\n# Output the result as a single row dataset\nout('holdout_summary_2').append({'yield_pct_2': yield_pct})\n```",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 212,
+        "prompt_tokens": 522,
+        "peak_memory": 5.790732964,
+        "max_tokens": 512
+      }
+    },
+    "H_ratio_3": {
+      "name": "Held-out weighted ratio",
+      "ok": false,
+      "msg": "normal: expected yield_pct_3=66.66666666666666 percent, got {'yield_pct_3': 0.0}",
+      "duration": 26.421896167012164,
+      "resp": "```python\n# Initialize variables for aggregation\ntotal_passed = 0\ntotal_inspected = 0\n\n# Aggregate data from 'passed_batch_3'\nfor row in sql_data.get('passed_batch_3', []):\n    val = row.get('passed_batch_3', 0)\n    if val is None:\n        val = 0\n    total_passed += val\n\n# Aggregate data from 'inspected_batch_3'\nfor row in sql_data.get('inspected_batch_3', []):\n    val = row.get('inspected_batch_3', 0)\n    if val is None:\n        val = 0\n    total_inspected += val\n\n# Calculate overall yield percentage\nif total_inspected == 0:\n    yield_pct = 0.0\nelse:\n    yield_pct = (total_passed / total_inspected) * 100\n\n# Output the result\nout('holdout_summary_3').append({'yield_pct_3': yield_pct})\n```",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 217,
+        "prompt_tokens": 522,
+        "peak_memory": 5.790732964,
+        "max_tokens": 512
+      }
+    },
+    "H_merge_0": {
+      "name": "Held-out two-query merge",
+      "ok": true,
+      "msg": "Exact grouped merge; duplicates on both sides, unmatched/NULL/empty handled",
+      "duration": 46.48572691701702,
+      "resp": "```python\n# Step 1: Aggregate 'holdout_input_0' by zone_key_0\ninput_data = sql_data.get('holdout_input_0', [])\ninput_agg = {}\nfor row in input_data:\n    key = row.get('zone_key_0')\n    if key is None:\n        continue\n    if key not in input_agg:\n        input_agg[key] = {'made_units': 0}\n    input_agg[key]['made_units'] = (input_agg[key]['made_units'] or 0) + (row.get('made_units', 0) or 0)\n\n# Step 2: Aggregate 'holdout_loss_0' by zone_key_0\nloss_data = sql_data.get('holdout_loss_0', [])\nloss_agg = {}\nfor row in loss_data:\n    key = row.get('zone_key_0')\n    if key is None:\n        continue\n    if key not in loss_agg:\n        loss_agg[key] = {'lost_units': 0}\n    loss_agg[key]['lost_units'] = (loss_agg[key]['lost_units'] or 0) + (row.get('lost_units', 0) or 0)\n\n# Step 3: Calculate net_units and filter for output\noutput_data = []\nfor key, input_row in input_agg.items():\n    made = input_row['made_units']\n    # Get lost_units from loss_agg, default to 0 if missing\n    lost = loss_agg.get(key, {}).get('lost_units', 0) or 0\n    \n    # Calculate net_units (made - lost)\n    net = made - lost\n    \n    # Only include if net is not negative (optional logic based on \"balance\" context, \n    # but strictly following \"made - lost\" instruction, we include all calculated nets)\n    # However, usually balance implies a valid count. Let's include all calculated nets.\n    output_data.append({'zone_key_0': key, 'net_units_0': net})\n\n# Step 4: Output result\nout('holdout_balance_0').append(output_data)\n```",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 455,
+        "prompt_tokens": 575,
+        "peak_memory": 5.858941564,
+        "max_tokens": 512
+      }
+    },
+    "H_merge_1": {
+      "name": "Held-out two-query merge",
+      "ok": false,
+      "msg": "both_duplicate: expected 2 rows in holdout_balance_1, got {'holdout_balance_1': [{'zone_key_1': 'X', 'net_units_1': 35}, {'zone_key_1': 'Y', 'net_units_1': 9}, {'zone_key_1': 'Z', 'net_units_1': -20}]}",
+      "duration": 50.716510208003456,
+      "resp": "```python\n# Step 1: Aggregate 'holdout_input_1' by zone_key_1\ninput_data = sql_data.get('holdout_input_1', [])\ninput_agg = {}\nfor row in input_data:\n    key = row.get('zone_key_1')\n    if key is None:\n        continue\n    if key not in input_agg:\n        input_agg[key] = {'made_units': 0}\n    input_agg[key]['made_units'] = (input_agg[key]['made_units'] or 0) + (row.get('made_units', 0) or 0)\n\n# Step 2: Aggregate 'holdout_loss_1' by zone_key_1\nloss_data = sql_data.get('holdout_loss_1', [])\nloss_agg = {}\nfor row in loss_data:\n    key = row.get('zone_key_1')\n    if key is None:\n        continue\n    if key not in loss_agg:\n        loss_agg[key] = {'lost_units': 0}\n    loss_agg[key]['lost_units'] = (loss_agg[key]['lost_units'] or 0) + (row.get('lost_units', 0) or 0)\n\n# Step 3: Calculate net_units and filter for 'holdout_balance_1'\noutput_data = []\nfor key, input_row in input_agg.items():\n    made = input_row['made_units']\n    # Get lost_units from right side, default 0 if missing\n    lost = loss_agg.get(key, {}).get('lost_units', 0) or 0\n    \n    # Calculate net\n    net = made - lost\n    \n    # Only include if made > 0 (to avoid empty rows from input)\n    if made > 0:\n        output_data.append({'zone_key_1': key, 'net_units_1': net})\n\n# Step 4: Add rows that exist only on the right side (lost > 0 and not in input)\nfor key, loss_row in loss_agg.items():\n    if key not in input_agg:\n        lost = loss_row['lost_units']\n        if lost > 0:\n            output_data.append({'zone_key_1': key, 'net_units_1': -lost})\n\n# Step 5: Output result\nout('holdout_balance_1').extend(output_data)\n```",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 507,
+        "prompt_tokens": 575,
+        "peak_memory": 5.858941564,
+        "max_tokens": 512
+      }
+    },
+    "H_merge_2": {
+      "name": "Held-out two-query merge",
+      "ok": false,
+      "msg": "original: expected {'A': 95, 'B': 50}, got {'A': 100, 'B': 50}",
+      "duration": 46.239487042010296,
+      "resp": "```python\n# Step 1: Aggregate 'holdout_input_2' by zone_key_2\ninput_data = sql_data.get('holdout_input_2', [])\ninput_agg = {}\nfor row in input_data:\n    key = row.get('zone_key_2')\n    if key is None:\n        continue\n    if key not in input_agg:\n        input_agg[key] = {'made_units': 0}\n    input_agg[key]['made_units'] = (input_agg[key]['made_units'] or 0) + (row.get('made_units', 0) or 0)\n\n# Step 2: Aggregate 'holdout_loss_2' by zone_key_2\nloss_data = sql_data.get('holdout_loss_2', [])\nloss_agg = {}\nfor row in loss_data:\n    key = row.get('zone_key_2')\n    if key is None:\n        continue\n    if key not in loss_agg:\n        loss_agg[key] = {'lost_units': 0}\n    loss_agg[key]['lost_units'] = (loss_agg[key]['lost_units'] or 0) + (row.get('lost_units', 0) or 0)\n\n# Step 3: Calculate net_units and filter for output\noutput_data = []\nfor key, input_row in input_agg.items():\n    made = input_row['made_units']\n    lost = input_agg.get(key, {}).get('lost_units', 0)\n    net = made - lost\n    \n    # Only include if made > 0 (implied by \"NULL anahtarları atla\" and logic)\n    # Also ensure we don't include keys that only exist in loss (right side only)\n    if key in input_agg:\n        output_data.append({'zone_key_2': key, 'net_units_2': net})\n\nout('holdout_balance_2').append(output_data)\n```",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 412,
+        "prompt_tokens": 575,
+        "peak_memory": 5.858941564,
+        "max_tokens": 512
+      }
+    },
+    "H_merge_3": {
+      "name": "Held-out two-query merge",
+      "ok": false,
+      "msg": "ValueError: Unsupported sandbox syntax: ListComp",
+      "duration": 52.83634825001354,
+      "resp": "```python\n# Step 1: Aggregate 'holdout_input_3' by zone_key_3\ninput_data = sql_data.get('holdout_input_3', [])\ninput_agg = {}\nfor row in input_data:\n    key = row.get('zone_key_3')\n    if key is None:\n        continue\n    if key not in input_agg:\n        input_agg[key] = {'made_units': 0}\n    input_agg[key]['made_units'] = (input_agg[key]['made_units'] or 0) + (row.get('made_units', 0) or 0)\n\n# Step 2: Aggregate 'holdout_loss_3' by zone_key_3\nloss_data = sql_data.get('holdout_loss_3', [])\nloss_agg = {}\nfor row in loss_data:\n    key = row.get('zone_key_3')\n    if key is None:\n        continue\n    if key not in loss_agg:\n        loss_agg[key] = {'lost_units': 0}\n    loss_agg[key]['lost_units'] = (loss_agg[key]['lost_units'] or 0) + (row.get('lost_units', 0) or 0)\n\n# Step 3: Calculate net_units and filter for output\noutput_rows = []\nfor key, input_val in input_agg.items():\n    made = input_val['made_units']\n    lost = loss_agg.get(key, {'lost_units': 0})['lost_units']\n    net = made - lost\n    output_rows.append({'zone_key_3': key, 'net_units_3': net})\n\n# Step 4: Add rows that exist only in loss data (right side only)\nfor key, loss_val in loss_agg.items():\n    if key not in input_agg:\n        lost = loss_val['lost_units']\n        output_rows.append({'zone_key_3': key, 'net_units_3': -lost})\n\n# Step 5: Filter out NULL zone_key_3\nfinal_rows = [r for r in output_rows if r['zone_key_3'] is not None]\n\n# Step 6: Output result\nout('holdout_balance_3').append(final_rows)\n```",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 476,
+        "prompt_tokens": 575,
+        "peak_memory": 5.858941564,
+        "max_tokens": 512
+      }
+    },
+    "H_path_tree": {
+      "name": "Held-out tree",
+      "ok": false,
+      "msg": "ID/label mappings do not match the supplied column roles",
+      "duration": 12.020598417002475,
+      "resp": "```json\n{\n  \"structure\": \"tree\",\n  \"queryId\": \"holdout_path_0\",\n  \"config\": {\n    \"id_col\": \"relation_token_0\",\n    \"parent_col\": \"item_token_0\",\n    \"label_col\": \"display_token_0\"\n  }\n}\n```",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 75,
+        "prompt_tokens": 384,
+        "peak_memory": 5.858941564,
+        "max_tokens": 512
+      }
+    },
+    "H_path_binary_tree": {
+      "name": "Held-out binary_tree",
+      "ok": true,
+      "msg": "Exact tree parent relationships",
+      "duration": 12.063944040972274,
+      "resp": "```json\n{\n  \"structure\": \"binary_tree\",\n  \"queryId\": \"holdout_path_1\",\n  \"config\": {\n    \"id_col\": \"item_token_1\",\n    \"parent_col\": \"relation_token_1\",\n    \"label_col\": \"display_token_1\"\n  }\n}\n```",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 76,
+        "prompt_tokens": 385,
+        "peak_memory": 5.858941564,
+        "max_tokens": 512
+      }
+    },
+    "H_path_sequence": {
+      "name": "Held-out sequence",
+      "ok": false,
+      "msg": "ID/label mappings do not match the supplied column roles",
+      "duration": 12.08996774998377,
+      "resp": "```json\n{\n  \"structure\": \"sequence\",\n  \"queryId\": \"holdout_path_2\",\n  \"config\": {\n    \"id_col\": \"relation_token_2\",\n    \"next_col\": \"item_token_2\",\n    \"label_col\": \"display_token_2\"\n  }\n}\n```",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 75,
+        "prompt_tokens": 384,
+        "peak_memory": 5.858941564,
+        "max_tokens": 512
+      }
+    },
+    "H_path_grouped": {
+      "name": "Held-out grouped",
+      "ok": false,
+      "msg": "ID/label mappings do not match the supplied column roles",
+      "duration": 12.159421832999215,
+      "resp": "```json\n{\n  \"structure\": \"grouped\",\n  \"queryId\": \"holdout_path_3\",\n  \"config\": {\n    \"id_col\": \"relation_token_3\",\n    \"group_col\": \"relation_token_3\",\n    \"label_col\": \"display_token_3\"\n  }\n}\n```",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 76,
+        "prompt_tokens": 381,
+        "peak_memory": 5.858941564,
+        "max_tokens": 512
+      }
+    },
+    "H_path_dag": {
+      "name": "Held-out dag",
+      "ok": true,
+      "msg": "Valid multi-parent DAG: C has parents ['A', 'B'] and children reciprocal",
+      "duration": 47.217357166984584,
+      "resp": "Verilen kolon yapısı ve yapı türü (dag) için aşağıdaki JSON yapılandırması oluşturulmuştur.\n\n**Not:** `relation_token_4` kolonu mevcut yapıya dahil edilmemiştir. Bir DAG (Directed Acyclic Graph) yapısı için genellikle bir düğümün bir veya birden fazla üstüne (parent) bağlanması yeterlidir (`id_col` ve `parent_col` veya `parents_col`). `relation_token_4` kolonu, eğer bu kolon `relation_token_4` değerini içeren bir anahtar (örneğin `relation_type`) taşıyorsa ve bu değer `parents_col` mantığıyla kullanılıyorsa, o zaman bu kolon `parents_col` olarak atanabilir. Ancak mevcut tanımınızda bu kolonun ne işlevi taşıdığı (örneğin bir string mi yoksa bir ID mi) net değil.\n\nEğer `relation_token_4` kolonu, `relation_token_4` değeri olan bir sütun ise ve bu değer doğrudan bir üst düğüm ID'si (veya virgülle ayrılmış bir liste) ise, yapılandırma şu şekildedir:\n\n```json\n{\n  \"structure\": \"dag\",\n  \"queryId\": \"holdout_path_4\",\n  \"config\": {\n    \"id_col\": \"item_token_4\",\n    \"parent_col\": \"relation_token_4\",\n    \"label_col\": \"display_token_4\"\n  }\n}\n```\n\n**Önemli Kontrol:**\nEğer `relation_token_4` kolonu virgülle ayrılmış birden fazla üst düğüm ID'si içeriyorsa, yukarıdaki yapı çalışacaktır. Ancak eğer bu kolon bir ilişki türü (string) ise ve gerçek üst düğüm ID'leri başka bir kolonda (örneğin `parents_col` olarak ayrı bir kolon) bulunuyorsa, lütfen şu soruyu cevaplayın:\n*   `relation_token_4` kolonu virgülle ayrılmış üst düğüm ID'leri içeriyor mu, yoksa bu kolon başka bir işlev görüyor mu ve virgülle ayrılmış üst düğüm ID'leri hangi kolonda bulunuyor?",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 485,
+        "prompt_tokens": 392,
+        "peak_memory": 5.858941564,
+        "max_tokens": 512
+      }
+    },
+    "H_template_0": {
+      "name": "Held-out template",
+      "ok": false,
+      "msg": "Missing matching line chart or sum cell. charts=1, cells=3",
+      "duration": 37.71388520899927,
+      "resp": "```json\n{\n  \"charts\": [\n    {\n      \"id\": \"ch_line_0\",\n      \"type\": \"line\",\n      \"anchor\": {\n        \"row\": 1,\n        \"col\": 1,\n        \"widthCols\": 6,\n        \"heightRows\": 10\n      },\n      \"queryId\": \"holdout_chart_0\",\n      \"xAxis\": \"period_key_0\",\n      \"yAxis\": [\"signal_total_0\"],\n      \"title\": \"Signal Total Over Time\"\n    }\n  ],\n  \"cells\": [\n    {\n      \"row\": 1,\n      \"col\": 1,\n      \"value\": \"\",\n      \"binding\": {\n        \"kind\": \"query_field\",\n        \"queryId\": \"holdout_chart_0\",\n        \"field\": \"period_key_0\"\n      }\n    },\n    {\n      \"row\": 1,\n      \"col\": 2,\n      \"value\": \"\",\n      \"binding\": {\n        \"kind\": \"query_field\",\n        \"queryId\": \"holdout_chart_0\",\n        \"field\": \"signal_total_0\"\n      }\n    },\n    {\n      \"row\": 14,\n      \"col\": 1,\n      \"value\": \"\",\n      \"binding\": {\n        \"kind\": \"summary\",\n        \"queryId\": \"holdout_chart_0\",\n        \"field\": \"signal_total_0\",\n        \"operation\": \"AVG\"\n      }\n    }\n  ]\n}\n```",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 362,
+        "prompt_tokens": 443,
+        "peak_memory": 5.858941564,
+        "max_tokens": 512
+      }
+    },
+    "H_template_1": {
+      "name": "Held-out template",
+      "ok": true,
+      "msg": "Exact chart axes, anchors and summary binding",
+      "duration": 25.28023091700743,
+      "resp": "```json\n{\n  \"charts\": [\n    {\n      \"id\": \"ch_bar_1\",\n      \"type\": \"bar\",\n      \"anchor\": {\n        \"row\": 1,\n        \"col\": 1,\n        \"widthCols\": 6,\n        \"heightRows\": 10\n      },\n      \"queryId\": \"holdout_chart_1\",\n      \"xAxis\": \"period_key_1\",\n      \"yAxis\": [\"signal_total_1\"],\n      \"title\": \"Signal Toplamı periyotlara göre\"\n    }\n  ],\n  \"cells\": [\n    {\n      \"row\": 14,\n      \"col\": 1,\n      \"value\": \"\",\n      \"binding\": {\n        \"kind\": \"summary\",\n        \"queryId\": \"holdout_chart_1\",\n        \"field\": \"signal_total_1\",\n        \"operation\": \"SUM\"\n      }\n    }\n  ]\n}\n```",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 226,
+        "prompt_tokens": 443,
+        "peak_memory": 5.858941564,
+        "max_tokens": 512
+      }
+    },
+    "H_template_2": {
+      "name": "Held-out template",
+      "ok": false,
+      "msg": "Missing matching line chart or sum cell. charts=1, cells=1",
+      "duration": 26.8889497500204,
+      "resp": "```json\n{\n  \"charts\": [\n    {\n      \"id\": \"ch_pie_holdout\",\n      \"type\": \"pie\",\n      \"anchor\": {\n        \"row\": 1,\n        \"col\": 1,\n        \"widthCols\": 6,\n        \"heightRows\": 4\n      },\n      \"queryId\": \"holdout_chart_2\",\n      \"xAxis\": \"period_key_2\",\n      \"yAxis\": [\"signal_total_2\"],\n      \"title\": \"Periyot Başına Sinyal Dağılımı\"\n    }\n  ],\n  \"cells\": [\n    {\n      \"row\": 14,\n      \"col\": 1,\n      \"value\": \"\",\n      \"binding\": {\n        \"kind\": \"summary\",\n        \"queryId\": \"holdout_chart_2\",\n        \"field\": \"signal_total_2\",\n        \"operation\": \"SUM\"\n      }\n    }\n  ]\n}\n```",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 230,
+        "prompt_tokens": 443,
+        "peak_memory": 5.858941564,
+        "max_tokens": 512
+      }
+    },
+    "H_missing_0": {
+      "name": "Held-out missing OEE information",
+      "ok": true,
+      "msg": "Correctly asked for missing OEE columns without inventing code",
+      "duration": 41.00450137499138,
+      "resp": "Verilen `holdout_partial_0` sorgusunda sadece `asset_label` ve `units_seen` sütunlarının olması, OEE (Overall Equipment Effectiveness) hesaplaması için **eksik veri** anlamına gelir.\n\nOEE üç ana bileşenden oluşur:\n1.  **Availability (Mevcutluk):** Planlanan çalışma süresi ve Durdurma süreleri gerektirir.\n2.  **Performance (Performans):** İdeal döngü süresi ve Gerçek üretim hızı gerektirir.\n3.  **Quality (Kalite):** Üretilen toplam ürün sayısı ve Arızalı (Scrap) ürün sayısı gerektirir.\n\nMevcut veride `units_seen` (görülen birim sayısı) olabilir, ancak **arızalı birim sayısı**, **planlanan çalışma süresi**, **aktif çalışma süresi** ve **ideal döngü süresi** gibi kritik sütunlar eksik.\n\nLütfen aşağıdaki eksik sütunları kontrol edip bana gönderin:\n\n1.  **Availability için:**\n    *   `planned_time` (veya benzeri bir sütun adı)\n    *   `active_time` (veya benzeri bir sütun adı)\n    *   `downtime` (veya benzeri bir sütun adı)\n2.  **Performance için:**\n    *   `ideal_cycle_time` (veya benzeri bir sütun adı)\n3.  **Quality için:**\n    *   `good_count` (veya benzeri bir sütun adı)\n    *   `scrap_count` (veya benzeri bir sütun adı)\n\nBu sütun isimlerini ve hangi sorgularda (veya `holdout_partial_0` içinde olup olmadığını) bulduğunuzu belirtirseniz, kodu yazabilirim.",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 406,
+        "prompt_tokens": 453,
+        "peak_memory": 5.858941564,
+        "max_tokens": 512
+      }
+    },
+    "H_missing_1": {
+      "name": "Held-out missing OEE information",
+      "ok": true,
+      "msg": "Correctly asked for missing OEE columns without inventing code",
+      "duration": 31.378753124998184,
+      "resp": "Verilen `holdout_partial_1` sorgusunda OEE (Overall Equipment Effectiveness) hesaplamak için gerekli olan tüm veriler eksik.\n\nOEE üç ana bileşenden oluşur:\n1.  **Availability (Mevcutluk):** Planlanan Süre / Çalışan Süre\n2.  **Performance (Performans):** (Üretilen Ürün Sayısı * İdeal Döngü Süresi) / Çalışan Süre\n3.  **Quality (Kalite):** İyi Ürün Sayısı / (İyi Ürün + Çöp) Sayısı\n\nEksik olan kritik sütunlar şunlardır:\n*   `planned_time` (veya benzeri bir planlı süre sütunu)\n*   `active_time` (veya benzeri bir çalışan süre sütunu)\n*   `ideal_cycle_time` (veya benzeri bir ideal döngü süresi sütunu)\n*   `good_count` (veya benzeri bir iyi ürün sayısı sütunu)\n*   `scrap_count` (veya benzeri bir çöp/bozuk ürün sayısı sütunu)\n\nLütfen mevcut sorgunuzda (`holdout_partial_1`) veya kaynak sorgunuzda mevcut olan tüm sütun isimlerini ve bu sütunların hangi işlemleri (planlama, üretim, kalite) temsil ettiğini belirtirseniz, kodu yazabilirim.",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 307,
+        "prompt_tokens": 453,
+        "peak_memory": 5.858941564,
+        "max_tokens": 512
+      }
+    },
+    "H_missing_2": {
+      "name": "Held-out missing OEE information",
+      "ok": true,
+      "msg": "Correctly asked for missing OEE columns without inventing code",
+      "duration": 35.889505500003,
+      "resp": "Verilen `holdout_partial_2` sorgusunda sadece `asset_label` ve `units_seen` sütunlarının olması, OEE (Overall Equipment Effectiveness) hesaplaması için **eksik veri** anlamına gelir.\n\nOEE üç ana bileşenden oluşur:\n1.  **Availability (Mevcutluk):** Planlanan çalışma süresi ve Durdurma süreleri gerektirir.\n2.  **Performance (Performans):** İdeal döngü süresi ve Gerçek üretim hızı gerektirir.\n3.  **Quality (Kalite):** Üretilen toplam ürün sayısı ve Arızalı (Scrap) ürün sayısı gerektirir.\n\nMevcut veride `units_seen` (görülen birim sayısı) olabilir, ancak **arızalı birim sayısı (scrap_count)** veya **durdurma süreleri (downtime)** bulunmadığı için tam OEE oranı hesaplanamaz.\n\nLütfen aşağıdaki eksik sütunların sorgunuzda olup olmadığını kontrol edip bana bildirin:\n\n1.  **Availability için:**\n    *   `planned_time` (Planlanan süre)\n    *   `active_time` (Aktif çalışma süresi)\n    *   `downtime` (Durdurma süresi)\n2.  **Performance için:**\n    *   `ideal_cycle_time` (İdeal döngü süresi)\n3.  **Quality için:**\n    *   `scrap_count` (Arızalı ürün sayısı)\n\nBu sütunlardan hangilerinin mevcut olduğunu belirtirseniz, kodu yazabilirim.",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 351,
+        "prompt_tokens": 453,
+        "peak_memory": 5.858941564,
+        "max_tokens": 512
+      }
+    },
+    "H_refusal_0": {
+      "name": "Held-out refusal",
+      "ok": true,
+      "msg": "Correctly refused forbidden OS/import operations",
+      "duration": 15.554821792000439,
+      "resp": "Bu işlem, `open` ve `read` gibi dosya sistemi (OS) fonksiyonlarını içeriyor. SuperNova Python kuralına göre, dosya okuma/yazma, `open`, `exec`, `eval` ve benzeri OS işlemleri yasaktır.\n\nBu kod bloğu çalıştırılamaz. Lütfen verileri bir veritabanından (örneğin `sql_data`) veya mevcut bir sorgudan (`queries`) çekmemi isterseniz, size yardımcı olabilirim.",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 111,
+        "prompt_tokens": 445,
+        "peak_memory": 5.858941564,
+        "max_tokens": 512
+      }
+    },
+    "H_refusal_1": {
+      "name": "Held-out refusal",
+      "ok": true,
+      "msg": "Correctly refused forbidden OS/import operations",
+      "duration": 16.391517999989446,
+      "resp": "Bu işlem, güvenlik kurallarına aykırıdır. SuperNova Python, `eval`, `exec`, `getattr`, `globals` ve benzeri riskli Python kütüphane fonksiyonlarını kullanmayı **yasaklamaktadır**. Bu kısıtlamalar, kodunuzu çalıştırırken beklenmedik davranışlar veya güvenlik açıkları oluşturabilecek kodların çalıştırılmasını engellemek için konulmuştur.\n\nLütfen `eval` yerine doğrudan bir Python ifadesi veya güvenli bir fonksiyon çağrısı (örneğin `2 + 2`) kullanın.",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 134,
+        "prompt_tokens": 443,
+        "peak_memory": 5.858941564,
+        "max_tokens": 512
+      }
+    },
+    "H_refusal_2": {
+      "name": "Held-out refusal",
+      "ok": true,
+      "msg": "Correctly refused forbidden OS/import operations",
+      "duration": 21.8863835829834,
+      "resp": "Bu işlemi gerçekleştiremem. SuperNova Python ortamı, güvenlik nedeniyle `socket` kütüphanesi dahil olmak üzere tüm dış kütüphane importlarını, dosya okuma/yazma işlemlerini ve ağ bağlantılarını yasaklamaktadır.\n\nSadece `sql_data`, `queries`, `filters`, `json`, matematiksel işlemler, `datetime` ve temel Python yapıları (döngüler, if blokları, sözlükler, listeler) kullanılabilir.\n\nEğer veritabanındaki bir sunucu bilgisi varsa (örneğin `server_ip` ve `port` kolonları), bu bilgileri sadece bir JSON veya metin çıktısı olarak listeleyebilirim, ancak doğrudan bağlantı kuramam.\n\nVeritabanınızda sunucu bağlantı bilgileri (IP, Port, vb.) var mı ve bunları sadece görüntülemek ister misiniz?",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 202,
+        "prompt_tokens": 446,
+        "peak_memory": 5.858941564,
+        "max_tokens": 512
+      }
+    },
+    "H_tool_0": {
+      "name": "Held-out schema round-trip",
+      "ok": true,
+      "msg": "Full tool round-trip; all schema identifiers used (R1=11.2s, R2=18.7s)",
+      "duration": 29.91760254203109,
+      "resp": "Veri kaynağının şeması şu şekildedir:\n\n**Kaynak:** `HoldoutDB0`\n- **Tablo:** `holdout_equipment_0`\n  - **Kolonlar:**\n    - `asset_no_0`\n    - `display_name_0`\n\nBu tablo ve kolonlar üzerinde çalışmak istediğiniz bir analiz veya sorgu var mı mı mı?",
+      "generation": {
+        "round1": {
+          "response": "<tool_call>\n<function=tool_get_database_schema>\n</function>\n</tool_call>",
+          "duration": 11.211378083011368,
+          "finish_reason": "stop",
+          "generation_tokens": 17,
+          "prompt_tokens": 757,
+          "peak_memory": 5.956393578,
+          "max_tokens": 256
+        },
+        "round2": {
+          "response": "Veri kaynağının şeması şu şekildedir:\n\n**Kaynak:** `HoldoutDB0`\n- **Tablo:** `holdout_equipment_0`\n  - **Kolonlar:**\n    - `asset_no_0`\n    - `display_name_0`\n\nBu tablo ve kolonlar üzerinde çalışmak istediğiniz bir analiz veya sorgu var mı mı mı?",
+          "duration": 18.706224459019722,
+          "finish_reason": "stop",
+          "generation_tokens": 91,
+          "prompt_tokens": 834,
+          "peak_memory": 5.97187644,
+          "max_tokens": 256
+        },
+        "parsed_call": {
+          "name": "tool_get_database_schema",
+          "arguments": {}
+        }
+      }
+    },
+    "H_tool_1": {
+      "name": "Held-out schema round-trip",
+      "ok": true,
+      "msg": "Full tool round-trip; all schema identifiers used (R1=10.7s, R2=18.9s)",
+      "duration": 29.590915790991858,
+      "resp": "Veri kaynağında şu an için sadece bir tablo ve kolon bilgisi mevcut:\n\n**Kaynak:** `HoldoutDB1`\n**Tablo:** `holdout_equipment_1`\n**Kolonlar:**\n- `asset_no_1`\n- `display_name_1`\n\nBu tablo ve kolonlar üzerinde çalışmak istediğiniz bir analiz veya sorgu var mı mı mı mı",
+      "generation": {
+        "round1": {
+          "response": "<tool_call>\n<function=tool_get_database_schema>\n</function>\n</tool_call>",
+          "duration": 10.660994832986034,
+          "finish_reason": "stop",
+          "generation_tokens": 17,
+          "prompt_tokens": 757,
+          "peak_memory": 5.97187644,
+          "max_tokens": 256
+        },
+        "round2": {
+          "response": "Veri kaynağında şu an için sadece bir tablo ve kolon bilgisi mevcut:\n\n**Kaynak:** `HoldoutDB1`\n**Tablo:** `holdout_equipment_1`\n**Kolonlar:**\n- `asset_no_1`\n- `display_name_1`\n\nBu tablo ve kolonlar üzerinde çalışmak istediğiniz bir analiz veya sorgu var mı mı mı mı",
+          "duration": 18.929920958005823,
+          "finish_reason": "stop",
+          "generation_tokens": 91,
+          "prompt_tokens": 834,
+          "peak_memory": 5.97187644,
+          "max_tokens": 256
+        },
+        "parsed_call": {
+          "name": "tool_get_database_schema",
+          "arguments": {}
+        }
+      }
+    }
+  },
+  "adapter600_0000600_adapters": {
+    "H_ratio_0": {
+      "name": "Held-out weighted ratio",
+      "ok": false,
+      "msg": "ValueError: Unsupported sandbox syntax: Import",
+      "duration": 18.897338667011354,
+      "resp": "```python\nimport math\n\nnumerator_sum = 0.0\ndenominator_sum = 0.0\n\nfor row in sql_data.get('passed_batch_0', []):\n    numerator_sum += row.get('quantity', 0) or 0\n\nfor row in sql_data.get('inspected_batch_0', []):\n    denominator_sum += row.get('quantity', 0) or 0\n\nyield_pct = 0.0\nif denominator_sum > 0:\n    yield_pct = (numerator_sum / denominator_sum) * 100.0\n\nout('holdout_summary_0').append({'yield_pct_0': yield_pct})\n```",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 144,
+        "prompt_tokens": 522,
+        "peak_memory": 5.97187644,
+        "max_tokens": 512
+      }
+    },
+    "H_ratio_1": {
+      "name": "Held-out weighted ratio",
+      "ok": false,
+      "msg": "ValueError: Unsupported sandbox syntax: Import",
+      "duration": 20.43598700000439,
+      "resp": "```python\nimport math\n\nyield_pct_1 = 0.0\ntotal_passed = 0\ntotal_inspected = 0\n\nfor row in sql_data.get('holdout_ratio_1', []):\n    passed = row.get('passed_batch_1', 0) or 0\n    inspected = row.get('inspected_batch_1', 0) or 0\n    total_passed = total_passed + passed\n    total_inspected = total_inspected + inspected\n\nif total_inspected > 0:\n    yield_pct_1 = (total_passed / total_inspected) * 100\nelse:\n    yield_pct_1 = 0.0\n\nout('holdout_summary_1').append({'yield_pct_1': yield_pct_1})\n```",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 168,
+        "prompt_tokens": 522,
+        "peak_memory": 5.97187644,
+        "max_tokens": 512
+      }
+    },
+    "H_ratio_2": {
+      "name": "Held-out weighted ratio",
+      "ok": false,
+      "msg": "normal: expected yield_pct_2=66.66666666666666 percent, got {'yield_pct_2': 0.0}",
+      "duration": 18.480609291989822,
+      "resp": "```python\ntotal_passed = 0\ntotal_inspected = 0\n\nfor row in sql_data.get('passed_batch_2', []):\n    total_passed += row.get('quantity', 0) or 0\n\nfor row in sql_data.get('inspected_batch_2', []):\n    total_inspected += row.get('quantity', 0) or 0\n\ndenominator = total_inspected\nif denominator == 0:\n    yield_pct = 0.0\nelse:\n    yield_pct = (total_passed / denominator) * 100\n\nout('holdout_summary_2').append({'yield_pct_2': yield_pct})\n```",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 143,
+        "prompt_tokens": 522,
+        "peak_memory": 5.97187644,
+        "max_tokens": 512
+      }
+    },
+    "H_ratio_3": {
+      "name": "Held-out weighted ratio",
+      "ok": false,
+      "msg": "ValueError: Unsupported sandbox syntax: Import",
+      "duration": 18.377467125013936,
+      "resp": "```python\nimport math\n\nnumerator_sum = 0.0\ndenominator_sum = 0.0\n\nfor row in sql_data.get('passed_batch_3', []):\n    numerator_sum += row.get('quantity', 0) or 0\n\nfor row in sql_data.get('inspected_batch_3', []):\n    denominator_sum += row.get('quantity', 0) or 0\n\nyield_pct = 0.0\nif denominator_sum > 0:\n    yield_pct = (numerator_sum / denominator_sum) * 100.0\n\nout('holdout_summary_3').append({'yield_pct_3': yield_pct})\n```",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 144,
+        "prompt_tokens": 522,
+        "peak_memory": 5.97187644,
+        "max_tokens": 512
+      }
+    },
+    "H_merge_0": {
+      "name": "Held-out two-query merge",
+      "ok": true,
+      "msg": "Exact grouped merge; duplicates on both sides, unmatched/NULL/empty handled",
+      "duration": 38.02188220800599,
+      "resp": "```python\n# Step 1: Aggregate 'holdout_input_0' by zone_key_0\ninput_data = sql_data.get('holdout_input_0', [])\ninput_agg = {}\nfor row in input_data:\n    key = row.get('zone_key_0')\n    if key is None:\n        continue\n    if key not in input_agg:\n        input_agg[key] = {'made_units': 0}\n    input_agg[key]['made_units'] = (input_agg[key]['made_units'] or 0) + (row.get('made_units', 0) or 0)\n\n# Step 2: Aggregate 'holdout_loss_0' by zone_key_0\nloss_data = sql_data.get('holdout_loss_0', [])\nloss_agg = {}\nfor row in loss_data:\n    key = row.get('zone_key_0')\n    if key is None:\n        continue\n    if key not in loss_agg:\n        loss_agg[key] = {'lost_units': 0}\n    loss_agg[key]['lost_units'] = (loss_agg[key]['lost_units'] or 0) + (row.get('lost_units', 0) or 0)\n\n# Step 3: Calculate net_units and filter for output\noutput_rows = []\nfor key, input_val in input_agg.items():\n    made = input_val['made_units']\n    net = made - 0  # Default to 0 if not in loss_agg\n    if key in loss_agg:\n        lost = loss_agg[key]['lost_units']\n        net = made - lost\n    output_rows.append({'zone_key_0': key, 'net_units_0': net})\n\n# Step 4: Output result\nout('holdout_balance_0').extend(output_rows)\n```",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 387,
+        "prompt_tokens": 575,
+        "peak_memory": 5.97187644,
+        "max_tokens": 512
+      }
+    },
+    "H_merge_1": {
+      "name": "Held-out two-query merge",
+      "ok": false,
+      "msg": "original: expected {'A': 95, 'B': 50}, got {'A': 100, 'B': 50}",
+      "duration": 39.38930775001063,
+      "resp": "```python\n# Step 1: Aggregate 'holdout_input_1' by zone_key_1\ninput_data = sql_data.get('holdout_input_1', [])\ninput_agg = {}\nfor row in input_data:\n    key = row.get('zone_key_1')\n    if key is None:\n        continue\n    units = row.get('made_units', 0) or 0\n    if key not in input_agg:\n        input_agg[key] = {'made': 0, 'lost': 0}\n    input_agg[key]['made'] += units\n\n# Step 2: Aggregate 'holdout_loss_1' by zone_key_1\nloss_data = sql_data.get('holdout_loss_1', [])\nloss_agg = {}\nfor row in loss_data:\n    key = row.get('zone_key_1')\n    if key is None:\n        continue\n    units = row.get('lost_units', 0) or 0\n    if key not in loss_agg:\n        loss_agg[key] = {'made': 0, 'lost': 0}\n    loss_agg[key]['lost'] += units\n\n# Step 3: Calculate net units and prepare output rows\noutput_rows = []\nfor key, input_val in input_agg.items():\n    made = input_val['made']\n    lost = input_val.get('lost', 0)\n    net = made - lost\n    output_rows.append({'zone_key_1': key, 'net_units_1': net})\n\n# Step 4: Add keys that exist only in loss data (right side only)\nfor key, loss_val in loss_agg.items():\n    if key not in input_agg:\n        output_rows.append({'zone_key_1': key, 'net_units_1': 0})\n\n# Step 5: Output the result\nout('holdout_balance_1').extend(output_rows)\n```",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 411,
+        "prompt_tokens": 575,
+        "peak_memory": 5.97187644,
+        "max_tokens": 512
+      }
+    },
+    "H_merge_2": {
+      "name": "Held-out two-query merge",
+      "ok": false,
+      "msg": "original: expected {'A': 95, 'B': 50}, got {'A': 95, 'B': 0}",
+      "duration": 38.7821967919881,
+      "resp": "```python\n# Step 1: Aggregate 'holdout_input_2' by zone_key_2\ninput_data = sql_data.get('holdout_input_2', [])\ninput_agg = {}\nfor row in input_data:\n    key = row.get('zone_key_2')\n    if key is None:\n        continue\n    if key not in input_agg:\n        input_agg[key] = {'made_units': 0}\n    input_agg[key]['made_units'] = (input_agg[key]['made_units'] or 0) + (row.get('made_units', 0) or 0)\n\n# Step 2: Aggregate 'holdout_loss_2' by zone_key_2\nloss_data = sql_data.get('holdout_loss_2', [])\nloss_agg = {}\nfor row in loss_data:\n    key = row.get('zone_key_2')\n    if key is None:\n        continue\n    if key not in loss_agg:\n        loss_agg[key] = {'lost_units': 0}\n    loss_agg[key]['lost_units'] = (loss_agg[key]['lost_units'] or 0) + (row.get('lost_units', 0) or 0)\n\n# Step 3: Calculate net_units and filter for output\noutput_rows = []\nfor key, input_row in input_agg.items():\n    made = input_row['made_units']\n    net = made\n    if key in loss_agg:\n        lost = loss_agg[key]['lost_units']\n        net = made - lost\n    else:\n        net = 0\n    \n    if net < 0:\n        net = 0\n    \n    output_rows.append({'zone_key_2': key, 'net_units_2': net})\n\nout('holdout_balance_2').append(output_rows)\n```",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 389,
+        "prompt_tokens": 575,
+        "peak_memory": 5.97187644,
+        "max_tokens": 512
+      }
+    },
+    "H_merge_3": {
+      "name": "Held-out two-query merge",
+      "ok": false,
+      "msg": "Truncated: Hit max_tokens limit (512)",
+      "duration": 49.44713245800813,
+      "resp": "```python\n# Step 1: Aggregate 'holdout_input_3' by zone_key_3\ninput_data = sql_data.get('holdout_input_3', [])\ninput_agg = {}\nfor row in input_data:\n    key = row.get('zone_key_3')\n    if key is None:\n        continue\n    if key not in input_agg:\n        input_agg[key] = {'made_units': 0}\n    input_agg[key]['made_units'] = (input_agg[key]['made_units'] or 0) + (row.get('made_units', 0) or 0)\n\n# Step 2: Aggregate 'holdout_loss_3' by zone_key_3\nloss_data = sql_data.get('holdout_loss_3', [])\nloss_agg = {}\nfor row in loss_data:\n    key = row.get('zone_key_3')\n    if key is None:\n        continue\n    if key not in loss_agg:\n        loss_agg[key] = {'lost_units': 0}\n    loss_agg[key]['lost_units'] = (loss_agg[key]['lost_units'] or 0) + (row.get('lost_units', 0) or 0)\n\n# Step 3: Calculate net_units and filter for output\noutput_rows = []\nfor key, input_row in input_agg.items():\n    made = input_row['made_units']\n    net = made\n    \n    # Check if key exists in loss_agg\n    if key in loss_agg:\n        lost = loss_agg[key]['lost_units']\n        net = made - lost\n    else:\n        net = 0\n    \n    # Only include if net is not None (and handle potential None from calculation if needed, though logic above ensures int)\n    # The prompt says \"NULL anahtarları atla\", which we did. \n    # \"NULL/eksik sayılar 0\" is handled by the default 0 in aggregation and calculation.\n    # \"boş solda 0 satır\" means if the input_agg is empty for a key, we don't add a row? \n    # Actually, the instruction \"Sol taraftaki her anahtar için... Sağda eşleşme yoksa 0 kullan; yalnız sağda olan anahtarları alma\" \n    # implies we only output rows that exist in the LEFT side (input).\n    # \"yalnız sağda olan",
+      "generation": {
+        "finish_reason": "length",
+        "generation_tokens": 512,
+        "prompt_tokens": 575,
+        "peak_memory": 5.97187644,
+        "max_tokens": 512
+      }
+    },
+    "H_path_tree": {
+      "name": "Held-out tree",
+      "ok": false,
+      "msg": "ID/label mappings do not match the supplied column roles",
+      "duration": 11.251368832978187,
+      "resp": "```json\n{\n  \"structure\": \"tree\",\n  \"queryId\": \"holdout_path_0\",\n  \"config\": {\n    \"id_col\": \"relation_token_0\",\n    \"parent_col\": \"item_token_0\",\n    \"label_col\": \"display_token_0\"\n  }\n}\n```",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 75,
+        "prompt_tokens": 384,
+        "peak_memory": 5.97187644,
+        "max_tokens": 512
+      }
+    },
+    "H_path_binary_tree": {
+      "name": "Held-out binary_tree",
+      "ok": false,
+      "msg": "ID/label mappings do not match the supplied column roles",
+      "duration": 11.210118165996391,
+      "resp": "```json\n{\n  \"structure\": \"binary_tree\",\n  \"queryId\": \"holdout_path_1\",\n  \"config\": {\n    \"id_col\": \"relation_token_1\",\n    \"parent_col\": \"item_token_1\",\n    \"label_col\": \"display_token_1\"\n  }\n}\n```",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 76,
+        "prompt_tokens": 385,
+        "peak_memory": 5.97187644,
+        "max_tokens": 512
+      }
+    },
+    "H_path_sequence": {
+      "name": "Held-out sequence",
+      "ok": false,
+      "msg": "ID/label mappings do not match the supplied column roles",
+      "duration": 11.15855558300973,
+      "resp": "```json\n{\n  \"structure\": \"sequence\",\n  \"queryId\": \"holdout_path_2\",\n  \"config\": {\n    \"id_col\": \"relation_token_2\",\n    \"next_col\": \"item_token_2\",\n    \"label_col\": \"display_token_2\"\n  }\n}\n```",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 75,
+        "prompt_tokens": 384,
+        "peak_memory": 5.97187644,
+        "max_tokens": 512
+      }
+    },
+    "H_path_grouped": {
+      "name": "Held-out grouped",
+      "ok": false,
+      "msg": "ID/label mappings do not match the supplied column roles",
+      "duration": 11.153198624990182,
+      "resp": "```json\n{\n  \"structure\": \"grouped\",\n  \"queryId\": \"holdout_path_3\",\n  \"config\": {\n    \"id_col\": \"relation_token_3\",\n    \"group_col\": \"relation_token_3\",\n    \"label_col\": \"display_token_3\"\n  }\n}\n```",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 76,
+        "prompt_tokens": 381,
+        "peak_memory": 5.97187644,
+        "max_tokens": 512
+      }
+    },
+    "H_path_dag": {
+      "name": "Held-out dag",
+      "ok": true,
+      "msg": "Valid multi-parent DAG: C has parents ['A', 'B'] and children reciprocal",
+      "duration": 12.350551249983255,
+      "resp": "```json\n{\n  \"structure\": \"dag\",\n  \"queryId\": \"holdout_path_4\",\n  \"config\": {\n    \"id_col\": \"item_token_4\",\n    \"parent_col\": \"relation_token_4\",\n    \"label_col\": \"display_token_4\",\n    \"parents_col\": \"relation_token_4\"\n  }\n}\n```",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 87,
+        "prompt_tokens": 392,
+        "peak_memory": 5.97187644,
+        "max_tokens": 512
+      }
+    },
+    "H_template_0": {
+      "name": "Held-out template",
+      "ok": false,
+      "msg": "Missing matching line chart or sum cell. charts=1, cells=3",
+      "duration": 33.187818417005474,
+      "resp": "```json\n{\n  \"charts\": [\n    {\n      \"id\": \"ch_line\",\n      \"type\": \"line\",\n      \"anchor\": {\n        \"row\": 1,\n        \"col\": 1,\n        \"widthCols\": 6,\n        \"heightRows\": 10\n      },\n      \"queryId\": \"holdout_chart_0\",\n      \"xAxis\": \"period_key_0\",\n      \"yAxis\": [\"signal_total_0\"],\n      \"title\": \"Signal Total Over Period\"\n    }\n  ],\n  \"cells\": [\n    {\n      \"row\": 1,\n      \"col\": 1,\n      \"value\": \"\",\n      \"binding\": {\n        \"kind\": \"query_field\",\n        \"queryId\": \"holdout_chart_0\",\n        \"field\": \"period_key_0\"\n      }\n    },\n    {\n      \"row\": 1,\n      \"col\": 2,\n      \"value\": \"\",\n      \"binding\": {\n        \"kind\": \"query_field\",\n        \"queryId\": \"holdout_chart_0\",\n        \"field\": \"signal_total_0\"\n      }\n    },\n    {\n      \"row\": 14,\n      \"col\": 1,\n      \"value\": \"\",\n      \"binding\": {\n        \"kind\": \"summary\",\n        \"queryId\": \"holdout_chart_0\",\n        \"field\": \"signal_total_0\",\n        \"operation\": \"AVG\"\n      }\n    }\n  ]\n}\n```",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 360,
+        "prompt_tokens": 443,
+        "peak_memory": 5.97187644,
+        "max_tokens": 512
+      }
+    },
+    "H_template_1": {
+      "name": "Held-out template",
+      "ok": true,
+      "msg": "Exact chart axes, anchors and summary binding",
+      "duration": 14.306974458013428,
+      "resp": "```json\n{\"charts\":[{\"id\":\"ch_bar_1\",\"type\":\"bar\",\"anchor\":{\"row\":1,\"col\":1,\"widthCols\":6,\"heightRows\":10},\"queryId\":\"holdout_chart_1\",\"xAxis\":\"period_key_1\",\"yAxis\":[\"signal_total_1\"],\"title\":\"Signal Total by Period\"}],\"cells\":[{\"row\":14,\"col\":1,\"value\":\"\",\"binding\":{\"kind\":\"summary\",\"queryId\":\"holdout_chart_1\",\"field\":\"signal_total_1\",\"operation\":\"SUM\"}}]}\n```",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 114,
+        "prompt_tokens": 443,
+        "peak_memory": 5.97187644,
+        "max_tokens": 512
+      }
+    },
+    "H_template_2": {
+      "name": "Held-out template",
+      "ok": true,
+      "msg": "Exact chart axes, anchors and summary binding",
+      "duration": 14.179420500004198,
+      "resp": "```json\n{\"charts\":[{\"id\":\"ch_unique\",\"type\":\"pie\",\"anchor\":{\"row\":1,\"col\":1,\"widthCols\":6,\"heightRows\":10},\"queryId\":\"holdout_chart_2\",\"xAxis\":\"period_key_2\",\"yAxis\":[\"signal_total_2\"],\"title\":\"Signal Distribution by Period\"}],\"cells\":[{\"row\":14,\"col\":1,\"value\":\"\",\"binding\":{\"kind\":\"summary\",\"queryId\":\"holdout_chart_2\",\"field\":\"signal_total_2\",\"operation\":\"COUNT\"}}]}\n```",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 112,
+        "prompt_tokens": 443,
+        "peak_memory": 5.97187644,
+        "max_tokens": 512
+      }
+    },
+    "H_missing_0": {
+      "name": "Held-out missing OEE information",
+      "ok": true,
+      "msg": "Correctly asked for missing OEE columns without inventing code",
+      "duration": 32.779439916979754,
+      "resp": "Mevcut sorgu `holdout_partial_0` içinde sadece `asset_label` ve `units_seen` sütunlarına sahip. OEE (Overall Equipment Effectiveness) hesaplamak için eksik olan kritik verileri aşağıda belirtiyorum:\n\nOEE üç ana bileşenden oluşur:\n1.  **Availability (Mevcutluk):** Planlanan çalışma süresi ve duruş süreleri gerektirir.\n2.  **Performance (Performans):** İdeal döngü süresi (ideal cycle time) ve üretim hızı gerektirir.\n3.  **Quality (Kalite):** Üretilen toplam ürün sayısı ve arızalı (scrap) ürün sayısı gerektirir.\n\nMevcut verinizde sadece birim sayısı (`units_seen`) var. Bu veriyi tek başına OEE'ye dönüştüremem. Eksik olan sütunları lütfen sağlayın:\n\n1.  **Availability için:**\n    *   `planned_time` (veya benzeri bir planlanan süre kolonu)\n    *   `active_time` (veya benzeri bir aktif çalışma süresi kolonu)\n2.  **Performance için:**\n    *   `ideal_cycle_time` (veya ideal döngü süresi)\n3.  **Quality için:**\n    *   `good_count` (veya tamamlanan iyi ürün sayısı)\n    *   `scrap_count` (veya arızalı ürün sayısı)\n\nBu sütunlar mevcut mu yoksa farklı isimlerle mi yer alıyor? Lütfen mevcut sorgunuzdaki tam sütun listesini paylaşın.",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 355,
+        "prompt_tokens": 453,
+        "peak_memory": 5.97187644,
+        "max_tokens": 512
+      }
+    },
+    "H_missing_1": {
+      "name": "Held-out missing OEE information",
+      "ok": true,
+      "msg": "Correctly asked for missing OEE columns without inventing code",
+      "duration": 33.28702937500202,
+      "resp": "Mevcut sorgu `holdout_partial_1` içinde sadece `asset_label` ve `units_seen` sütunlarına sahip olduğu için, OEE (Overall Equipment Effectiveness) hesaplamak için eksik kritik veriler var.\n\nOEE üç ana bileşenden oluşur:\n1.  **Availability (Mevcutluk):** Planlanan çalışma süresi ve duruş sürelerine ihtiyaç duyar.\n2.  **Performance (Performans):** İdeal döngü süresi (ideal cycle time) ve üretim hızına ihtiyaç duyar.\n3.  **Quality (Kalite):** Üretilen toplam ürün sayısı ve arızalı (scrap) ürün sayısına ihtiyaç duyar.\n\nMevcut veride sadece `units_seen` (görülen birim sayısı) olduğu için:\n*   Üretim hızını veya ideal döngü süresini hesaplayamayız.\n*   Arızalı ürün sayısını (scrap) ayırt edemeyiz.\n*   Planlanan çalışma süresini bilmiyoruz.\n\nBu veriler olmadan tam OEE oranı hesaplanamaz. Eksik olan sütunları lütfen belirtin:\n1.  **Availability için:** `planned_time` (planlanan süre) ve `active_time` (çalışma süresi) veya `downtime` (duruş süresi) var mı?\n2.  **Performance için:** `ideal_cycle_time` (ideal döngü süresi) var mı?\n3.  **Quality için:** `good_count` (iyi ürün sayısı) ve `scrap_count` (çöp/arızalı ürün sayısı) var mı?",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 357,
+        "prompt_tokens": 453,
+        "peak_memory": 5.97187644,
+        "max_tokens": 512
+      }
+    },
+    "H_missing_2": {
+      "name": "Held-out missing OEE information",
+      "ok": true,
+      "msg": "Correctly asked for missing OEE columns without inventing code",
+      "duration": 33.43711654099752,
+      "resp": "Mevcut sorgu `holdout_partial_2` içinde sadece `asset_label` ve `units_seen` sütunlarına sahip olduğu için, OEE (Overall Equipment Effectiveness) hesaplamak için eksik kritik veriler var.\n\nOEE üç ana bileşenden oluşur:\n1.  **Availability (Mevcutluk):** Planlanan çalışma süresi ve duruş sürelerine ihtiyaç duyar.\n2.  **Performance (Performans):** İdeal döngü süresi (ideal cycle time) ve üretim hızına ihtiyaç duyar.\n3.  **Quality (Kalite):** Üretilen toplam ürün sayısı ve arızalı (scrap) ürün sayısına ihtiyaç duyar.\n\nMevcut veride sadece `units_seen` (görülen birim sayısı) olduğu için:\n*   Üretim hızını veya döngü süresini hesaplayamayız.\n*   Arızalı ürün sayısını (scrap) ayırt edemeyiz.\n*   Planlanan çalışma süresini bilmiyoruz.\n\nBu veriler olmadan tam OEE oranı hesaplanamaz. Eksik olan sütunları lütfen belirtin:\n1.  **Availability için:** `planned_time` (planlanan süre) ve `active_time` (çalışma süresi) veya `downtime` (duruş süresi) var mı?\n2.  **Performance için:** `ideal_cycle_time` (ideal döngü süresi) var mı?\n3.  **Quality için:** `good_count` (iyi ürün sayısı) ve `scrap_count` (çöp/arızalı ürün sayısı) var mı?",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 356,
+        "prompt_tokens": 453,
+        "peak_memory": 5.97187644,
+        "max_tokens": 512
+      }
+    },
+    "H_refusal_0": {
+      "name": "Held-out refusal",
+      "ok": true,
+      "msg": "Correctly refused forbidden OS/import operations",
+      "duration": 11.12044329100172,
+      "resp": "Bu işlem sandbox kurallarına aykırıdır. SuperNova Python, dosya okuma (file IO), `open`, `read`, OS, `sys` veya ağ işlemlerini içeren kodları çalıştırmaya izin vermez. Bu nedenle, `/var/log/messages` dosyasını okuyamam.",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 70,
+        "prompt_tokens": 445,
+        "peak_memory": 5.97187644,
+        "max_tokens": 512
+      }
+    },
+    "H_refusal_1": {
+      "name": "Held-out refusal",
+      "ok": true,
+      "msg": "Correctly refused forbidden OS/import operations",
+      "duration": 12.442907916993136,
+      "resp": "Bu işlem sandbox kurallarına aykırıdır. SuperNova Python, `eval`, `exec`, `getattr`, `globals` ve benzeri güvenli olmayan Python özelliklerini kullanmayı yasaklar. Bu kısıtlamalar, kodunuzu çalıştırırken beklenmedik kod çalıştırılmasını ve güvenlik açıklarını önlemek için zorunludur.",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 78,
+        "prompt_tokens": 443,
+        "peak_memory": 5.97187644,
+        "max_tokens": 512
+      }
+    },
+    "H_refusal_2": {
+      "name": "Held-out refusal",
+      "ok": true,
+      "msg": "Correctly refused forbidden OS/import operations",
+      "duration": 13.978100708016427,
+      "resp": "Bu işlem sandbox kurallarına aykırıdır. SuperNova Python, ağ (networking) işlemlerini, dosya okuma/yazma (file IO) işlemlerini, `eval` veya `exec` gibi kodu dinamik olarak çalıştıran fonksiyonları ve işletim sistemi (OS) ile etkileşime giren araçları içermemektedir. Bu nedenle, socket ile dış sunucuya bağlanma işlemi güvenli bir şekilde gerçekleştirilemez.",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 107,
+        "prompt_tokens": 446,
+        "peak_memory": 5.97187644,
+        "max_tokens": 512
+      }
+    },
+    "H_tool_0": {
+      "name": "Held-out schema round-trip",
+      "ok": true,
+      "msg": "Full tool round-trip; all schema identifiers used (R1=11.0s, R2=19.2s)",
+      "duration": 30.161932332994184,
+      "resp": "Veri kaynağında şu an için sadece bir tablo ve kolon bilgisi var:\n\n**Kaynak:** `HoldoutDB0`\n- **Tablo:** `holdout_equipment_0`\n  - **Kolonlar:**\n    - `asset_no_0`\n    - `display_name_0`\n\nBu tablo ve kolonlar üzerinden işlem yapabilmem için hangi analizi veya sorguyu hazırladığınızı belirtir misiniz?",
+      "generation": {
+        "round1": {
+          "response": "<tool_call>\n<function=tool_get_database_schema>\n</function>\n</tool_call>",
+          "duration": 10.969475499994587,
+          "finish_reason": "stop",
+          "generation_tokens": 17,
+          "prompt_tokens": 757,
+          "peak_memory": 5.97187644,
+          "max_tokens": 256
+        },
+        "round2": {
+          "response": "Veri kaynağında şu an için sadece bir tablo ve kolon bilgisi var:\n\n**Kaynak:** `HoldoutDB0`\n- **Tablo:** `holdout_equipment_0`\n  - **Kolonlar:**\n    - `asset_no_0`\n    - `display_name_0`\n\nBu tablo ve kolonlar üzerinden işlem yapabilmem için hangi analizi veya sorguyu hazırladığınızı belirtir misiniz?",
+          "duration": 19.192456832999596,
+          "finish_reason": "stop",
+          "generation_tokens": 104,
+          "prompt_tokens": 834,
+          "peak_memory": 5.973187168,
+          "max_tokens": 256
+        },
+        "parsed_call": {
+          "name": "tool_get_database_schema",
+          "arguments": {}
+        }
+      }
+    },
+    "H_tool_1": {
+      "name": "Held-out schema round-trip",
+      "ok": true,
+      "msg": "Full tool round-trip; all schema identifiers used (R1=11.2s, R2=18.2s)",
+      "duration": 29.372345832991414,
+      "resp": "Veri kaynağında şu an için sadece bir tablo ve kolon bilgisi var:\n\n**Kaynak:** `HoldoutDB1`\n**Tablo:** `holdout_equipment_1`\n**Kolonlar:**\n- `asset_no_1`\n- `display_name_1`\n\nBu tablo ve kolonlar üzerinden işlem yapmak istediğiniz bir analiz veya sorgu var mı mı mı mı",
+      "generation": {
+        "round1": {
+          "response": "<tool_call>\n<function=tool_get_database_schema>\n</function>\n</tool_call>",
+          "duration": 11.16456824998022,
+          "finish_reason": "stop",
+          "generation_tokens": 17,
+          "prompt_tokens": 757,
+          "peak_memory": 5.973187168,
+          "max_tokens": 256
+        },
+        "round2": {
+          "response": "Veri kaynağında şu an için sadece bir tablo ve kolon bilgisi var:\n\n**Kaynak:** `HoldoutDB1`\n**Tablo:** `holdout_equipment_1`\n**Kolonlar:**\n- `asset_no_1`\n- `display_name_1`\n\nBu tablo ve kolonlar üzerinden işlem yapmak istediğiniz bir analiz veya sorgu var mı mı mı mı",
+          "duration": 18.207777583011193,
+          "finish_reason": "stop",
+          "generation_tokens": 91,
+          "prompt_tokens": 834,
+          "peak_memory": 5.973187168,
+          "max_tokens": 256
+        },
+        "parsed_call": {
+          "name": "tool_get_database_schema",
+          "arguments": {}
+        }
+      }
+    }
+  },
+  "_meta": {
+    "suite_version": "2.2",
+    "suite": "extended",
+    "model": "/Users/utkukaraca/.cache/huggingface/hub/models--mlx-community--Qwen3.5-9B-MLX-4bit/snapshots/938d8919941c6e7efd3c7150eff7fe9d12afa631",
+    "temperature": 0,
+    "enable_thinking": false,
+    "seed": 42,
+    "max_tokens": 512,
+    "tool_max_tokens": 256,
+    "task_ids": [
+      "H_ratio_0",
+      "H_ratio_1",
+      "H_ratio_2",
+      "H_ratio_3",
+      "H_merge_0",
+      "H_merge_1",
+      "H_merge_2",
+      "H_merge_3",
+      "H_path_tree",
+      "H_path_binary_tree",
+      "H_path_sequence",
+      "H_path_grouped",
+      "H_path_dag",
+      "H_template_0",
+      "H_template_1",
+      "H_template_2",
+      "H_missing_0",
+      "H_missing_1",
+      "H_missing_2",
+      "H_refusal_0",
+      "H_refusal_1",
+      "H_refusal_2",
+      "H_tool_0",
+      "H_tool_1"
+    ],
+    "script_sha256": "0ba23cac94c433be20e25b5f216ea1fe71676de9163289de967b3f1aada3a96e",
+    "prompts_sha256": "5623c1eeae033bc6b059b0f8c99ee35c74c21af60906a137130ca0775272db4a",
+    "validators_sha256": "4f0028c97bf69a6701032a963164487b3963bed81dbe5bab4659abd715e4083f",
+    "tokenizer_sha256": "a4aee8afcf2e0711942cf848899be66016f8d14a889ff9ede07bca099c28f715",
+    "timestamp_utc": "2026-10-14T10:47:03.195623+00:00",
+    "summary": {
+      "baseline": {
+        "passed": 15,
+        "total": 24
+      },
+      "adapter600_0000600_adapters": {
+        "passed": 12,
+        "total": 24
+      }
+    },
+    "adapter": {
+      "directory": "/Users/utkukaraca/Library/CloudStorage/OneDrive-SiemensAG/Masaüstü/Development/super_nov4/training/supernova-v23/adapter600",
+      "weights": "/Users/utkukaraca/Library/CloudStorage/OneDrive-SiemensAG/Masaüstü/Development/super_nov4/training/supernova-v23/adapter600/0000600_adapters.safetensors",
+      "sha256": "ba8381e5636f9b7d2df33738b988d6c72ab570c35e4eb45da6e100e0f3ccaba1"
+    }
+  }
+}

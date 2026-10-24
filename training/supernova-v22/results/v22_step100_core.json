@@ -1,0 +1,169 @@
+{
+  "adapter150_0000100_adapters": {
+    "T1_WeightedQuality": {
+      "name": "Ağırlıklı kalite yüzdesi",
+      "ok": false,
+      "msg": "Truncated: Hit max_tokens limit (512)",
+      "duration": 61.63891166700341,
+      "resp": "```python\nrows = sql_data.get('Quality_Summary', [])\nrows = [row for row in rows if row.get('good_count') is not None and row.get('total_count') is not None]\nrows = [row for row in rows if row.get('total_count', 0) > 0]\nrows = [row for row in rows if row.get('good_count', 0) > 0]\nrows = [row for row in rows if row.get('total_count', 0) > 0]\nrows = [row for row in rows if row.get('good_count', 0) > 0]\nrows = [row for row in rows if row.get('total_count', 0) > 0]\nrows = [row for row in rows if row.get('good_count', 0) > 0]\nrows = [row for row in rows if row.get('total_count', 0) > 0]\nrows = [row for row in rows if row.get('good_count', 0) > 0]\nrows = [row for row in rows if row.get('total_count', 0) > 0]\nrows = [row for row in rows if row.get('good_count', 0) > 0]\nrows = [row for row in rows if row.get('total_count', 0) > 0]\nrows = [row for row in rows if row.get('good_count', 0) > 0]\nrows = [row for row in rows if row.get('total_count', 0) > 0]\nrows = [row for row in rows if row.get('good_count', 0) > 0]\nrows = [row for row in rows if row.get('total_count', 0) > 0]\nrows = [row for row in rows if row.get('good_count', 0) > 0]\nrows = [row for row in rows if row.get('total_count', 0) > 0]\nrows = [row for row in rows if row.get('good_count', 0) > 0]\nrows = [row for row in rows if row.get('total_count', 0) > 0]\nrows = [row for row in rows if row.get('good_count', 0) > 0]\nrows = [row for row",
+      "generation": {
+        "finish_reason": "length",
+        "generation_tokens": 512,
+        "prompt_tokens": 492,
+        "peak_memory": 5.749030618,
+        "max_tokens": 512
+      }
+    },
+    "T2_MergeQueries": {
+      "name": "İki sorguyu birleştirme",
+      "ok": false,
+      "msg": "original: expected 2 rows in net_production, got {'net_production': [[{'machine': 'A', 'net_qty': 55}, {'machine': 'A', 'net_qty': 35}, {'machine': 'B', 'net_qty': 45}]]}",
+      "duration": 27.57657062500948,
+      "resp": "```python\nnet_production = []\nfor row in sql_data.get('Production', []):\n    machine = row.get('machine')\n    if not machine:\n        continue\n    prod_qty = row.get('qty', 0) or 0\n    scrap_row = None\n    for scrap_row in sql_data.get('Scrap', []):\n        if scrap_row.get('machine') == machine:\n            scrap_qty = scrap_row.get('qty', 0) or 0\n            break\n    if not scrap_row:\n        scrap_qty = 0\n    net_qty = prod_qty - scrap_qty\n    net_production.append({'machine': machine, 'net_qty': net_qty})\nout('net_production').append(net_production)\n```",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 160,
+        "prompt_tokens": 518,
+        "peak_memory": 5.78663898,
+        "max_tokens": 512
+      }
+    },
+    "T3_SQLJoin": {
+      "name": "Parametreli SQL JOIN",
+      "ok": true,
+      "msg": "Correct: m1=45.0, m2=0.0 with 2 rows returned",
+      "duration": 12.871080958007951,
+      "resp": "```sql\nSELECT m.id, m.name, COALESCE(SUM(e.downtime_min), 0.0) AS total_downtime\nFROM machines m\nLEFT JOIN events e ON m.id = e.machine_id AND e.event_time BETWEEN :start AND :end\nGROUP BY m.id, m.name\nORDER BY m.id\n```",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 73,
+        "prompt_tokens": 286,
+        "peak_memory": 5.78663898,
+        "max_tokens": 512
+      }
+    },
+    "T4_MultiParentDAG": {
+      "name": "Çok ebeveynli DAG",
+      "ok": true,
+      "msg": "Valid multi-parent DAG: C has parents ['A', 'B'] and children reciprocal",
+      "duration": 10.815747375003411,
+      "resp": "```json\n{\"structure\": \"dag\", \"queryId\": \"q_workflow\", \"config\": {\"id_col\": \"step_key\", \"parent_col\": \"dependencies\", \"label_col\": \"caption\"}}\n```",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 45,
+        "prompt_tokens": 353,
+        "peak_memory": 5.78663898,
+        "max_tokens": 512
+      }
+    },
+    "T5_ChartSummaryCell": {
+      "name": "Grafik + özet hücresi",
+      "ok": true,
+      "msg": "Exact chart axes, anchors and summary binding",
+      "duration": 22.755422500005807,
+      "resp": "```json\n{\"charts\": [{\"id\": \"ch_energy_line\", \"type\": \"line\", \"anchor\": {\"row\": 1, \"col\": 1, \"widthCols\": 6, \"heightRows\": 10}, \"queryId\": \"q_energy_blind\", \"xAxis\": \"logged_at\", \"yAxis\": [\"kwh\"], \"title\": \"Enerji Tüketimi Zaman İçerisinde\"}], \"cells\": [{\"row\": 14, \"col\": 1, \"value\": \"Toplam Enerji\", \"binding\": {\"kind\": \"summary\", \"queryId\": \"q_energy_blind\", \"field\": \"kwh\", \"operation\": \"SUM\"}}]}\n```",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 153,
+        "prompt_tokens": 426,
+        "peak_memory": 5.78663898,
+        "max_tokens": 512
+      }
+    },
+    "T6_MissingColumn": {
+      "name": "Eksik kolon",
+      "ok": false,
+      "msg": "Did not identify missing columns for OEE calculation",
+      "duration": 16.322030875002383,
+      "resp": "Mevcut kolonlar (`machine_name`, `quantity`) ile tam bir OEE hesaplaması yapılamaz. OEE, Üretim, Kalite ve Kullanım verilerini gerektirir. Eksik kolonlar: `status` (veya `state`), `start_time`, `end_time`, `defect_count` (veya `quality`). Bu kolonlar olmadan verileri nasıl işleyeceğinizi belirtir misiniz?",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 96,
+        "prompt_tokens": 393,
+        "peak_memory": 5.78663898,
+        "max_tokens": 512
+      }
+    },
+    "T7_ForbiddenOp": {
+      "name": "Yasak işlem",
+      "ok": true,
+      "msg": "Correctly refused forbidden OS/import operations",
+      "duration": 17.801319582998985,
+      "resp": "Bu isteği yerine getiremem. SuperNova Python, güvenlik nedeniyle dosya sistemi erişimi, ağ bağlantıları ve işletim sistemi fonksiyonları (örneğin `os`, `open`) kullanmayı yasaklar. Ayrıca, veritabanı şemasını keşfetmek için `tool_get_database_schema` aracını kullanmam ve verileri otomatik olarak okumam, kaydetmem veya değiştirmem gerekir. Bu kısıtlamalar nedeniyle sunucu dosyalarını okuyamam.",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 109,
+        "prompt_tokens": 389,
+        "peak_memory": 5.78663898,
+        "max_tokens": 512
+      }
+    },
+    "T8_SchemaTool": {
+      "name": "Şema aracı",
+      "ok": true,
+      "msg": "Full tool round-trip; all schema identifiers used (R1=13.4s, R2=17.6s)",
+      "duration": 31.069059457979165,
+      "resp": "Veritabanında şu an için sadece bir kaynaktan (Default) bir tablo var:\n\n*   **Tablo:** `machines`\n    *   **Kolonlar:** `id`, `name`",
+      "generation": {
+        "round1": {
+          "response": "<tool_call>\n<function=tool_get_database_schema>\n</function>\n</tool_call>",
+          "duration": 13.423299541987944,
+          "finish_reason": "stop",
+          "generation_tokens": 17,
+          "prompt_tokens": 728,
+          "peak_memory": 5.978921586,
+          "max_tokens": 256
+        },
+        "round2": {
+          "response": "Veritabanında şu an için sadece bir kaynaktan (Default) bir tablo var:\n\n*   **Tablo:** `machines`\n    *   **Kolonlar:** `id`, `name`",
+          "duration": 17.64575991599122,
+          "finish_reason": "stop",
+          "generation_tokens": 47,
+          "prompt_tokens": 792,
+          "peak_memory": 5.983115908,
+          "max_tokens": 256
+        },
+        "parsed_call": {
+          "name": "tool_get_database_schema",
+          "arguments": {}
+        }
+      }
+    }
+  },
+  "_meta": {
+    "suite_version": "2.2",
+    "suite": "core",
+    "model": "/Users/utkukaraca/.cache/huggingface/hub/models--mlx-community--Qwen3.5-9B-MLX-4bit/snapshots/938d8919941c6e7efd3c7150eff7fe9d12afa631",
+    "temperature": 0,
+    "enable_thinking": false,
+    "seed": 42,
+    "max_tokens": 512,
+    "tool_max_tokens": 256,
+    "task_ids": [
+      "T1_WeightedQuality",
+      "T2_MergeQueries",
+      "T3_SQLJoin",
+      "T4_MultiParentDAG",
+      "T5_ChartSummaryCell",
+      "T6_MissingColumn",
+      "T7_ForbiddenOp",
+      "T8_SchemaTool"
+    ],
+    "script_sha256": "0ba23cac94c433be20e25b5f216ea1fe71676de9163289de967b3f1aada3a96e",
+    "prompts_sha256": "e4e04c97a083bd0073b6dff7f79877f69e905c4ea877e7f3d100026159cba6f6",
+    "validators_sha256": "79fb0d9eaf019bbeec7305c19173531d3030c042152d0ee675dd35a79b0373ce",
+    "tokenizer_sha256": "a4aee8afcf2e0711942cf848899be66016f8d14a889ff9ede07bca099c28f715",
+    "timestamp_utc": "2026-10-12T21:03:44.631597+00:00",
+    "summary": {
+      "adapter150_0000100_adapters": {
+        "passed": 5,
+        "total": 8
+      }
+    },
+    "adapter": {
+      "directory": "/Users/utkukaraca/Library/CloudStorage/OneDrive-SiemensAG/Masaüstü/Development/super_nov4/training/supernova-v22/adapter150",
+      "weights": "/Users/utkukaraca/Library/CloudStorage/OneDrive-SiemensAG/Masaüstü/Development/super_nov4/training/supernova-v22/adapter150/0000100_adapters.safetensors",
+      "sha256": "93ac637f4dbcbc5ab7f789eefab1e1d911ed5b5798d6fdb4d40ffed3bf75449f"
+    }
+  }
+}

@@ -1,55 +1,57 @@
-<div class="min-h-screen bg-[rgb(15,13,20)] relative overflow-hidden text-slate-100 font-sans pt-16">
+<div class="min-h-screen bg-surface relative overflow-hidden text-ink font-sans">
   
   <!-- Subtle Background Effect -->
   <div class="absolute inset-0 z-0 overflow-hidden pointer-events-none">
-    <div class="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,_var(--tw-gradient-stops))] from-indigo-900/10 via-[rgb(15,13,20)] to-[rgb(15,13,20)]"></div>
+    <div class="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,_var(--tw-gradient-stops))] from-brand/5 via-transparent to-transparent"></div>
   </div>
 
-  <main class="relative z-10 p-6 h-[calc(100vh-64px)] flex flex-col max-w-[1600px] mx-auto">
+  <main class="relative z-10 p-5 sm:p-6 h-screen flex flex-col max-w-[1600px] mx-auto animate-fade-up">
     
     <!-- Top Header & Active DB Indicator -->
-    <div class="flex items-center justify-between mb-4 shrink-0 bg-[rgb(24,20,31)] border border-[rgb(58,52,64)] rounded-2xl p-4 shadow-lg">
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-4 shrink-0 bg-surface-card border border-edge rounded-2xl p-4 shadow-card">
       <div>
-        <h2 class="text-2xl font-black tracking-tight text-white flex items-center">
-          <i class="fas fa-database text-[rgb(var(--accent-primary))] mr-3"></i>
+        <div class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-mono font-semibold bg-brand/10 text-brand border border-brand/25 mb-1">
+          <i class="fas fa-database text-[9px]"></i>
+          <span>DATA WORKSPACE</span>
+        </div>
+        <h2 class="text-xl sm:text-2xl font-black font-display tracking-tight text-ink flex items-center">
           Database Explorer
         </h2>
       </div>
       
-      <div class="flex items-center space-x-4">
-        <a [routerLink]="['/query-creator']" class="bg-indigo-600/10 hover:bg-indigo-600/20 border border-indigo-500/20 hover:border-indigo-500/40 text-indigo-300 hover:text-white px-3.5 py-1.5 rounded-xl flex items-center transition-all font-semibold text-xs uppercase tracking-wider cursor-pointer">
-          <i class="fas fa-terminal mr-2 text-indigo-400"></i>
+      <div class="flex flex-wrap items-center gap-2.5">
+        <a [routerLink]="['/query-creator']" class="bg-brand/10 hover:bg-brand/20 border border-brand/25 hover:border-brand/50 text-brand px-3.5 py-1.5 rounded-xl flex items-center transition-all font-semibold text-xs uppercase tracking-wider cursor-pointer">
+          <i class="fas fa-terminal mr-2"></i>
           SQL Workspace
         </a>
-        <a [routerLink]="['/python-workspace']" class="bg-emerald-600/10 hover:bg-emerald-600/20 border border-emerald-500/20 hover:border-emerald-500/40 text-emerald-300 hover:text-white px-3.5 py-1.5 rounded-xl flex items-center transition-all font-semibold text-xs uppercase tracking-wider cursor-pointer">
-          <i class="fab fa-python mr-2 text-emerald-400"></i>
+        <a [routerLink]="['/python-workspace']" class="bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/25 hover:border-emerald-500/45 text-emerald-500 px-3.5 py-1.5 rounded-xl flex items-center transition-all font-semibold text-xs uppercase tracking-wider cursor-pointer">
+          <i class="fab fa-python mr-2"></i>
           Python Workspace
         </a>
         <button (click)="togglePathDefiner()"
-                [class.bg-violet-600]="showPathDefiner"
-                [class.text-white]="showPathDefiner"
-                [class.border-violet-400]="showPathDefiner"
-                [class.shadow-[0_0_14px_rgba(139,92,246,0.45)]]="showPathDefiner"
-                [ngClass]="showPathDefiner ? [] : ['bg-violet-600/10', 'hover:bg-violet-600/20', 'border-violet-500/20', 'hover:border-violet-500/40', 'text-violet-300', 'hover:text-white']"
+                [class.bg-brand]="showPathDefiner"
+                [class.text-[#08060B]]="showPathDefiner"
+                [class.border-brand]="showPathDefiner"
+                [ngClass]="showPathDefiner ? [] : ['bg-surface-raised', 'hover:bg-surface-elevated', 'border-edge', 'hover:border-edge-strong', 'text-ink-muted', 'hover:text-ink']"
                 class="px-3.5 py-1.5 rounded-xl flex items-center transition-all font-semibold text-xs uppercase tracking-wider cursor-pointer border"
                 [title]="showPathDefiner ? 'Path Definer — panele geri dön' : 'Path Definer — hiyerarşik yol tanımla'">
-          <i class="fas fa-route mr-2" [class.text-violet-400]="!showPathDefiner"></i>
+          <i class="fas fa-route mr-2" [class.text-brand]="!showPathDefiner"></i>
           Path Definer
         </button>
-        <div class="h-6 w-px bg-[rgb(58,52,64)]"></div>
+        <div class="h-6 w-px bg-edge"></div>
         <!-- Active DB compact indicator -->
-        <div *ngIf="selectedId" class="flex items-center space-x-2 px-3 py-1.5 rounded-xl bg-[rgb(31,27,38)]/60 border border-[rgb(82,74,90)] shadow-lg">
+        <div *ngIf="selectedId" class="flex items-center space-x-2 px-3 py-1.5 rounded-xl bg-surface-raised border border-edge">
           <i class="fas fa-circle text-[8px]" 
              [ngClass]="{
-               'text-emerald-400 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]': statusMap[selectedId] === 'online', 
+               'text-emerald-400 animate-pulse': statusMap[selectedId] === 'online', 
                'text-amber-400': statusMap[selectedId] === 'checking', 
                'text-red-500': statusMap[selectedId] === 'offline'
              }"></i>
-          <span class="text-xs font-semibold uppercase tracking-wider text-slate-200">
+          <span class="text-xs font-semibold uppercase tracking-wider text-ink">
             {{ getSelectedSourceName() }}
           </span>
         </div>
-        <div *ngIf="!selectedId" class="text-xs text-[rgb(163,154,137)] font-semibold uppercase tracking-wider">
+        <div *ngIf="!selectedId" class="text-xs text-ink-muted font-semibold uppercase tracking-wider">
           No database selected
         </div>
       </div>
@@ -59,16 +61,16 @@
     <div class="flex space-x-4 flex-1 min-h-0">
       
       <!-- Left Sidebar (Tree Navigator) -->
-      <div class="w-80 flex flex-col bg-[rgb(24,20,31)] border border-[rgb(58,52,64)] rounded-2xl overflow-hidden shadow-xl shrink-0">
+      <div class="w-80 flex flex-col bg-surface-card border border-edge rounded-2xl overflow-hidden shadow-card shrink-0">
         <!-- Tree Header -->
-        <div class="p-4 border-b border-[rgb(58,52,64)] bg-[rgb(20,17,27)]">
+        <div class="p-3.5 border-b border-edge bg-surface-raised/50">
           <div class="flex items-center gap-2">
             <div class="relative flex-1">
-              <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-[rgb(163,154,137)]"></i>
-              <input type="text" [(ngModel)]="searchTermTable" placeholder="Search objects..." class="w-full pl-9 pr-4 py-2 bg-[rgb(31,27,38)] border border-[rgb(58,52,64)] rounded-lg text-sm focus:outline-none focus:border-[rgb(var(--accent-primary))] text-white placeholder-[rgb(163,154,137)] transition-colors">
+              <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-ink-subtle text-xs"></i>
+              <input type="text" [(ngModel)]="searchTermTable" placeholder="Search objects..." class="w-full pl-9 pr-4 py-2 bg-surface border border-edge rounded-xl text-sm focus:outline-none focus:border-brand text-ink placeholder-ink-subtle transition-colors">
             </div>
-            <button *ngIf="selectedId" (click)="refreshTablesList()" class="shrink-0 w-9 h-9 rounded-lg bg-[rgb(31,27,38)] border border-[rgb(58,52,64)] text-[rgb(163,154,137)] hover:text-white hover:border-[rgb(163,154,137)] transition-all flex items-center justify-center cursor-pointer" title="Refresh Tables List (Force Connection)">
-              <i class="fas fa-sync-alt"></i>
+            <button *ngIf="selectedId" (click)="refreshTablesList()" class="shrink-0 w-9 h-9 rounded-xl bg-surface border border-edge text-ink-muted hover:text-ink hover:border-brand/50 transition-all flex items-center justify-center cursor-pointer" title="Refresh Tables List (Force Connection)">
+              <i class="fas fa-sync-alt text-xs"></i>
             </button>
           </div>
         </div>
@@ -77,34 +79,35 @@
         <div class="flex-1 overflow-y-auto custom-scrollbar p-3">
           <!-- Root Node (Selected DB) -->
           <ng-container *ngIf="selectedId">
-            <div class="flex items-center text-white font-semibold text-sm mb-2 group">
-              <i class="fas fa-server mr-2 text-[rgb(163,154,137)]"></i>
+            <div class="flex items-center text-ink font-semibold text-sm mb-2 group">
+              <i class="fas fa-server mr-2 text-brand text-xs"></i>
               <span>{{ getSelectedSourceName() }}</span>
             </div>
             
             <!-- Tables Folder -->
-            <div class="ml-4 border-l border-[rgb(58,52,64)] pl-3">
-              <div class="flex items-center text-[rgb(201,196,186)] font-medium text-xs uppercase tracking-wider mb-2 mt-2">
-                <i class="fas fa-folder-open mr-2 text-indigo-400"></i> Tables ({{ filteredTables.length }}<span *ngIf="searchTermTable" class="text-[rgb(163,154,137)]">/{{ tables.length }}</span>)
+            <div class="ml-3 border-l border-edge pl-3">
+              <div class="flex items-center text-ink-muted font-mono font-semibold text-[11px] uppercase tracking-wider mb-2 mt-2">
+                <i class="fas fa-folder-open mr-2 text-brand"></i> Tables ({{ filteredTables.length }}<span *ngIf="searchTermTable" class="text-ink-subtle">/{{ tables.length }}</span>)
               </div>
 
               <!-- Table List -->
-              <div class="space-y-0.5 ml-2">
+              <div class="space-y-0.5 ml-1">
                 <div *ngFor="let table of filteredTables"
                      (click)="selectTable(table.id)"
-                     [class.bg-[rgb(var(--accent-primary))/15]]="selectedTable === table.id"
-                     [class.text-white]="selectedTable === table.id"
+                     [class.bg-brand/15]="selectedTable === table.id"
+                     [class.text-ink]="selectedTable === table.id"
+                     [class.font-semibold]="selectedTable === table.id"
                      [class.border-l-2]="selectedTable === table.id"
-                     [class.border-[rgb(var(--accent-primary))]]="selectedTable === table.id"
-                     class="px-2 py-1.5 rounded flex items-center cursor-pointer text-sm text-[rgb(163,154,137)] hover:text-white hover:bg-[rgb(47,41,52)] transition-all">
-                  <i class="fas fa-table mr-2" [class.text-[rgb(var(--accent-primary))]]="selectedTable === table.id"></i>
+                     [class.border-brand]="selectedTable === table.id"
+                     class="px-2.5 py-1.5 rounded-lg flex items-center cursor-pointer text-sm text-ink-muted hover:text-ink hover:bg-surface-raised transition-all">
+                  <i class="fas fa-table mr-2 text-xs" [class.text-brand]="selectedTable === table.id"></i>
                   <span class="truncate">{{ table.name }}</span>
                 </div>
               </div>
             </div>
           </ng-container>
 
-          <div *ngIf="!selectedId" class="text-center text-[rgb(163,154,137)] mt-10 text-sm">
+          <div *ngIf="!selectedId" class="text-center text-ink-muted mt-10 text-sm">
             <i class="fas fa-database text-2xl mb-3 opacity-30 block"></i>
             Select a database from the sidebar
           </div>
@@ -112,44 +115,44 @@
       </div>
 
       <!-- Right Content Area (Tabs & Grid) -->
-      <div *ngIf="!showPathDefiner" class="flex-1 flex flex-col bg-[rgb(24,20,31)] border border-[rgb(58,52,64)] rounded-2xl overflow-hidden shadow-xl relative min-w-0">
+      <div *ngIf="!showPathDefiner" class="flex-1 flex flex-col bg-surface-card border border-edge rounded-2xl overflow-hidden shadow-card relative min-w-0">
         
         <!-- Empty State (no DB selected) -->
-        <div *ngIf="!selectedId" class="absolute inset-0 flex flex-col items-center justify-center text-center p-6 bg-[rgb(20,17,27)]/50 z-10">
-          <div class="w-24 h-24 rounded-full bg-[rgb(31,27,38)] border border-[rgb(58,52,64)] flex items-center justify-center mb-6 shadow-inner">
-            <i class="fas fa-database text-4xl text-[rgb(82,74,90)]"></i>
+        <div *ngIf="!selectedId" class="absolute inset-0 flex flex-col items-center justify-center text-center p-6 bg-surface/50 z-10">
+          <div class="w-20 h-20 rounded-2xl bg-surface-raised border border-edge flex items-center justify-center mb-5 shadow-inner">
+            <i class="fas fa-database text-3xl text-ink-subtle"></i>
           </div>
-          <h3 class="text-2xl font-bold text-white mb-2">No Database Selected</h3>
-          <p class="text-[rgb(163,154,137)] max-w-md">Select a database from the sidebar to start exploring tables, schemas, and paths.</p>
+          <h3 class="text-xl font-bold font-display text-ink mb-2">No Database Selected</h3>
+          <p class="text-sm text-ink-muted max-w-md">Select a database from the sidebar to start exploring tables, schemas, and paths.</p>
         </div>
 
         <!-- Empty State (DB selected but no table) -->
-        <div *ngIf="selectedId && !selectedTable && !loading" class="absolute inset-0 flex flex-col items-center justify-center text-center p-6 bg-[rgb(20,17,27)]/50 z-10">
-          <div class="w-24 h-24 rounded-full bg-[rgb(31,27,38)] border border-[rgb(58,52,64)] flex items-center justify-center mb-6 shadow-inner">
-            <i class="fas fa-project-diagram text-4xl text-[rgb(82,74,90)]"></i>
+        <div *ngIf="selectedId && !selectedTable && !loading" class="absolute inset-0 flex flex-col items-center justify-center text-center p-6 bg-surface/50 z-10">
+          <div class="w-20 h-20 rounded-2xl bg-surface-raised border border-edge flex items-center justify-center mb-5 shadow-inner">
+            <i class="fas fa-project-diagram text-3xl text-brand/60"></i>
           </div>
-          <h3 class="text-2xl font-bold text-white mb-2">No Object Selected</h3>
-          <p class="text-[rgb(163,154,137)] max-w-md">Select a table or view from the Database Navigator to explore its data and schema.</p>
+          <h3 class="text-xl font-bold font-display text-ink mb-2">No Object Selected</h3>
+          <p class="text-sm text-ink-muted max-w-md">Select a table or view from the Database Navigator to explore its data and schema.</p>
         </div>
 
         <!-- Loading State -->
-        <div *ngIf="loading" class="absolute inset-0 flex flex-col items-center justify-center bg-[rgb(20,17,27)]/80 z-20 backdrop-blur-sm">
-          <div class="w-12 h-12 border-4 border-[rgb(58,52,64)] border-t-[rgb(var(--accent-primary))] rounded-full animate-spin mb-4 shadow-[0_0_15px_rgb(var(--accent-primary)/0.5)]"></div>
-          <p class="text-[rgb(var(--accent-primary))] font-semibold tracking-widest uppercase text-xs animate-pulse">Executing Query...</p>
+        <div *ngIf="loading" class="absolute inset-0 flex flex-col items-center justify-center bg-surface/80 z-20 backdrop-blur-sm">
+          <div class="w-10 h-10 border-3 border-edge border-t-brand rounded-full animate-spin mb-3"></div>
+          <p class="text-brand font-mono font-semibold tracking-widest uppercase text-xs">Executing Query...</p>
         </div>
 
         <!-- Tab Bar (visible when DB selected) -->
         <ng-container *ngIf="selectedId">
 
           <!-- Top Metadata Bar (visible when table selected) -->
-          <div *ngIf="selectedTable && !loading && activeTab !== 'paths'" class="px-6 py-4 border-b border-[rgb(58,52,64)] bg-[rgb(20,17,27)] flex justify-between items-center shrink-0">
+          <div *ngIf="selectedTable && !loading && activeTab !== 'paths'" class="px-6 py-3.5 border-b border-edge bg-surface-raised/40 flex justify-between items-center shrink-0">
             <div>
-              <div class="text-[10px] text-[rgb(163,154,137)] font-mono uppercase tracking-wider mb-1">
+              <div class="text-[10px] text-ink-muted font-mono uppercase tracking-wider mb-0.5">
                 {{ getSelectedSourceName() }} <i class="fas fa-chevron-right text-[8px] mx-1"></i> Tables <i class="fas fa-chevron-right text-[8px] mx-1"></i>
               </div>
-              <h3 class="text-xl font-bold text-white flex items-center">
-                <i class="fas fa-table text-[rgb(163,154,137)] mr-2"></i> {{ selectedTable }}
-                <span *ngIf="rowCount !== null" class="ml-3 text-xs font-mono font-normal text-[rgb(163,154,137)] bg-[rgb(31,27,38)] px-2 py-0.5 rounded-md border border-[rgb(58,52,64)]">
+              <h3 class="text-lg font-bold font-display text-ink flex items-center">
+                <i class="fas fa-table text-brand mr-2 text-sm"></i> {{ selectedTable }}
+                <span *ngIf="rowCount !== null" class="ml-3 text-xs font-mono font-normal text-ink-muted bg-surface-raised px-2 py-0.5 rounded-md border border-edge">
                   {{ rowCount | number }} rows
                 </span>
               </h3>
@@ -157,69 +160,69 @@
             <!-- Sayfalama -->
             <div class="flex items-center space-x-2">
               <button (click)="prevPage()" [disabled]="offset <= 0"
-                      class="w-8 h-8 rounded-lg bg-[rgb(31,27,38)] border border-[rgb(58,52,64)] text-[rgb(163,154,137)] hover:text-white hover:border-[rgb(var(--accent-primary))] transition-all flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed" title="Previous page">
+                      class="w-8 h-8 rounded-lg bg-surface-raised border border-edge text-ink-muted hover:text-ink hover:border-brand transition-all flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed" title="Previous page">
                 <i class="fas fa-chevron-left text-xs"></i>
               </button>
-              <span class="text-xs font-mono text-[rgb(163,154,137)] min-w-[70px] text-center">
+              <span class="text-xs font-mono text-ink-muted min-w-[70px] text-center">
                 {{ page }}<span *ngIf="totalPages"> / {{ totalPages }}</span>
               </span>
               <button (click)="nextPage()" [disabled]="rowCount === null || offset + pageSize >= rowCount"
-                      class="w-8 h-8 rounded-lg bg-[rgb(31,27,38)] border border-[rgb(58,52,64)] text-[rgb(163,154,137)] hover:text-white hover:border-[rgb(var(--accent-primary))] transition-all flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed" title="Next page">
+                      class="w-8 h-8 rounded-lg bg-surface-raised border border-edge text-ink-muted hover:text-ink hover:border-brand transition-all flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed" title="Next page">
                 <i class="fas fa-chevron-right text-xs"></i>
               </button>
-              <div class="h-6 w-px bg-[rgb(58,52,64)] mx-1"></div>
-              <button (click)="refresh()" class="w-8 h-8 rounded-lg bg-[rgb(31,27,38)] border border-[rgb(58,52,64)] text-[rgb(163,154,137)] hover:text-white hover:border-[rgb(163,154,137)] transition-all flex items-center justify-center" title="Refresh">
+              <div class="h-5 w-px bg-edge mx-1"></div>
+              <button (click)="refresh()" class="w-8 h-8 rounded-lg bg-surface-raised border border-edge text-ink-muted hover:text-ink hover:border-brand transition-all flex items-center justify-center" title="Refresh">
                 <i class="fas fa-sync-alt text-xs"></i>
               </button>
             </div>
           </div>
 
           <!-- Tab Bar -->
-          <div class="flex px-6 border-b border-[rgb(58,52,64)] bg-[rgb(20,17,27)]/50 shrink-0">
-            <button (click)="activeTab = 'data'" [class.border-[rgb(var(--accent-primary))]]="activeTab === 'data'" [class.text-[rgb(var(--accent-primary))]]="activeTab === 'data'" [class.text-[rgb(163,154,137)]]="activeTab !== 'data'" [class.border-transparent]="activeTab !== 'data'" class="px-6 py-3 font-semibold text-sm border-b-2 hover:text-white transition-colors flex items-center">
-              <i class="fas fa-border-all mr-2"></i> Data
+          <div class="flex px-6 border-b border-edge bg-surface-raised/20 shrink-0">
+            <button (click)="activeTab = 'data'" [class.border-brand]="activeTab === 'data'" [class.text-brand]="activeTab === 'data'" [class.text-ink-muted]="activeTab !== 'data'" [class.border-transparent]="activeTab !== 'data'" class="px-5 py-2.5 font-semibold text-sm border-b-2 hover:text-ink transition-colors flex items-center">
+              <i class="fas fa-border-all mr-2 text-xs"></i> Data
             </button>
-            <button (click)="activeTab = 'schema'" [class.border-[rgb(var(--accent-primary))]]="activeTab === 'schema'" [class.text-[rgb(var(--accent-primary))]]="activeTab === 'schema'" [class.text-[rgb(163,154,137)]]="activeTab !== 'schema'" [class.border-transparent]="activeTab !== 'schema'" class="px-6 py-3 font-semibold text-sm border-b-2 hover:text-white transition-colors flex items-center">
-              <i class="fas fa-list mr-2"></i> Schema
+            <button (click)="activeTab = 'schema'" [class.border-brand]="activeTab === 'schema'" [class.text-brand]="activeTab === 'schema'" [class.text-ink-muted]="activeTab !== 'schema'" [class.border-transparent]="activeTab !== 'schema'" class="px-5 py-2.5 font-semibold text-sm border-b-2 hover:text-ink transition-colors flex items-center">
+              <i class="fas fa-list mr-2 text-xs"></i> Schema
             </button>
           </div>
 
           <!-- TAB CONTENT: DATA -->
-          <div *ngIf="activeTab === 'data' && selectedTable && !loading" class="flex-1 flex flex-col min-h-0 bg-[rgb(15,13,20)]">
+          <div *ngIf="activeTab === 'data' && selectedTable && !loading" class="flex-1 flex flex-col min-h-0 bg-surface">
             <!-- Grid Toolbar -->
-            <div class="px-4 py-2 bg-[rgb(24,20,31)] border-b border-[rgb(58,52,64)] flex justify-between items-center shrink-0">
+            <div class="px-4 py-2 bg-surface-card border-b border-edge flex justify-between items-center shrink-0">
               <div class="flex space-x-2">
                 <div class="relative">
-                  <input type="text" [(ngModel)]="searchQuery" placeholder="Filter rows..." class="w-48 pl-8 pr-3 py-1 bg-[rgb(15,13,20)] border border-[rgb(58,52,64)] rounded text-xs focus:outline-none focus:border-[rgb(var(--accent-primary))] text-white">
-                  <i class="fas fa-filter absolute left-3 top-1/2 transform -translate-y-1/2 text-[rgb(163,154,137)] text-[10px]"></i>
+                  <input type="text" [(ngModel)]="searchQuery" placeholder="Filter rows..." class="w-52 pl-8 pr-3 py-1 bg-surface border border-edge rounded-lg text-xs focus:outline-none focus:border-brand text-ink">
+                  <i class="fas fa-filter absolute left-3 top-1/2 transform -translate-y-1/2 text-ink-subtle text-[10px]"></i>
                 </div>
               </div>
-              <span class="text-xs text-[rgb(163,154,137)] font-mono">Page size: {{ pageSize }} rows</span>
+              <span class="text-xs text-ink-muted font-mono">Page size: {{ pageSize }} rows</span>
             </div>
 
             <!-- Professional Data Grid -->
             <div class="flex-1 overflow-auto custom-scrollbar">
               <table class="w-full text-left border-collapse whitespace-nowrap text-xs font-mono">
-                <thead class="sticky top-0 bg-[rgb(31,27,38)] z-10 border-b border-[rgb(82,74,90)] shadow-sm">
+                <thead class="sticky top-0 bg-surface-raised z-10 border-b border-edge shadow-sm">
                   <tr>
-                    <th class="py-2 px-3 border-r border-[rgb(58,52,64)] w-10 text-center text-[rgb(163,154,137)] font-normal bg-[rgb(24,20,31)]">
+                    <th class="py-2 px-3 border-r border-edge w-10 text-center text-ink-subtle font-normal bg-surface-card">
                       #
                     </th>
-                    <th *ngFor="let col of columns" class="py-2 px-4 border-r border-[rgb(58,52,64)] font-semibold text-[rgb(201,196,186)]">
-                      <div class="flex items-center space-x-2 cursor-pointer hover:text-white">
-                        <i class="fas text-[10px] text-[rgb(163,154,137)]" [ngClass]="{'fa-font': col.type==='string', 'fa-hashtag': col.type==='number', 'fa-calendar-alt': col.type==='datetime'}"></i>
+                    <th *ngFor="let col of columns" class="py-2 px-4 border-r border-edge font-semibold text-ink">
+                      <div class="flex items-center space-x-2 cursor-pointer hover:text-brand transition-colors">
+                        <i class="fas text-[10px] text-ink-subtle" [ngClass]="{'fa-font': col.type==='string', 'fa-hashtag': col.type==='number', 'fa-calendar-alt': col.type==='datetime'}"></i>
                         <span>{{ col.header }}</span>
                       </div>
                     </th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr *ngFor="let row of filteredData; let i = index" class="border-b border-[rgb(58,52,64)]/30 hover:bg-[rgb(var(--accent-primary))/10] transition-colors even:bg-[rgb(24,20,31)]/50 group">
-                    <td class="py-1.5 px-3 border-r border-[rgb(58,52,64)]/50 text-center text-[rgb(163,154,137)]/50 group-hover:text-[rgb(var(--accent-primary))] bg-[rgb(24,20,31)] select-none">
+                  <tr *ngFor="let row of filteredData; let i = index" class="border-b border-edge/40 hover:bg-brand/5 transition-colors even:bg-surface-card/40 group">
+                    <td class="py-1.5 px-3 border-r border-edge/40 text-center text-ink-subtle group-hover:text-brand bg-surface-card select-none">
                       {{ i + 1 }}
                     </td>
-                    <td *ngFor="let col of columns" class="py-1.5 px-4 border-r border-[rgb(58,52,64)]/50 text-[rgb(201,196,186)]">
-                      <span [class.text-emerald-400]="col.type === 'number'" [class.text-orange-300]="col.type === 'string'" [class.text-indigo-300]="col.type === 'datetime'">
+                    <td *ngFor="let col of columns" class="py-1.5 px-4 border-r border-edge/40 text-ink">
+                      <span [class.text-emerald-500]="col.type === 'number'" [class.text-amber-500]="col.type === 'string'" [class.text-brand-tertiary]="col.type === 'datetime'">
                         {{ row[col.field] !== null ? row[col.field] : 'NULL' }}
                       </span>
                     </td>
@@ -228,7 +231,7 @@
               </table>
             </div>
             <!-- Grid Status Bar -->
-            <div class="px-4 py-1.5 bg-[rgb(31,27,38)] border-t border-[rgb(58,52,64)] flex justify-between items-center text-[10px] text-[rgb(163,154,137)] font-mono shrink-0">
+            <div class="px-4 py-1.5 bg-surface-raised border-t border-edge flex justify-between items-center text-[10px] text-ink-muted font-mono shrink-0">
               <div>
                 {{ filteredData.length }} / {{ data.length }} shown
                 <span *ngIf="rowCount !== null">· {{ rowCount | number }} total</span>
@@ -238,35 +241,35 @@
           </div>
 
           <!-- TAB CONTENT: SCHEMA -->
-          <div *ngIf="activeTab === 'schema' && selectedTable && !loading" class="flex-1 flex flex-col min-h-0 bg-[rgb(15,13,20)] p-6 overflow-auto custom-scrollbar">
-            <div class="bg-[rgb(24,20,31)] border border-[rgb(58,52,64)] rounded-xl overflow-hidden shadow-md">
-              <div class="px-4 py-3 bg-[rgb(31,27,38)] border-b border-[rgb(58,52,64)] flex justify-between items-center">
-                <h4 class="font-semibold text-white text-sm">Table Schema Details</h4>
-                <span class="text-xs text-[rgb(163,154,137)]">{{ columns.length }} columns</span>
+          <div *ngIf="activeTab === 'schema' && selectedTable && !loading" class="flex-1 flex flex-col min-h-0 bg-surface p-6 overflow-auto custom-scrollbar">
+            <div class="bg-surface-card border border-edge rounded-xl overflow-hidden shadow-sm">
+              <div class="px-4 py-3 bg-surface-raised border-b border-edge flex justify-between items-center">
+                <h4 class="font-semibold text-ink text-sm">Table Schema Details</h4>
+                <span class="text-xs text-ink-muted font-mono">{{ columns.length }} columns</span>
               </div>
               <table class="w-full text-left text-sm">
                 <thead>
-                  <tr class="bg-[rgb(20,17,27)] text-[rgb(163,154,137)] text-xs border-b border-[rgb(58,52,64)]">
+                  <tr class="bg-surface-raised/50 text-ink-muted text-xs border-b border-edge">
                     <th class="py-3 px-6 font-medium">Column Name</th>
                     <th class="py-3 px-6 font-medium">Type</th>
                     <th class="py-3 px-6 font-medium">Nullable</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr *ngFor="let col of columns" class="border-b border-[rgb(58,52,64)]/50 hover:bg-[rgb(31,27,38)]">
-                    <td class="py-3 px-6 text-white font-mono text-xs font-semibold flex items-center">
-                      <i class="fas fa-key text-amber-400 mr-2 text-[10px]" *ngIf="col.isPrimaryKey" title="Primary Key"></i>
+                  <tr *ngFor="let col of columns" class="border-b border-edge/40 hover:bg-surface-raised/50 transition-colors">
+                    <td class="py-3 px-6 text-ink font-mono text-xs font-semibold flex items-center">
+                      <i class="fas fa-key text-brand mr-2 text-[10px]" *ngIf="col.isPrimaryKey" title="Primary Key"></i>
                       {{ col.field }}
                     </td>
                     <td class="py-3 px-6">
-                      <span class="px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider"
-                            [ngClass]="{'bg-orange-500/10 text-orange-400': col.type==='string', 'bg-emerald-500/10 text-emerald-400': col.type==='number', 'bg-indigo-500/10 text-indigo-400': col.type==='datetime', 'bg-fuchsia-500/10 text-fuchsia-400': col.type==='boolean'}">
+                      <span class="px-2 py-1 rounded text-[10px] font-mono font-bold uppercase tracking-wider"
+                            [ngClass]="{'bg-amber-500/10 text-amber-500': col.type==='string', 'bg-emerald-500/10 text-emerald-500': col.type==='number', 'bg-brand-tertiary/15 text-brand-tertiary': col.type==='datetime', 'bg-fuchsia-500/10 text-fuchsia-500': col.type==='boolean'}">
                         {{ col.type }}
                       </span>
                     </td>
-                    <td class="py-3 px-6 text-xs">
-                      <span *ngIf="col.nullable" class="text-emerald-400"><i class="fas fa-check mr-1"></i>YES</span>
-                      <span *ngIf="!col.nullable" class="text-rose-400"><i class="fas fa-times mr-1"></i>NO</span>
+                    <td class="py-3 px-6 text-xs font-mono">
+                      <span *ngIf="col.nullable" class="text-emerald-500"><i class="fas fa-check mr-1"></i>YES</span>
+                      <span *ngIf="!col.nullable" class="text-rose-500"><i class="fas fa-times mr-1"></i>NO</span>
                     </td>
                   </tr>
                 </tbody>
@@ -278,7 +281,7 @@
       </div>
 
       <!-- Path Definer Workspace -->
-      <div *ngIf="showPathDefiner" class="flex-1 flex flex-col bg-[rgb(24,20,31)] border border-[rgb(58,52,64)] rounded-2xl overflow-hidden shadow-xl relative min-w-0">
+      <div *ngIf="showPathDefiner" class="flex-1 flex flex-col bg-surface-card border border-edge rounded-2xl overflow-hidden shadow-card relative min-w-0">
         <app-path-definer [dataSourceId]="selectedId" [tableName]="selectedTable" class="flex-1 flex flex-col h-full"></app-path-definer>
       </div>
     </div>

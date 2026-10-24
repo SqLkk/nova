@@ -128,6 +128,11 @@ export class DashboardEditService {
     return this.http.get<any>(`${this.apiUrl}/python/scripts`);
   }
 
+  getAvailablePythonColumns(scriptId: string): Observable<{ success: boolean; data: string[]; datasets?: any[] }> {
+    const cleanId = String(scriptId || '').startsWith('py:') ? String(scriptId).split(':')[1] : String(scriptId || '');
+    return this.http.get<any>(`${this.apiUrl}/python/scripts/${cleanId}/columns`);
+  }
+
   getAvailablePaths(): Observable<{ success: boolean; data: any[] }> {
     return this.http.get<any>(`${this.apiUrl}/paths`);
   }

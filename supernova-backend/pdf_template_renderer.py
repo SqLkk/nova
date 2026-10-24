@@ -11,6 +11,13 @@ import os
 import re
 from datetime import datetime
 from typing import Any, Dict, List, Optional
+from xml.sax.saxutils import escape as _xml_escape
+
+
+def _esc(val: Any) -> str:
+    if val is None:
+        return ""
+    return _xml_escape(str(val))
 
 import openpyxl
 from reportlab.lib.pagesizes import A4, landscape
@@ -145,8 +152,8 @@ def render_template_to_pdf(
     elements = []
 
     # 1. Başlık & Üst Bilgi
-    title_text = report_title or model.get("name") or "Executive Performance Report"
-    desc_text = model.get("description") or "Automated Enterprise Intelligence Report"
+    title_text = _esc(report_title or model.get("name") or "Executive Performance Report")
+    desc_text = _esc(model.get("description") or "Automated Enterprise Intelligence Report")
     gen_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     elements.append(Paragraph(f"<b>{title_text}</b>", title_style))
@@ -166,21 +173,28 @@ def render_template_to_pdf(
         except Exception:
             wb = None
 
+    sheet_models = model.get("sheets") or []
     if wb and wb.worksheets:
         first_sheet = True
-        for ws in wb.worksheets:
+        for s_idx, ws in enumerate(wb.worksheets):
             if not first_sheet:
                 elements.append(PageBreak())
             first_sheet = False
 
-            elements.append(Paragraph(f"<b>{ws.title}</b>", sheet_heading_style))
+            elements.append(Paragraph(f"<b>{_esc(ws.title)}</b>", sheet_heading_style))
+
+            # Grafik scratch sütunlarını (col_count + 3) hariç tut
+            col_limit = None
+            if s_idx < len(sheet_models):
+                col_limit = int(sheet_models[s_idx].get("columnCount", 12)) + 1
 
             # Hücre matrisini topla
             raw_matrix = []
             for row in ws.iter_rows(values_only=True):
+                r_list = list(row)[:col_limit] if col_limit else list(row)
                 # Boş olmayan en az bir hücre var mı?
-                if any(c is not None and str(c).strip() != "" for c in row):
-                    raw_matrix.append(list(row))
+                if any(c is not None and str(c).strip() != "" for c in r_list):
+                    raw_matrix.append(r_list)
 
             if not raw_matrix:
                 elements.append(Paragraph("<i>No data in this sheet.</i>", subtitle_style))
@@ -210,7 +224,7 @@ def render_template_to_pdf(
                 row_data = []
                 is_header = (r_idx == 0)
                 for val in row:
-                    val_str = "" if val is None else str(val)
+                    val_str = "" if val is None else _esc(val)
                     p_style = cell_header if is_header else cell_style
                     if not is_header and _is_numeric(val):
                         align_style = ParagraphStyle(
@@ -253,12 +267,12 @@ def render_template_to_pdf(
             if not cols or not rows:
                 continue
 
-            elements.append(Paragraph(f"<b>Query Dataset: {qid}</b>", sheet_heading_style))
-            table_data = [[Paragraph(c, cell_header) for c in cols]]
+            elements.append(Paragraph(f"<b>Query Dataset: {_esc(qid)}</b>", sheet_heading_style))
+            table_data = [[Paragraph(_esc(c), cell_header) for c in cols]]
             for r in rows[:100]:
                 row_cells = []
                 for c in cols:
-                    v = str(r.get(c, "") if r.get(c) is not None else "")
+                    v = _esc(r.get(c, "") if r.get(c) is not None else "")
                     row_cells.append(Paragraph(v, cell_style))
                 table_data.append(row_cells)
 
@@ -363,9 +377,9 @@ def render_dashboard_to_pdf(dashboard_data: Dict[str, Any]) -> bytes:
 
     elements = []
 
-    dash_name = dashboard_data.get("name") or "Executive Dashboard"
-    dash_desc = dashboard_data.get("description") or "Supernova Endüstriyel Zeka & Süreç İzleme Panosu"
-    owner = dashboard_data.get("ownerName") or dashboard_data.get("owner") or "Sistem Yöneticisi"
+    dash_name = _esc(dashboard_data.get("name") or "Executive Dashboard")
+    dash_desc = _esc(dashboard_data.get("description") or "Supernova Endüstriyel Zeka & Süreç İzleme Panosu")
+    owner = _esc(dashboard_data.get("ownerName") or dashboard_data.get("owner") or "Sistem Yöneticisi")
     now_str = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
 
     elements.append(Paragraph(f"<b>SUPERNOVA</b> — {dash_name}", title_style))
@@ -426,13 +440,13 @@ def render_dashboard_to_pdf(dashboard_data: Dict[str, Any]) -> bytes:
 
         w_rows.append([
             Paragraph(str(i), cell_bold),
-            Paragraph(f"<b>{w.get('title', 'Untitled')}</b>", cell_style),
-            Paragraph(w.get("category", "General"), cell_style),
-            Paragraph(f"<font color='#0284c7'><b>{vtype}</b></font>", cell_style),
-            Paragraph(src_type, cell_style),
-            Paragraph(f"<font color='#475569'>{assigned}</font>", cell_style),
-            Paragraph(mapping_str, cell_style),
-            Paragraph(ref_str, cell_style),
+            Paragraph(f"<b>{_esc(w.get('title', 'Untitled'))}</b>", cell_style),
+            Paragraph(_esc(w.get("category", "General")), cell_style),
+            Paragraph(f"<font color='#0284c7'><b>{_esc(vtype)}</b></font>", cell_style),
+            Paragraph(_esc(src_type), cell_style),
+            Paragraph(f"<font color='#475569'>{_esc(assigned)}</font>", cell_style),
+            Paragraph(_esc(mapping_str), cell_style),
+            Paragraph(_esc(ref_str), cell_style),
         ])
 
     t_widgets = Table(w_rows, colWidths=[25, 160, 80, 100, 75, 140, 140, 60], repeatRows=1)

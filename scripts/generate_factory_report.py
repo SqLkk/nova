@@ -6,7 +6,7 @@ Generates showcase-ready corporate reports from the industrial dataset:
 1. Multi-Sheet Styled Excel Report (.xlsx) with KPI Dashboard, Batches, Downtime, Quality, ESG.
 2. Interactive Executive HTML Dashboard (.html) with SVG Charts, OEE Breakdown & Asset Trees.
 
-Target Audience: C-Level Executives, Plant Directors, Siemens / Tier-1 Automotive Stakeholders.
+Target Audience: C-Level Executives, Plant Directors, Industrial & Tier-1 Automotive Stakeholders.
 Language: English (Enterprise Standard)
 """
 

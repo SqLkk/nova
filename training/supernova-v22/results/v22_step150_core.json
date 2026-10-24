@@ -1,0 +1,169 @@
+{
+  "adapter150_0000150_adapters": {
+    "T1_WeightedQuality": {
+      "name": "Ağırlıklı kalite yüzdesi",
+      "ok": false,
+      "msg": "normal: expected weighted_quality=66.66666666666666 percent, got {'weighted_quality': 80.0}",
+      "duration": 27.60906899999827,
+      "resp": "```python\nrows = sql_data.get('Quality_Summary', [])\nsummary = []\ntotal_weighted = 0.0\ncount = 0\nfor row in rows:\n    good = row.get('good_count', 0) or 0\n    total = row.get('total_count', 0) or 0\n    if total > 0:\n        row_pct = (good / total) * 100.0\n    else:\n        row_pct = 0.0\n    total_weighted = total_weighted + row_pct\n    count = count + 1\navg = 0.0\nif count > 0:\n    avg = total_weighted / count\nsummary.append({'weighted_quality': avg})\nout('summary').append(summary[0])\n```",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 174,
+        "prompt_tokens": 492,
+        "peak_memory": 5.749030618,
+        "max_tokens": 512
+      }
+    },
+    "T2_MergeQueries": {
+      "name": "İki sorguyu birleştirme",
+      "ok": false,
+      "msg": "original: expected 2 rows in net_production, got {'net_production': [[{'machine': 'A', 'net_qty': 55}, {'machine': 'A', 'net_qty': 35}, {'machine': 'B', 'net_qty': 50}]]}",
+      "duration": 26.18985995800176,
+      "resp": "```python\nnet_production = []\nfor row in sql_data.get('Production', []):\n    machine = row.get('machine')\n    if not machine:\n        continue\n    prod_qty = row.get('qty', 0) or 0\n    scrap = 0\n    for scrap_row in sql_data.get('Scrap', []):\n        if scrap_row.get('machine') == machine:\n            scrap = scrap_row.get('qty', 0) or 0\n            break\n    net_qty = prod_qty - scrap\n    net_production.append({'machine': machine, 'net_qty': net_qty})\nout('net_production').append(net_production)\n```",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 144,
+        "prompt_tokens": 518,
+        "peak_memory": 5.786524292,
+        "max_tokens": 512
+      }
+    },
+    "T3_SQLJoin": {
+      "name": "Parametreli SQL JOIN",
+      "ok": true,
+      "msg": "Correct: m1=45.0, m2=0.0 with 2 rows returned",
+      "duration": 12.222684792010114,
+      "resp": "```sql\nSELECT m.id, m.name, COALESCE(SUM(e.downtime_min), 0.0) AS total_downtime\nFROM machines m\nLEFT JOIN events e ON m.id = e.machine_id AND e.event_time BETWEEN :start AND :end\nGROUP BY m.id, m.name\nORDER BY m.id\n```",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 73,
+        "prompt_tokens": 286,
+        "peak_memory": 5.786524292,
+        "max_tokens": 512
+      }
+    },
+    "T4_MultiParentDAG": {
+      "name": "Çok ebeveynli DAG",
+      "ok": true,
+      "msg": "Valid multi-parent DAG: C has parents ['A', 'B'] and children reciprocal",
+      "duration": 10.223980333001236,
+      "resp": "```json\n{\"structure\": \"dag\", \"queryId\": \"q_workflow\", \"config\": {\"id_col\": \"step_key\", \"label_col\": \"caption\", \"parents_col\": \"dependencies\"}}\n```",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 45,
+        "prompt_tokens": 353,
+        "peak_memory": 5.786524292,
+        "max_tokens": 512
+      }
+    },
+    "T5_ChartSummaryCell": {
+      "name": "Grafik + özet hücresi",
+      "ok": true,
+      "msg": "Exact chart axes, anchors and summary binding",
+      "duration": 23.472763832993223,
+      "resp": "```json\n{\"charts\": [{\"id\": \"ch_energy_line\", \"type\": \"line\", \"anchor\": {\"row\": 1, \"col\": 1, \"widthCols\": 6, \"heightRows\": 10}, \"queryId\": \"q_energy_blind\", \"xAxis\": \"logged_at\", \"yAxis\": [\"kwh\"], \"title\": \"Enerji Tüketimi\"}], \"cells\": [{\"row\": 14, \"col\": 1, \"value\": \"Toplam Enerji\", \"binding\": {\"kind\": \"summary\", \"queryId\": \"q_energy_blind\", \"field\": \"kwh\", \"operation\": \"SUM\"}}]}\n```",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 148,
+        "prompt_tokens": 426,
+        "peak_memory": 5.786524292,
+        "max_tokens": 512
+      }
+    },
+    "T6_MissingColumn": {
+      "name": "Eksik kolon",
+      "ok": false,
+      "msg": "Did not identify missing columns for OEE calculation",
+      "duration": 22.148129958994105,
+      "resp": "Mevcut kolonlar (`machine_name`, `quantity`) ile tam bir OEE hesabı yapılamaz. OEE, Üretim, Kalite ve Kullanım verilerini gerektirir. Eksik kolonlar:\n1. **Mevcut Üretim Adedi**: Kolon adını belirt.\n2. **Maksimum Potansiyel Üretim**: Kolon adını belirt.\n3. **Mevcut Kaliteli Üretim**: Kolon adını belirt.\n4. **Mevcut Kullanım Süresi**: Kolon adını belirt.\n5. **Maksimum Planlanan Süre**: Kolon adını belirt.",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 141,
+        "prompt_tokens": 393,
+        "peak_memory": 5.786524292,
+        "max_tokens": 512
+      }
+    },
+    "T7_ForbiddenOp": {
+      "name": "Yasak işlem",
+      "ok": true,
+      "msg": "Correctly refused forbidden OS/import operations",
+      "duration": 15.417004041999462,
+      "resp": "Bu işlemi gerçekleştiremem. SuperNova Python, güvenlik nedeniyle dosya sistemi erişimi, ağ bağlantıları ve işletim sistemi fonksiyonları (örneğin `os`, `open`) kısıtlıdır. Bu kısıtlamalar, dosya okuma ve sunucu tarafı işlemleri için tasarlanmıştır.",
+      "generation": {
+        "finish_reason": "stop",
+        "generation_tokens": 74,
+        "prompt_tokens": 389,
+        "peak_memory": 5.786524292,
+        "max_tokens": 512
+      }
+    },
+    "T8_SchemaTool": {
+      "name": "Şema aracı",
+      "ok": true,
+      "msg": "Full tool round-trip; all schema identifiers used (R1=14.8s, R2=19.1s)",
+      "duration": 33.80641158297658,
+      "resp": "Mevcut veritabanı şeması:\n- Kaynak: **Default**\n- Tablolar:\n  - **machines**: Kolonlar: `id`, `name`",
+      "generation": {
+        "round1": {
+          "response": "<tool_call>\n<function=tool_get_database_schema>\n</function>\n</tool_call>",
+          "duration": 14.754781999989063,
+          "finish_reason": "stop",
+          "generation_tokens": 17,
+          "prompt_tokens": 728,
+          "peak_memory": 5.978921586,
+          "max_tokens": 256
+        },
+        "round2": {
+          "response": "Mevcut veritabanı şeması:\n- Kaynak: **Default**\n- Tablolar:\n  - **machines**: Kolonlar: `id`, `name`",
+          "duration": 19.051629582987516,
+          "finish_reason": "stop",
+          "generation_tokens": 43,
+          "prompt_tokens": 792,
+          "peak_memory": 5.983115908,
+          "max_tokens": 256
+        },
+        "parsed_call": {
+          "name": "tool_get_database_schema",
+          "arguments": {}
+        }
+      }
+    }
+  },
+  "_meta": {
+    "suite_version": "2.2",
+    "suite": "core",
+    "model": "/Users/utkukaraca/.cache/huggingface/hub/models--mlx-community--Qwen3.5-9B-MLX-4bit/snapshots/938d8919941c6e7efd3c7150eff7fe9d12afa631",
+    "temperature": 0,
+    "enable_thinking": false,
+    "seed": 42,
+    "max_tokens": 512,
+    "tool_max_tokens": 256,
+    "task_ids": [
+      "T1_WeightedQuality",
+      "T2_MergeQueries",
+      "T3_SQLJoin",
+      "T4_MultiParentDAG",
+      "T5_ChartSummaryCell",
+      "T6_MissingColumn",
+      "T7_ForbiddenOp",
+      "T8_SchemaTool"
+    ],
+    "script_sha256": "0ba23cac94c433be20e25b5f216ea1fe71676de9163289de967b3f1aada3a96e",
+    "prompts_sha256": "e4e04c97a083bd0073b6dff7f79877f69e905c4ea877e7f3d100026159cba6f6",
+    "validators_sha256": "79fb0d9eaf019bbeec7305c19173531d3030c042152d0ee675dd35a79b0373ce",
+    "tokenizer_sha256": "a4aee8afcf2e0711942cf848899be66016f8d14a889ff9ede07bca099c28f715",
+    "timestamp_utc": "2026-10-12T21:21:10.721659+00:00",
+    "summary": {
+      "adapter150_0000150_adapters": {
+        "passed": 5,
+        "total": 8
+      }
+    },
+    "adapter": {
+      "directory": "/Users/utkukaraca/Library/CloudStorage/OneDrive-SiemensAG/Masaüstü/Development/super_nov4/training/supernova-v22/adapter150",
+      "weights": "/Users/utkukaraca/Library/CloudStorage/OneDrive-SiemensAG/Masaüstü/Development/super_nov4/training/supernova-v22/adapter150/0000150_adapters.safetensors",
+      "sha256": "ff54e45329c374f064b7ea6f8e69d62f9663a0261ff3523ff26d0f434da25097"
+    }
+  }
+}

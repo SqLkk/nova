@@ -12,6 +12,8 @@ import { ThemeService } from './services/theme.service';
 })
 export class AppComponent implements OnInit {
   showNavigation = false; // Modern navigation bar için
+  copilotDocked = false;
+  copilotWide = false;
 
   constructor(
     private router: Router,
@@ -23,12 +25,10 @@ export class AppComponent implements OnInit {
       .pipe(filter(event => event instanceof NavigationEnd))
       .subscribe((event) => {
         if (event instanceof NavigationEnd) {
-          // Login, root path ve Template Builder (tam ekran odak modu) hariç:
-          // builder'da nav kaybolsun, kullanıcı sadece şablonla ilgilensin.
+          const currentUrl = event.urlAfterRedirects || event.url;
           this.showNavigation =
-            !event.url.includes('/login') &&
-            event.url !== '/' &&
-            !event.url.includes('/template-builder');
+            !currentUrl.includes('/login') &&
+            currentUrl !== '/';
         }
       });
   }

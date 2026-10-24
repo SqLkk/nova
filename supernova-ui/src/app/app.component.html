@@ -1,4 +1,4 @@
-<div class="app-layout">
+<div class="app-layout" [class.copilot-docked]="copilotDocked" [class.copilot-wide]="copilotWide">
   <!-- Sol sidebar — yalnızca login değilse -->
   <app-navigation *ngIf="showNavigation"></app-navigation>
 
@@ -8,4 +8,5 @@
   </main>
 
   <app-confirm-dialog></app-confirm-dialog>
+  <app-ai-copilot (dockChange)="copilotDocked = $event" (wideChange)="copilotWide = $event"></app-ai-copilot>
 </div>

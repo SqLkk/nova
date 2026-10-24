@@ -1,0 +1,688 @@
+<ng-container *ngIf="visible">
+  <!-- GLOBAL HUMAN-LIKE LIVE CO-WORKER OVERLAY (Cursor + Spotlight + Top HUD) -->
+  <div *ngIf="coworkerState.active" class="coworker-stage" aria-live="polite">
+    <div *ngIf="coworkerState.spotlight.visible"
+      class="coworker-spotlight"
+      [style.top.px]="coworkerState.spotlight.top"
+      [style.left.px]="coworkerState.spotlight.left"
+      [style.width.px]="coworkerState.spotlight.width"
+      [style.height.px]="coworkerState.spotlight.height">
+    </div>
+
+    <div *ngIf="coworkerState.cursorVisible"
+      class="coworker-cursor"
+      [class.is-clicking]="coworkerState.clicking"
+      [style.transform]="'translate3d(' + coworkerState.cursorX + 'px, ' + coworkerState.cursorY + 'px, 0)'">
+      <span class="cursor-ripple"></span>
+      <svg class="cursor-pointer-svg" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+        <path d="M4.2 2.6L20.4 10.7C21.3 11.1 21.2 12.5 20.2 12.8L13.1 14.8L9.8 21.3C9.3 22.2 8 22 7.8 21L3.1 3.9C2.9 2.9 3.4 2.2 4.2 2.6Z" />
+      </svg>
+      <span class="cursor-tag">
+        <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
+        <span>{{ coworkerState.cursorTag }}</span>
+      </span>
+    </div>
+
+    <div class="coworker-hud"
+      [class.panel-docked]="open && docked"
+      [class.panel-wide]="open && docked && wideMode">
+      <div class="hud-top">
+        <span class="hud-live-pill">
+          <span class="hud-pulse"></span>CANLI EKRAN
+        </span>
+        <strong class="hud-title">{{ coworkerState.workflowTitle }}</strong>
+        <span class="hud-step-counter">Adım {{ coworkerState.stepIndex }}/{{ coworkerState.totalSteps }}</span>
+        <button type="button" class="hud-stop-btn" (click)="stopCoworker()" title="Canlı çalışmayı durdur (Esc)">
+          <i class="fa-solid fa-stop" aria-hidden="true"></i> Durdur
+        </button>
+      </div>
+      <div class="hud-step-label">{{ coworkerState.stepLabel }}</div>
+      <div class="hud-progress-track">
+        <div class="hud-progress-bar" [style.width.%]="(coworkerState.stepIndex / (coworkerState.totalSteps || 1)) * 100"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FLOATING LAUNCHER -->
+  <button #launcher *ngIf="!open" class="copilot-launcher" type="button"
+    [class.is-offline]="!health.available" [attr.aria-expanded]="offlineNotice"
+    [attr.aria-label]="health.available ? 'SuperNova Copilot aç' : 'Yerel AI çevrimdışı — durumunu göster'"
+    aria-controls="supernova-copilot" [title]="health.available ? 'Copilot · Ctrl/⌘ + Shift + K' : 'Yerel Yapay Zeka Servisi Başlatılmadı (Tak-Çıkar Modu)'"
+    (click)="toggle()">
+    <span class="nova-mark"><i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i></span>
+    <span class="launcher-label">Copilot <span class="launcher-dot" [class.online]="health.available"></span></span>
+  </button>
+
+  <aside *ngIf="offlineNotice && !open" class="offline-popover" aria-live="polite">
+    <span class="offline-icon"><i class="fa-solid fa-plug" aria-hidden="true"></i></span>
+    <div>
+      <strong>Opsiyonel Yapay Zeka (Tak-Çıkar Modu)</strong>
+      <p>SuperNova yapay zeka olmadan %100 tam kapasite çalışır. Dilerseniz geçmiş sohbetlerinizi yerel veritabanından açabilirsiniz.</p>
+    </div>
+    <div class="offline-actions">
+      <button *ngIf="health.reason !== 'disabled'" type="button" (click)="refreshHealth()" [disabled]="checking">
+        {{ checking ? 'Kontrol ediliyor…' : 'Yeniden kontrol et' }}
+      </button>
+      <button type="button" class="primary-offline-btn" (click)="openHistoryOffline()">
+        <i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i> Yerel Geçmişi Aç
+      </button>
+      <button type="button" class="ghost-offline-btn" (click)="dismissLauncher()" title="Bu oturumda Copilot rozetini gizle">
+        Rozeti Gizle
+      </button>
+    </div>
+  </aside>
+
+  <!-- MAIN COPILOT PANEL -->
+  <section *ngIf="open" id="supernova-copilot" class="copilot-panel"
+    [class.docked]="docked"
+    [class.wide]="wideMode"
+    cdkDrag cdkDragBoundary="body" [cdkDragDisabled]="docked"
+    role="region" aria-labelledby="copilot-title">
+    <header class="panel-header" cdkDragHandle>
+      <div class="brand">
+        <span class="nova-mark"><i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i></span>
+        <div class="brand-titles">
+          <span class="eyebrow">SUPERNOVA WORKSPACE</span>
+          <h2 id="copilot-title">Copilot<span class="beta-label">LOCAL AI</span></h2>
+          <small *ngIf="activeChatTitle" class="active-chat-subtitle" [title]="activeChatTitle">
+            <i class="fa-regular fa-comment-dots" aria-hidden="true"></i>{{ activeChatTitle }}
+          </small>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button type="button" class="icon-button history-btn" [class.active]="historyOpen" [attr.aria-pressed]="historyOpen"
+          title="Yerel DB Sohbet Geçmişi ve Kalıcı Hafıza" aria-label="Sohbet geçmişi ve kalıcı hafıza"
+          (click)="toggleHistoryDrawer()">
+          <i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i>
+          <span *ngIf="totalHistoryBadge > 0" class="mini-badge">{{ totalHistoryBadge > 99 ? '99+' : totalHistoryBadge }}</span>
+        </button>
+        <button type="button" class="icon-button" title="Yeni sohbet başlat" aria-label="Yeni sohbet" (click)="newChat()">
+          <i class="fa-solid fa-plus" aria-hidden="true"></i>
+        </button>
+        <button type="button" class="icon-button wide-control" [class.active]="wideMode" [attr.aria-pressed]="wideMode"
+          [title]="wideMode ? 'Standart genişliğe dön' : 'Geniş sohbet görünümü'" aria-label="Panel genişliğini değiştir"
+          (click)="toggleWide()">
+          <i class="fa-solid" [ngClass]="wideMode ? 'fa-compress' : 'fa-expand'" aria-hidden="true"></i>
+        </button>
+        <button type="button" class="icon-button dock-control" [class.active]="docked" [attr.aria-pressed]="docked"
+          [title]="docked ? 'Yüzen panele geç' : 'Paneli sağa sabitle'" aria-label="Panel sabitleme modunu değiştir"
+          (click)="toggleDock()">
+          <i class="fa-solid fa-thumbtack" aria-hidden="true"></i>
+        </button>
+        <button type="button" class="icon-button" title="Kapat · Esc" aria-label="Copilot kapat" (click)="close()">
+          <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+        </button>
+      </div>
+    </header>
+
+    <div class="context-bar">
+      <span class="context-chip" [title]="'Aktif ekran: ' + pageLabel">
+        <i class="fa-solid fa-location-crosshairs" aria-hidden="true"></i>{{ pageLabel }}
+      </span>
+      <span class="query-count" *ngIf="queryCount">
+        <i class="fa-solid fa-database" aria-hidden="true"></i>{{ queryCount }} sorgu
+      </span>
+      <button type="button" class="memory-pill" [class.has-mem]="memories.length > 0"
+        title="Kalıcı yerel hafıza: Copilot tercihlerinizi ve tablolarınızı yeni sohbetlerde otomatik hatırlar"
+        (click)="toggleHistoryDrawer('memory')">
+        <i class="fa-solid fa-brain" aria-hidden="true"></i>
+        <span>{{ memories.length ? (memories.length + ' hafıza') : 'Hafıza' }}</span>
+      </button>
+      <button type="button" class="coworker-toggle-pill"
+        [class.active]="autoCoworker"
+        [attr.aria-pressed]="autoCoworker"
+        title="Açık olduğunda Copilot rapor, SQL, Space Map ve Python adımlarını ekranınızda canlı olarak uygular"
+        (click)="toggleAutoCoworker()">
+        <span class="coworker-dot"></span>
+        <span>{{ autoCoworker ? 'Canlı Ekran' : 'Sadece Sohbet' }}</span>
+      </button>
+      <span class="connection" [class.ready]="health.available" [class.mock]="health.mock" [title]="health.model || statusText">
+        <span class="status-dot"></span>{{ health.mock ? 'Önizleme' : health.available ? 'Hazır' : 'Tak-Çıkar' }}
+      </span>
+    </div>
+
+    <!-- LOCAL DB CHAT HISTORY & PERSISTENT MEMORY DRAWER -->
+    <div *ngIf="historyOpen" class="history-drawer" role="region" aria-label="Yerel veritabanı sohbet geçmişi ve kalıcı hafıza">
+      <div class="drawer-tabs">
+        <button type="button" class="drawer-tab" [class.active]="historyTab === 'chats'" (click)="historyTab = 'chats'">
+          <i class="fa-regular fa-comments" aria-hidden="true"></i>
+          <span>Son Sohbetler ({{ savedSessions.length }})</span>
+        </button>
+        <button type="button" class="drawer-tab" [class.active]="historyTab === 'memory'" (click)="historyTab = 'memory'">
+          <i class="fa-solid fa-brain" aria-hidden="true"></i>
+          <span>Kalıcı Hafıza ({{ memories.length }})</span>
+        </button>
+        <button type="button" class="drawer-close" title="Bölmeyi kapat" aria-label="Geçmiş bölmesini kapat" (click)="historyOpen = false">
+          <i class="fa-solid fa-chevron-up" aria-hidden="true"></i>
+        </button>
+      </div>
+
+      <!-- TAB 1: SAVED CHAT SESSIONS -->
+      <div *ngIf="historyTab === 'chats'" class="drawer-body">
+        <div class="drawer-toolbar">
+          <span class="drawer-caption"><i class="fa-solid fa-hard-drive" aria-hidden="true"></i> Yerel DB (<code>supernova_reports.db</code>)</span>
+          <div class="drawer-toolbar-btns">
+            <button type="button" class="mini-link-btn" (click)="newChat()">
+              <i class="fa-solid fa-plus" aria-hidden="true"></i> Yeni
+            </button>
+            <button *ngIf="savedSessions.length > 0" type="button" class="mini-link-btn danger"
+              [class.confirming]="confirmClearChats"
+              (click)="clearAllChats()">
+              {{ confirmClearChats ? 'Onayla (Sil)' : 'Tümünü Temizle' }}
+            </button>
+          </div>
+        </div>
+
+        <div *ngIf="!savedSessions.length && !loadingHistory" class="drawer-empty">
+          Henüz kayıtlı sohbet yok. Yazdığınız konuşmalar ve ürettiğiniz rapor kartları otomatik olarak yerel veritabanına kaydedilir.
+        </div>
+
+        <div class="history-list" *ngIf="savedSessions.length > 0">
+          <div *ngFor="let s of savedSessions" class="history-item"
+            [class.active]="s.id === activeChatId"
+            tabindex="0" role="button"
+            (click)="loadChatSession(s.id)"
+            (keydown.enter)="loadChatSession(s.id)">
+            <div class="history-item-main">
+              <strong>{{ s.title }}</strong>
+              <small>
+                <span>{{ pageChipLabel(s.lastPage) }}</span>
+                <span>·</span>
+                <span>{{ s.messageCount }} mesaj</span>
+                <span>·</span>
+                <span>{{ formatRelativeDate(s.updatedAt) }}</span>
+              </small>
+            </div>
+            <button type="button" class="history-del-btn" title="Bu sohbeti sil" aria-label="Sohbeti sil"
+              (click)="deleteChatSession(s.id, $event)">
+              <i class="fa-regular fa-trash-can" aria-hidden="true"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 2: CROSS-SESSION PERSISTENT MEMORY -->
+      <div *ngIf="historyTab === 'memory'" class="drawer-body">
+        <div class="memory-input-row">
+          <input type="text" class="proposal-input compact" [(ngModel)]="newMemoryNote"
+            maxlength="280"
+            (keydown.enter)="submitMemoryNote()"
+            placeholder="Kalıcı tercih ekle (örn: Raporlarda her zaman çizgi grafik kullan)…" />
+          <button type="button" class="revision-send-btn" [disabled]="!newMemoryNote.trim() || actionBusy" (click)="submitMemoryNote()">
+            <i class="fa-solid fa-plus" aria-hidden="true"></i> Ekle
+          </button>
+        </div>
+
+        <div class="drawer-toolbar">
+          <span class="drawer-caption">Yeni sohbetlerde tekrar yazmanıza gerek kalmadan hatırlanır</span>
+          <button *ngIf="memories.length > 0" type="button" class="mini-link-btn danger"
+            [class.confirming]="confirmClearMemory"
+            (click)="clearAllMemories()">
+            {{ confirmClearMemory ? 'Onayla (Sıfırla)' : 'Sıfırla' }}
+          </button>
+        </div>
+
+        <div *ngIf="!memories.length" class="drawer-empty">
+          Henüz kalıcı hafıza kaydı yok. Kullandığınız tablolar, JOIN yapıları, grafik tercihleri veya "unutma / her zaman" notlarınız otomatik öğrenilir.
+        </div>
+
+        <div class="memory-list" *ngIf="memories.length > 0">
+          <div *ngFor="let mem of memories" class="memory-item">
+            <span class="mem-cat-badge" [attr.data-cat]="mem.category">
+              <i class="fa-solid" [ngClass]="memoryCategoryIcon(mem.category)" aria-hidden="true"></i>
+              {{ memoryCategoryLabel(mem.category) }}
+            </span>
+            <span class="mem-label">{{ mem.label }}</span>
+            <span *ngIf="mem.hitCount > 1" class="mem-hits" title="Kullanım sıklığı">×{{ mem.hitCount }}</span>
+            <button type="button" class="history-del-btn" title="Hafızadan kaldır" aria-label="Hafıza kaydını kaldır"
+              (click)="removeMemoryItem(mem, $event)">
+              <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div *ngIf="health.mock" class="mock-banner"><i class="fa-solid fa-flask" aria-hidden="true"></i>Geliştirme önizlemesi · Yanıtlar örnektir.</div>
+    <div *ngIf="!health.available" class="connection-banner" role="status">
+      <i class="fa-solid fa-plug-circle-check" aria-hidden="true"></i>
+      <span>Tak-Çıkar Modu: Yerel AI servisi kapalı — geçmiş ve hafıza salt-okunur açık, SuperNova tam kapasite çalışır.</span>
+      <button *ngIf="health.reason !== 'disabled'" type="button" (click)="refreshHealth()" [disabled]="checking">Tekrar dene</button>
+    </div>
+
+    <div #conversation class="conversation" tabindex="0" aria-label="Copilot sohbet geçmişi">
+      <!-- WELCOME HERO -->
+      <div *ngIf="!messages.length" class="welcome">
+        <div class="orb-scene" aria-hidden="true">
+          <div class="orb-orbit"></div>
+          <div class="orb-orbit second"></div>
+          <div class="nova-orb"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
+          <span class="orb-star one">✦</span>
+          <span class="orb-star two">✧</span>
+        </div>
+        <span class="welcome-kicker">CANLI İŞ ARKADAŞI · YEREL AI</span>
+        <h3>Ekranında seninle birlikte<br><span>üreten asistan.</span></h3>
+        <p>Sorguları yazar, sayfalar arası geçiş yapar ve tercihlerinizi yerel hafızada tutarak her seferinde tekrar sormaz.</p>
+
+        <!-- Active Memory & Recent Chat Quick Resume Strip -->
+        <div *ngIf="memories.length > 0 || savedSessions.length > 0" class="welcome-memory-strip">
+          <button *ngIf="memories.length > 0" type="button" class="welcome-mem-pill" (click)="toggleHistoryDrawer('memory')">
+            <i class="fa-solid fa-brain" aria-hidden="true"></i>
+            <span>{{ memories.length }} kalıcı hafıza aktif</span>
+          </button>
+          <button *ngIf="savedSessions.length > 0" type="button" class="welcome-mem-pill resume" (click)="loadChatSession(savedSessions[0].id)">
+            <i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i>
+            <span>Son sohbet: {{ savedSessions[0].title }}</span>
+          </button>
+        </div>
+
+        <div class="suggestions">
+          <button *ngFor="let suggestion of suggestions" type="button" class="suggestion-card" (click)="useSuggestion(suggestion.prompt)">
+            <span class="suggestion-icon"><i class="fa-solid" [ngClass]="suggestion.icon" aria-hidden="true"></i></span>
+            <span class="suggestion-body"><strong>{{ suggestion.title }}</strong><small>{{ suggestion.detail }}</small></span>
+            <i class="fa-solid fa-arrow-up-right-from-square suggestion-arrow" aria-hidden="true"></i>
+          </button>
+        </div>
+        <div class="welcome-note">
+          <i class="fa-solid fa-bolt" aria-hidden="true"></i>SQL Studio · Template Builder · Space Map · Python canlı entegrasyonu
+        </div>
+      </div>
+
+      <!-- CHAT MESSAGES -->
+      <article *ngFor="let message of messages; trackBy: trackMessage"
+        class="chat-message"
+        [class.user-message]="message.role === 'user'"
+        [class.assistant-message]="message.role === 'assistant'">
+
+        <div class="message-author">
+          <span class="author-avatar" [class.user]="message.role === 'user'">
+            <i class="fa-solid" [ngClass]="message.role === 'user' ? 'fa-user' : 'fa-wand-magic-sparkles'" aria-hidden="true"></i>
+          </span>
+          <strong>{{ message.role === 'user' ? 'Sen' : 'Copilot' }}</strong>
+          <span *ngIf="message.role === 'assistant'" class="author-tag">LOCAL AI</span>
+          <span class="message-time">{{ message.timestamp }}</span>
+          <button *ngIf="message.role === 'assistant' && message.content && !sending"
+            type="button" class="msg-copy-btn" title="Yanıtı kopyala" aria-label="Yanıtı kopyala"
+            (click)="copyMessage(message)">
+            <i class="fa-regular fa-copy" aria-hidden="true"></i>
+          </button>
+        </div>
+
+        <div class="message-surface">
+          <ng-container *ngFor="let part of message.parts">
+            <!-- ZERO-XSS RICH MARKDOWN BLOCKS -->
+            <div *ngIf="part.kind === 'text' && part.blocks?.length" class="rich-blocks">
+              <ng-container *ngFor="let block of part.blocks" [ngSwitch]="block.kind">
+                <div *ngSwitchCase="'heading'" class="rich-heading">
+                  <ng-container *ngFor="let tok of block.tokens" [ngSwitch]="tok.kind">
+                    <strong *ngSwitchCase="'bold'">{{ tok.value }}</strong>
+                    <code *ngSwitchCase="'code'" class="inline-code" [class.is-bold]="!!tok.bold">{{ tok.value }}</code>
+                    <em *ngSwitchCase="'italic'">{{ tok.value }}</em>
+                    <ng-container *ngSwitchDefault>{{ tok.value }}</ng-container>
+                  </ng-container>
+                </div>
+
+                <div *ngSwitchCase="'bullet'" class="rich-bullet">
+                  <span class="bullet-dot">{{ block.bulletPrefix || '•' }}</span>
+                  <span class="bullet-body">
+                    <ng-container *ngFor="let tok of block.tokens" [ngSwitch]="tok.kind">
+                      <strong *ngSwitchCase="'bold'">{{ tok.value }}</strong>
+                      <code *ngSwitchCase="'code'" class="inline-code" [class.is-bold]="!!tok.bold">{{ tok.value }}</code>
+                      <em *ngSwitchCase="'italic'">{{ tok.value }}</em>
+                      <ng-container *ngSwitchDefault>{{ tok.value }}</ng-container>
+                    </ng-container>
+                  </span>
+                </div>
+
+                <p *ngSwitchDefault class="rich-para">
+                  <ng-container *ngFor="let tok of block.tokens" [ngSwitch]="tok.kind">
+                    <strong *ngSwitchCase="'bold'">{{ tok.value }}</strong>
+                    <code *ngSwitchCase="'code'" class="inline-code" [class.is-bold]="!!tok.bold">{{ tok.value }}</code>
+                    <em *ngSwitchCase="'italic'">{{ tok.value }}</em>
+                    <ng-container *ngSwitchDefault>{{ tok.value }}</ng-container>
+                  </ng-container>
+                </p>
+              </ng-container>
+            </div>
+            <p *ngIf="part.kind === 'text' && !part.blocks?.length" class="message-text">{{ part.text }}</p>
+
+            <!-- Template JSON is converted into the Interactive Report Proposal Card instead of raw JSON dump -->
+            <div *ngIf="part.kind === 'code' && part.isTemplateJson && !message.reportProposal && sending" class="template-preparing-banner">
+              <span class="thinking-dots"><b></b><b></b><b></b></span>
+              <span>Veritabanı sorgulanıyor ve Excel rapor şablonu hazırlanıyor…</span>
+            </div>
+
+            <!-- CODE ARTIFACT CARD -->
+            <div *ngIf="part.kind === 'code' && (!part.isTemplateJson || (!message.reportProposal && !sending))" class="code-card">
+              <div class="code-header">
+                <span><i class="fa-solid fa-code" aria-hidden="true"></i>{{ part.language || 'Kod' }}</span>
+                <button type="button" class="copy-button" (click)="copy(part)" title="Kodu kopyala">
+                  <i class="fa-regular fa-copy" aria-hidden="true"></i>Kopyala
+                </button>
+              </div>
+              <pre tabindex="0"><code>{{ part.text }}</code></pre>
+              <div class="code-actions" *ngIf="part.complete && !sending && !message.error && !message.interrupted">
+                <button type="button"
+                  *ngIf="part.language === 'sql' || part.language === 'python' || isSpaceMapJson(part)"
+                  class="action-pill live"
+                  [disabled]="actionBusy || coworkerState.active"
+                  (click)="runLiveCodeOnScreen(part, message)">
+                  <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>Ekranda Canlı Çalıştır
+                </button>
+                <button type="button" *ngIf="canApply(part)" class="action-pill primary" [disabled]="actionBusy" (click)="apply(part)">
+                  <i class="fa-solid fa-arrow-right-to-bracket" aria-hidden="true"></i>{{ actionLabel(part) }}
+                </button>
+                <button type="button" *ngIf="canTest(part)" class="action-pill" [disabled]="actionBusy" (click)="test(part, message)">
+                  <i class="fa-solid fa-play" aria-hidden="true"></i>Test et
+                </button>
+                <button type="button" *ngIf="part.language === 'sql' && !message.reportProposal" class="action-pill" [disabled]="actionBusy" (click)="convertSqlPartToReport(part)">
+                  <i class="fa-solid fa-file-excel" aria-hidden="true"></i>Rapor Hazırla
+                </button>
+                <button type="button" *ngIf="part.language === 'sql'" class="action-pill" [disabled]="actionBusy" (click)="openTableWizardForSqlPart(part)">
+                  <i class="fa-solid fa-link" aria-hidden="true"></i>Tablo JOIN
+                </button>
+                <button type="button" *ngIf="part.language === 'sql'" class="action-pill" [disabled]="actionBusy" (click)="convertSqlPartToSpaceMap(part)">
+                  <i class="fa-solid fa-diagram-project" aria-hidden="true"></i>Space Map
+                </button>
+                <button type="button" *ngIf="isSpaceMapJson(part)" class="action-pill primary" [disabled]="actionBusy" (click)="openJsonPartInSpaceMap(part)">
+                  <i class="fa-solid fa-globe" aria-hidden="true"></i>Space Map'i Kaydet &amp; Aç
+                </button>
+              </div>
+            </div>
+          </ng-container>
+
+          <!-- LIVE CO-WORKER STEP TIMELINE CARD -->
+          <div *ngIf="message.coworkerSteps?.length" class="coworker-steps-card" [class.is-running]="message.coworkerRunning">
+            <div class="coworker-steps-header">
+              <div class="coworker-steps-title">
+                <i class="fa-solid" [ngClass]="message.coworkerRunning ? 'fa-circle-notch fa-spin' : 'fa-wand-magic-sparkles'" aria-hidden="true"></i>
+                <span>Canlı Ekran İşlemleri</span>
+              </div>
+              <div class="coworker-steps-right">
+                <span class="coworker-status-badge" [class.done]="!message.coworkerRunning">
+                  {{ message.coworkerRunning ? 'Ekranda Çalışıyor…' : 'Tamamlandı' }}
+                </span>
+                <button *ngIf="message.coworkerRunning" type="button" class="coworker-mini-stop" (click)="stopCoworker()">Durdur</button>
+              </div>
+            </div>
+            <div class="coworker-steps-list">
+              <div *ngFor="let st of message.coworkerSteps" class="coworker-step-item" [ngClass]="'st-' + st.status">
+                <span class="step-state-icon" [ngSwitch]="st.status">
+                  <i *ngSwitchCase="'running'" class="fa-solid fa-circle-notch fa-spin" aria-hidden="true"></i>
+                  <i *ngSwitchCase="'done'" class="fa-solid fa-circle-check" aria-hidden="true"></i>
+                  <i *ngSwitchCase="'error'" class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+                  <i *ngSwitchDefault class="fa-regular fa-circle" aria-hidden="true"></i>
+                </span>
+                <div class="step-content">
+                  <div class="step-top">
+                    <span class="step-page-badge">{{ st.pageBadge }}</span>
+                    <span *ngIf="st.detail" class="step-detail">{{ st.detail }}</span>
+                  </div>
+                  <div class="step-label">{{ st.label }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- INTERACTIVE REPORT BUILDER & EXECUTION CARD -->
+          <div *ngIf="message.reportProposal as prop" class="report-proposal-card">
+            <div class="proposal-header">
+              <div class="proposal-title-wrap">
+                <span class="proposal-icon"><i class="fa-solid fa-file-excel" aria-hidden="true"></i></span>
+                <div>
+                  <strong>Excel Raporu &amp; Sorgu Yapılandırması</strong>
+                  <small>{{ prop.dataSourceName }} · {{ prop.rowCount }} satır veri çekildi</small>
+                </div>
+              </div>
+              <span class="proposal-badge"><i class="fa-solid fa-database" aria-hidden="true"></i> Canlı Veri</span>
+            </div>
+
+            <div class="proposal-body">
+              <!-- 1. Editable Report Name -->
+              <div class="proposal-field">
+                <label>Rapor Adı</label>
+                <input type="text" class="proposal-input" [(ngModel)]="prop.reportName" placeholder="Rapor adını girin…" />
+              </div>
+
+              <!-- 2. Query Selection & Live DB Preview -->
+              <div class="proposal-field">
+                <div class="field-label-row">
+                  <label>Veritabanı Sorgusu (Data Source)</label>
+                  <button type="button" class="link-btn" (click)="prop.showSqlPreview = !prop.showSqlPreview">
+                    <i class="fa-solid" [ngClass]="prop.showSqlPreview ? 'fa-chevron-up' : 'fa-table'" aria-hidden="true"></i>
+                    {{ prop.showSqlPreview ? 'Önizlemeyi Gizle' : 'SQL & Veri Önizle (5 Satır)' }}
+                  </button>
+                </div>
+                <select *ngIf="prop.candidateQueries && prop.candidateQueries.length > 1"
+                  class="proposal-select"
+                  [ngModel]="prop.queryId"
+                  (ngModelChange)="onProposalQueryChange(prop, $event)"
+                  [disabled]="actionBusy">
+                  <option *ngFor="let cq of prop.candidateQueries" [value]="cq.id">{{ cq.name }} ({{ cq.columns.length }} kolon)</option>
+                </select>
+                <div *ngIf="!prop.candidateQueries || prop.candidateQueries.length <= 1" class="query-static-chip">
+                  <i class="fa-solid fa-terminal" aria-hidden="true"></i> {{ prop.queryName }} (<code>{{ prop.queryId }}</code>)
+                </div>
+
+                <!-- Collapsible SQL + Live 5-Row DB Table Preview -->
+                <div *ngIf="prop.showSqlPreview" class="proposal-sql-preview">
+                  <pre class="sql-snippet"><code>{{ prop.sql }}</code></pre>
+                  <div class="table-scroll mini-table" *ngIf="prop.previewRows?.length">
+                    <table>
+                      <thead>
+                        <tr><th *ngFor="let col of prop.columns.slice(0, 6)">{{ col }}</th></tr>
+                      </thead>
+                      <tbody>
+                        <tr *ngFor="let r of prop.previewRows">
+                          <td *ngFor="let col of prop.columns.slice(0, 6)">{{ r[col] }}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 3. Chart Type Selector -->
+              <div class="proposal-field">
+                <label>Grafik Görünümü ({{ prop.chart.include ? prop.chart.xAxis + ' → ' + prop.chart.yAxis.join(', ') : 'Kapalı' }})</label>
+                <div class="chip-group">
+                  <button type="button" class="option-chip" [class.active]="prop.chart.include && prop.chart.type === 'bar'" (click)="setProposalChartType(prop, 'bar')">
+                    <i class="fa-solid fa-chart-column" aria-hidden="true"></i> Çubuk (Bar)
+                  </button>
+                  <button type="button" class="option-chip" [class.active]="prop.chart.include && prop.chart.type === 'line'" (click)="setProposalChartType(prop, 'line')">
+                    <i class="fa-solid fa-chart-line" aria-hidden="true"></i> Çizgi (Line)
+                  </button>
+                  <button type="button" class="option-chip" [class.active]="prop.chart.include && prop.chart.type === 'pie'" (click)="setProposalChartType(prop, 'pie')">
+                    <i class="fa-solid fa-chart-pie" aria-hidden="true"></i> Pasta (Pie)
+                  </button>
+                  <button type="button" class="option-chip" [class.active]="!prop.chart.include" (click)="setProposalChartType(prop, 'none')">
+                    <i class="fa-solid fa-ban" aria-hidden="true"></i> Grafik Yok
+                  </button>
+                </div>
+              </div>
+
+              <!-- 4. Summary KPI Metrics -->
+              <div class="proposal-field" *ngIf="prop.summaries?.length">
+                <label>Özet KPI Hesaplamaları (Seçmek için tıklayın)</label>
+                <div class="chip-group">
+                  <button *ngFor="let s of prop.summaries" type="button" class="option-chip kpi-chip"
+                    [class.active]="s.checked" (click)="toggleProposalSummary(prop, s)">
+                    <i class="fa-solid" [ngClass]="s.checked ? 'fa-square-check' : 'fa-regular fa-square'" aria-hidden="true"></i>
+                    <span>{{ s.operation }}({{ s.field }})</span>
+                    <strong *ngIf="s.value !== undefined">= {{ s.value }}</strong>
+                  </button>
+                </div>
+              </div>
+
+              <!-- 5. Detail Band Table Columns -->
+              <div class="proposal-field">
+                <div class="field-label-row">
+                  <label class="checkbox-label">
+                    <input type="checkbox" [(ngModel)]="prop.includeDetailTable" />
+                    <span>Veritabanı Satır Tablosu (Detail Band · {{ prop.selectedColumns.length }}/{{ prop.columns.length }} kolon)</span>
+                  </label>
+                </div>
+                <div class="chip-group" *ngIf="prop.includeDetailTable">
+                  <button *ngFor="let col of prop.columns" type="button" class="option-chip col-chip"
+                    [class.active]="prop.selectedColumns.includes(col)" (click)="toggleProposalColumn(prop, col)">
+                    {{ col }}
+                  </button>
+                </div>
+              </div>
+
+              <!-- 6. Confirmation Question & Action Buttons -->
+              <div class="proposal-confirm-box">
+                <div class="confirm-question">
+                  <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
+                  <span><strong>{{ prop.reportName }}</strong> şablonunu ekranda canlı kurabilir veya doğrudan indirebilirsiniz:</span>
+                </div>
+                <div class="proposal-actions">
+                  <button type="button" class="proposal-btn live-coworker" [disabled]="actionBusy || coworkerState.active" (click)="runLiveReportOnScreen(prop, message)">
+                    <i class="fa-solid fa-play" aria-hidden="true"></i> Ekranda Canlı Kur &amp; Çalıştır
+                  </button>
+                  <button type="button" class="proposal-btn execute-xlsx" [disabled]="actionBusy" (click)="executeReportProposal(prop, 'xlsx')">
+                    <i class="fa-solid fa-file-arrow-down" aria-hidden="true"></i> Excel İndir (.xlsx)
+                  </button>
+                  <button type="button" class="proposal-btn execute-pdf" [disabled]="actionBusy" (click)="executeReportProposal(prop, 'pdf')">
+                    <i class="fa-solid fa-file-pdf" aria-hidden="true"></i> PDF (.pdf)
+                  </button>
+                  <button type="button" class="proposal-btn open-builder" [disabled]="actionBusy" (click)="openProposalInBuilder(prop)">
+                    <i class="fa-solid fa-up-right-from-square" aria-hidden="true"></i> Template Builder'da Aç
+                  </button>
+                </div>
+                <div *ngIf="prop.executedFormat" class="execution-success-banner">
+                  <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
+                  <span><strong>{{ prop.reportName }}</strong> başarıyla oluşturuldu ve <code>.{{ prop.executedFormat }}</code> olarak indirildi.</span>
+                </div>
+              </div>
+
+              <!-- 7. Interactive Refinement Note -->
+              <div class="proposal-revision-row">
+                <input type="text" class="proposal-input compact" [(ngModel)]="prop.customNote"
+                  (keydown.enter)="submitProposalRevision(prop)"
+                  placeholder="Farklı bir filtre, gruplama veya değişiklik isteyin ve Enter'a basın…" />
+                <button type="button" class="revision-send-btn" [disabled]="!prop.customNote?.trim() || sending" (click)="submitProposalRevision(prop)">
+                  <i class="fa-solid fa-paper-plane" aria-hidden="true"></i> Güncelle
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- INTERACTIVE QUESTION / TABLE DISAMBIGUATION & DECISION CARD -->
+          <div *ngIf="message.dialog as dlg" class="interactive-dialog-card"
+            [class.is-submitted]="dlg.submitted"
+            [class.is-table-wizard]="dlg.dialogType === 'table_disambiguation'">
+            <div class="dialog-header">
+              <span class="dialog-icon">
+                <i class="fa-solid" [ngClass]="dlg.dialogType === 'table_disambiguation' ? 'fa-table-columns' : 'fa-comments'" aria-hidden="true"></i>
+              </span>
+              <div class="dialog-title-wrap">
+                <strong>{{ dlg.title }}</strong>
+                <small>{{ dlg.submitted ? 'Seçiminiz değerlendirildi ve uygulandı' : (dlg.multiSelect ? 'Tek veya birden fazla tablo işaretleyebilirsiniz (Çoklu seçim = Otomatik JOIN)' : 'Devam etmek için bir seçenek belirleyin') }}</small>
+              </div>
+            </div>
+
+            <p class="dialog-prompt">{{ dlg.prompt }}</p>
+
+            <!-- Target Action Selector when disambiguating tables -->
+            <div *ngIf="dlg.dialogType === 'table_disambiguation' && !dlg.submitted" class="dialog-target-bar">
+              <span class="target-label">Hedef Çıktı:</span>
+              <div class="target-pills">
+                <button type="button" class="target-pill" [class.active]="!dlg.targetAction || dlg.targetAction === 'auto'" (click)="setDialogTargetAction(dlg, 'auto')">Otomatik</button>
+                <button type="button" class="target-pill" [class.active]="dlg.targetAction === 'report'" (click)="setDialogTargetAction(dlg, 'report')"><i class="fa-solid fa-file-excel" aria-hidden="true"></i> Excel Raporu</button>
+                <button type="button" class="target-pill" [class.active]="dlg.targetAction === 'sql'" (click)="setDialogTargetAction(dlg, 'sql')"><i class="fa-solid fa-database" aria-hidden="true"></i> SQL Sorgusu</button>
+                <button type="button" class="target-pill" [class.active]="dlg.targetAction === 'spacemap'" (click)="setDialogTargetAction(dlg, 'spacemap')"><i class="fa-solid fa-diagram-project" aria-hidden="true"></i> Space Map</button>
+                <button type="button" class="target-pill" [class.active]="dlg.targetAction === 'python'" (click)="setDialogTargetAction(dlg, 'python')"><i class="fa-brands fa-python" aria-hidden="true"></i> Python</button>
+              </div>
+            </div>
+
+            <div class="dialog-options">
+              <button *ngFor="let opt of dlg.options" type="button" class="dialog-option-btn"
+                [class.selected]="opt.selected" [class.rich-option]="!!opt.description || !!opt.columns?.length"
+                [disabled]="dlg.submitted || sending"
+                (click)="selectDialogOption(dlg, opt)">
+                <i class="fa-solid check-icon" [ngClass]="opt.selected ? (dlg.multiSelect ? 'fa-square-check' : 'fa-circle-check') : (dlg.multiSelect ? 'fa-regular fa-square' : 'fa-regular fa-circle')" aria-hidden="true"></i>
+                <div class="opt-content">
+                  <div class="opt-top-row">
+                    <span class="opt-label">{{ opt.label }}</span>
+                    <span class="opt-badges">
+                      <span *ngIf="opt.badge" class="opt-meta-badge">{{ opt.badge }}</span>
+                      <span *ngIf="opt.recommended" class="opt-rec-badge">Önerilen</span>
+                    </span>
+                  </div>
+                  <span *ngIf="opt.description" class="opt-desc">{{ opt.description }}</span>
+                  <div *ngIf="opt.columns?.length" class="opt-cols-row">
+                    <span *ngFor="let col of opt.columns?.slice(0, 6)" class="opt-col-chip">{{ col }}</span>
+                    <span *ngIf="(opt.columns?.length || 0) > 6" class="opt-col-more">+{{ (opt.columns?.length || 0) - 6 }}</span>
+                  </div>
+                </div>
+              </button>
+            </div>
+
+            <div *ngIf="dlg.dialogType === 'table_disambiguation' && getSelectedTablesSummary(dlg) as joinSummary" class="dialog-join-summary">
+              <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
+              <span>{{ joinSummary }}</span>
+            </div>
+
+            <div class="dialog-custom-row" *ngIf="!dlg.submitted">
+              <input type="text" class="proposal-input compact" [(ngModel)]="dlg.customText"
+                (keydown.enter)="submitDialog(dlg)"
+                placeholder="Ek filtre veya not (örn: Line-A, OEE > 80, son vardiya)…" />
+              <button type="button" class="dialog-submit-btn" [disabled]="sending" (click)="submitDialog(dlg)">
+                <i class="fa-solid fa-check" aria-hidden="true"></i> Onayla &amp; Devam Et
+              </button>
+            </div>
+          </div>
+
+          <div *ngIf="message.error" class="message-error" role="alert"><i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i>{{ message.error }}</div>
+          <span *ngIf="message.interrupted" class="interrupted-note">Yanıt durduruldu.</span>
+        </div>
+      </article>
+
+      <div *ngIf="sending" class="thinking" role="status"><span class="thinking-dots"><b></b><b></b><b></b></span>{{ toolLabel || 'Copilot düşünüyor ve hazırlıyor…' }}</div>
+
+      <div *ngIf="preview" class="result-card">
+        <div class="result-header">
+          <span><i class="fa-solid fa-circle-check" aria-hidden="true"></i>{{ preview.title }}</span>
+          <button type="button" class="icon-button" (click)="preview = null" aria-label="Önizlemeyi kapat">
+            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+          </button>
+        </div>
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th *ngFor="let column of preview.columns">{{ column }}</th></tr></thead>
+            <tbody>
+              <tr *ngFor="let row of preview.rows">
+                <td *ngFor="let column of preview.columns">{{ row[column] }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p *ngIf="!preview.rows.length">Sorgu tamamlandı; sonuç satırı yok.</p>
+      </div>
+    </div>
+
+    <div *ngIf="notice" class="action-notice" [class.error]="noticeError" role="status">
+      <i class="fa-solid" [ngClass]="noticeError ? 'fa-circle-exclamation' : 'fa-circle-check'" aria-hidden="true"></i>{{ notice }}
+    </div>
+
+    <footer class="panel-footer">
+      <div class="composer-box" [class.busy]="sending">
+        <textarea #composer [(ngModel)]="prompt" (keydown)="composerKey($event)" maxlength="6000" rows="2" aria-label="Copilot mesajı"
+          [placeholder]="health.available ? 'Rapor oluştur, sorgu yaz veya verilerini canlı analiz et…' : 'Tak-çıkar modu: Mesaj göndermek için yerel yapay zeka servisini başlatın…'" [disabled]="!health.available"></textarea>
+        <div class="composer-tools">
+          <span class="context-included">
+            <i class="fa-solid fa-bolt" aria-hidden="true"></i>
+            {{ autoCoworker ? 'Canlı ekran hazır' : 'Sayfa bağlamı' }}{{ memories.length ? ' · ' + memories.length + ' hafıza aktif' : '' }}
+          </span>
+          <button *ngIf="sending" type="button" class="send-button stop" aria-label="Yanıtı durdur" title="Yanıtı durdur" (click)="stop()"><i class="fa-solid fa-stop" aria-hidden="true"></i></button>
+          <button *ngIf="!sending" type="button" class="send-button" aria-label="Mesajı gönder" title="Gönder · Enter" [disabled]="!prompt.trim() || !health.available" (click)="send()"><i class="fa-solid fa-arrow-up" aria-hidden="true"></i></button>
+        </div>
+      </div>
+      <div class="footer-meta">
+        <span><i class="fa-solid fa-microchip" aria-hidden="true"></i>{{ health.mock ? 'Mock' : health.model || 'Yerel model' }}</span>
+        <span>Enter ↵ gönder <span class="footer-divider">·</span> Esc durdur/kapat</span>
+      </div>
+    </footer>
+  </section>
+</ng-container>

@@ -1,102 +1,264 @@
 <div class="login-page">
-  <!-- Language Selector -->
-  <div class="fixed top-5 right-5 z-50">
-    <select
-      [(ngModel)]="selectedLanguage"
-      (change)="changeLanguage($any($event.target).value)"
-      class="lang-select">
-      <option value="tr">🇹🇷 Türkçe</option>
-      <option value="en">🇬🇧 English</option>
-      <option value="de">🇩🇪 Deutsch</option>
-    </select>
-  </div>
+  <!-- Ambient Background Layers -->
+  <div class="grid-bg" aria-hidden="true"></div>
+  <div class="glow glow-1" aria-hidden="true"></div>
+  <div class="glow glow-2" aria-hidden="true"></div>
+  <div class="glow glow-3" aria-hidden="true"></div>
 
-  <!-- Decorative background -->
-  <div class="grid-bg"></div>
-  <div class="glow glow-1"></div>
-  <div class="glow glow-2"></div>
+  <!-- Top Utility Controls (Theme + Language) -->
+  <header class="login-topbar">
+    <button
+      type="button"
+      class="utility-pill theme-btn"
+      (click)="toggleTheme()"
+      [attr.title]="(isDarkTheme ? 'LOGIN.THEME_LIGHT' : 'LOGIN.THEME_DARK') | translate"
+      [attr.aria-label]="(isDarkTheme ? 'LOGIN.THEME_LIGHT' : 'LOGIN.THEME_DARK') | translate">
+      <i class="fas" [ngClass]="isDarkTheme ? 'fa-sun text-amber-400' : 'fa-moon text-brand'"></i>
+      <span class="hidden sm:inline">{{ (isDarkTheme ? 'LOGIN.THEME_LIGHT' : 'LOGIN.THEME_DARK') | translate }}</span>
+    </button>
 
-  <div class="login-card">
-    <!-- Header -->
-    <div class="text-center mb-8">
-      <div class="login-logo inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-4">
-        <i class="fas fa-wave-square text-2xl"></i>
-      </div>
-      <h1 class="text-2xl font-bold text-ink">{{ 'LOGIN.TITLE' | translate }}</h1>
-      <p class="text-ink-muted text-sm mt-1">{{ 'LOGIN.SUBTITLE' | translate }}</p>
-    </div>
-
-    <!-- Error -->
-    <div *ngIf="errorMessage"
-         class="mb-4 p-3 rounded-xl bg-danger/10 border border-danger/30 text-danger text-sm flex items-center gap-2">
-      <i class="fas fa-exclamation-circle"></i>
-      <span>{{ errorMessage }}</span>
-    </div>
-
-    <!-- Form -->
-    <form [formGroup]="loginForm" (ngSubmit)="onSubmit()" class="space-y-5">
-      <div>
-        <label class="block text-sm font-medium text-ink-secondary mb-2">
-          <i class="fas fa-user text-brand mr-2 text-xs"></i>{{ 'LOGIN.USERNAME' | translate }}
-        </label>
-        <input formControlName="username" type="text" autocomplete="username"
-               [placeholder]="'LOGIN.USERNAME_PLACEHOLDER' | translate"
-               class="login-input" [class.error]="hasError('username')" />
-        <p *ngIf="hasError('username')" class="text-danger text-xs mt-1.5">{{ getErrorMessage('username') }}</p>
-      </div>
-
-      <div>
-        <label class="block text-sm font-medium text-ink-secondary mb-2">
-          <i class="fas fa-lock text-brand mr-2 text-xs"></i>{{ 'LOGIN.PASSWORD' | translate }}
-        </label>
-        <input formControlName="password" type="password" autocomplete="current-password"
-               [placeholder]="'LOGIN.PASSWORD_PLACEHOLDER' | translate"
-               class="login-input" [class.error]="hasError('password')" />
-        <p *ngIf="hasError('password')" class="text-danger text-xs mt-1.5">{{ getErrorMessage('password') }}</p>
-      </div>
-
-      <label class="flex items-center gap-2 cursor-pointer select-none">
-        <input type="checkbox" formControlName="rememberMe"
-               class="w-4 h-4 rounded border-edge bg-surface-raised text-brand focus:ring-brand/30" />
-        <span class="text-ink-muted text-sm">{{ 'LOGIN.REMEMBER_ME' | translate }}</span>
-      </label>
-
-      <button type="submit" [disabled]="loading" class="login-btn">
-        <div *ngIf="loading" class="login-spinner animate-spin"></div>
-        <i *ngIf="!loading" class="fas fa-sign-in-alt"></i>
-        {{ loading ? ('LOGIN.LOGGING_IN' | translate) : ('LOGIN.LOGIN_BUTTON' | translate) }}
+    <div class="lang-segmented" role="group" aria-label="Language selector">
+      <button
+        *ngFor="let lang of languages"
+        type="button"
+        class="lang-pill"
+        [class.active]="selectedLanguage === lang.code"
+        [attr.title]="lang.name"
+        (click)="changeLanguage(lang.code)">
+        {{ lang.label }}
       </button>
+    </div>
+  </header>
 
-      <!-- Hızlı Test / Demo Hesapları -->
-      <div class="mt-5 pt-4 border-t border-edge/15">
-        <div class="flex items-center justify-between mb-2.5">
-          <span class="text-xs font-mono font-medium text-ink-secondary flex items-center gap-1.5">
-            <i class="fas fa-key text-brand text-[10px]"></i>
-            {{ 'LOGIN.DEMO_ACCOUNTS' | translate }}
-          </span>
-          <span class="text-[10px] text-ink-muted">Tek tıkla giriş</span>
-        </div>
-        <div class="grid grid-cols-2 gap-2">
-          <button
-            *ngFor="let cred of demoCredentials"
-            type="button"
-            (click)="loginAs(cred)"
-            [class]="'text-left p-2 rounded-lg border text-xs transition-all hover:scale-[1.02] cursor-pointer ' + cred.color"
-            [title]="cred.desc">
-            <div class="font-bold flex items-center justify-between gap-1.5 min-w-0">
-              <span class="truncate">{{ cred.role | translate }}</span>
-              <span class="text-[10px] opacity-75 font-mono shrink-0">{{ cred.username }}</span>
+  <!-- Main Split Shell -->
+  <main class="login-shell">
+    <!-- Left Enterprise Showcase Panel -->
+    <section class="showcase-panel" aria-label="Platform overview">
+      <div class="showcase-top">
+        <!-- Brand Identity -->
+        <div class="brand-lockup">
+          <div class="brand-mark">
+            <i class="fas fa-satellite-dish"></i>
+            <span class="brand-ring" aria-hidden="true"></span>
+          </div>
+          <div>
+            <div class="brand-name-row">
+              <span class="brand-title">NOV4</span>
+              <span class="brand-tag">SUPERNOVA</span>
             </div>
-            <div class="text-[10px] opacity-75 truncate mt-0.5">{{ cred.desc }}</div>
+            <p class="brand-sub">{{ 'LOGIN.SUBTITLE' | translate }}</p>
+          </div>
+        </div>
+
+        <!-- Status Badge -->
+        <div class="hero-badge">
+          <span class="pulse-dot" aria-hidden="true"></span>
+          <span>{{ 'LOGIN.HERO_BADGE' | translate }}</span>
+        </div>
+
+        <!-- Headline -->
+        <h1 class="hero-headline">{{ 'LOGIN.HERO_TITLE' | translate }}</h1>
+        <p class="hero-description">{{ 'LOGIN.HERO_SUBTITLE' | translate }}</p>
+      </div>
+
+      <!-- Orbital Architecture & Live Capabilities Visual -->
+      <div class="orbital-stage" aria-hidden="true">
+        <div class="orbit orbit-outer"></div>
+        <div class="orbit orbit-inner"></div>
+        <div class="orbit-core">
+          <i class="fas fa-bolt"></i>
+          <span>CORE</span>
+        </div>
+        <div class="orbit-node node-sql">
+          <i class="fas fa-database"></i>
+          <span>SQL Live</span>
+        </div>
+        <div class="orbit-node node-py">
+          <i class="fab fa-python"></i>
+          <span>Python</span>
+        </div>
+        <div class="orbit-node node-map">
+          <i class="fas fa-project-diagram"></i>
+          <span>Space Map</span>
+        </div>
+        <div class="orbit-node node-rep">
+          <i class="fas fa-file-invoice"></i>
+          <span>XLSX · PDF</span>
+        </div>
+      </div>
+
+      <!-- Feature Grid -->
+      <div class="feature-grid">
+        <div
+          *ngFor="let feat of showcaseFeatures"
+          class="feature-card"
+          [attr.data-accent]="feat.accent">
+          <div class="feature-icon">
+            <i class="fas" [ngClass]="feat.icon"></i>
+          </div>
+          <div class="feature-body">
+            <h3>{{ feat.titleKey | translate }}</h3>
+            <p>{{ feat.descKey | translate }}</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stack Footer Chips -->
+      <div class="showcase-footer">
+        <span class="stack-chip"><i class="fas fa-server"></i> Multi-DB Engine</span>
+        <span class="stack-chip"><i class="fas fa-diagram-project"></i> Tree · DAG · Sequence</span>
+        <span class="stack-chip"><i class="fas fa-wand-magic-sparkles"></i> Plug &amp; Play AI</span>
+      </div>
+    </section>
+
+    <!-- Right Authentication Panel -->
+    <section class="auth-panel">
+      <div class="login-card">
+        <!-- Mobile Compact Brand Header -->
+        <div class="mobile-brand">
+          <div class="brand-mark compact">
+            <i class="fas fa-satellite-dish"></i>
+          </div>
+          <div>
+            <span class="brand-title">NOV4</span>
+            <p class="brand-sub">{{ 'LOGIN.SUBTITLE' | translate }}</p>
+          </div>
+        </div>
+
+        <!-- Form Header -->
+        <div class="auth-header">
+          <div class="auth-eyebrow">
+            <i class="fas fa-fingerprint"></i>
+            <span>{{ 'LOGIN.TITLE' | translate }}</span>
+          </div>
+          <h2 class="auth-title">{{ 'LOGIN.WELCOME_BACK' | translate }}</h2>
+          <p class="auth-subtitle">{{ 'LOGIN.WELCOME_DESC' | translate }}</p>
+        </div>
+
+        <!-- Error Banner -->
+        <div *ngIf="errorMessage" class="error-banner" role="alert">
+          <div class="error-banner-left">
+            <i class="fas fa-circle-exclamation"></i>
+            <span>{{ errorMessage }}</span>
+          </div>
+          <button type="button" class="error-close" (click)="clearError()" aria-label="Close alert">
+            <i class="fas fa-xmark"></i>
           </button>
         </div>
-      </div>
-    </form>
 
-    <!-- Footer -->
-    <div class="mt-6 pt-4 border-t border-edge/10 text-center">
-      <p class="text-[11px] text-ink-muted/70">{{ 'LOGIN.COPYRIGHT' | translate }}</p>
-      <p class="text-[10px] text-ink-muted/40 mt-1">{{ 'LOGIN.VERSION' | translate }} · Build {{ currentYear }}</p>
-    </div>
-  </div>
+        <!-- Reactive Login Form -->
+        <form [formGroup]="loginForm" (ngSubmit)="onSubmit()" class="auth-form" novalidate>
+          <!-- Username -->
+          <div class="field-group">
+            <label for="login-username" class="field-label">
+              {{ 'LOGIN.USERNAME' | translate }}
+            </label>
+            <div class="input-wrapper" [class.has-error]="hasError('username')">
+              <i class="fas fa-user input-icon" aria-hidden="true"></i>
+              <input
+                id="login-username"
+                formControlName="username"
+                type="text"
+                autocomplete="username"
+                [attr.placeholder]="'LOGIN.USERNAME_PLACEHOLDER' | translate"
+                class="login-input" />
+            </div>
+            <p *ngIf="hasError('username')" class="field-error">
+              <i class="fas fa-triangle-exclamation"></i>
+              <span>{{ getErrorMessage('username') }}</span>
+            </p>
+          </div>
+
+          <!-- Password -->
+          <div class="field-group">
+            <label for="login-password" class="field-label">
+              {{ 'LOGIN.PASSWORD' | translate }}
+            </label>
+            <div class="input-wrapper" [class.has-error]="hasError('password')">
+              <i class="fas fa-lock input-icon" aria-hidden="true"></i>
+              <input
+                id="login-password"
+                formControlName="password"
+                [type]="showPassword ? 'text' : 'password'"
+                autocomplete="current-password"
+                [attr.placeholder]="'LOGIN.PASSWORD_PLACEHOLDER' | translate"
+                class="login-input with-action" />
+              <button
+                type="button"
+                class="pw-toggle-btn"
+                (click)="togglePasswordVisibility()"
+                [attr.title]="(showPassword ? 'LOGIN.HIDE_PASSWORD' : 'LOGIN.SHOW_PASSWORD') | translate"
+                [attr.aria-label]="(showPassword ? 'LOGIN.HIDE_PASSWORD' : 'LOGIN.SHOW_PASSWORD') | translate">
+                <i class="fas" [ngClass]="showPassword ? 'fa-eye-slash' : 'fa-eye'"></i>
+              </button>
+            </div>
+            <p *ngIf="hasError('password')" class="field-error">
+              <i class="fas fa-triangle-exclamation"></i>
+              <span>{{ getErrorMessage('password') }}</span>
+            </p>
+          </div>
+
+          <!-- Remember Me -->
+          <div class="form-meta-row">
+            <label class="remember-label">
+              <input type="checkbox" formControlName="rememberMe" class="remember-checkbox" />
+              <span>{{ 'LOGIN.REMEMBER_ME' | translate }}</span>
+            </label>
+            <span class="security-chip">
+              <i class="fas fa-lock"></i> JWT · RBAC
+            </span>
+          </div>
+
+          <!-- Submit CTA -->
+          <button type="submit" [disabled]="loading" class="login-btn">
+            <span *ngIf="loading" class="login-spinner animate-spin" aria-hidden="true"></span>
+            <i *ngIf="!loading" class="fas fa-arrow-right-to-bracket"></i>
+            <span>{{ loading ? ('LOGIN.LOGGING_IN' | translate) : ('LOGIN.LOGIN_BUTTON' | translate) }}</span>
+          </button>
+        </form>
+
+        <!-- Quick Role Access (1-Click Demo Cards) -->
+        <div class="demo-section">
+          <div class="demo-header">
+            <span class="demo-title">
+              <i class="fas fa-bolt"></i>
+              {{ 'LOGIN.DEMO_ACCOUNTS' | translate }}
+            </span>
+            <span class="demo-hint">{{ 'LOGIN.ONE_CLICK_HINT' | translate }}</span>
+          </div>
+
+          <div class="demo-grid">
+            <button
+              *ngFor="let cred of demoCredentials"
+              type="button"
+              class="demo-card"
+              [class.featured]="cred.featured"
+              [class.active]="activeDemoUser === cred.username"
+              [attr.data-tone]="cred.tone"
+              [disabled]="loading"
+              [attr.title]="cred.desc"
+              (click)="loginAs(cred)">
+              <div class="demo-card-icon">
+                <i class="fas" [ngClass]="cred.icon"></i>
+              </div>
+              <div class="demo-card-content">
+                <div class="demo-card-top">
+                  <span class="demo-role-name">{{ cred.role | translate }}</span>
+                  <span class="demo-username">@{{ cred.username }}</span>
+                </div>
+                <div class="demo-card-desc">{{ cred.desc }}</div>
+              </div>
+              <i class="fas fa-chevron-right demo-arrow" aria-hidden="true"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="card-footer">
+          <p>{{ 'LOGIN.COPYRIGHT' | translate }}</p>
+          <span class="version-pill">{{ 'LOGIN.VERSION' | translate }} · {{ currentYear }}</span>
+        </footer>
+      </div>
+    </section>
+  </main>
 </div>

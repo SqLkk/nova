@@ -57,9 +57,48 @@ export interface SavedPythonScript {
   description?: string;
   code: string;
   sqlQueryIds?: string[];
+  datasetNames?: string[];
+  datasetsMeta?: Array<{
+    name: string;
+    columns: QueryColumn[];
+    rowCount: number;
+  }>;
   owner?: string;
   allowedRoles?: string[];
   allowedUsers?: string[];
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface SharingRoleOption {
+  id: string;
+  key: string;
+  name: string;
+  color?: string;
+  level?: number;
+}
+
+export interface SharingUserOption {
+  id: string;
+  username: string;
+  displayName?: string;
+  role?: string;
+}
+
+export interface SharingOptions {
+  roles: SharingRoleOption[];
+  users: SharingUserOption[];
+}
+
+export interface PythonScriptRunResult {
+  id: string;
+  name: string;
+  description?: string;
+  datasetName: string;
+  datasetNames: string[];
+  columns: QueryColumn[];
+  rows: Array<Record<string, unknown>>;
+  totalRows: number;
+  datasets: Record<string, QueryResult>;
+  executionMs?: number;
 }

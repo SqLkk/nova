@@ -1,0 +1,26 @@
+{
+  "total_examples": 3000,
+  "categories": {
+    "py_basic": 250,
+    "py_weighted": 300,
+    "py_merge": 300,
+    "py_fix": 150,
+    "sql": 500,
+    "path": 400,
+    "template": 400,
+    "forbidden": 250,
+    "missing_info": 250,
+    "tool_calling": 200
+  },
+  "splits": {
+    "train": 2400,
+    "valid": 300,
+    "test": 300
+  },
+  "seed": 42,
+  "sha256": {
+    "train": "8c119b0f43bf658960f9ba94ae8cb6ee0198a9ba19f7d0976d780b319d9eca95",
+    "valid": "4232e66d2f99c19fb7e8034622c036ed5c5b374e2a30b812c755d3380fd66ea2",
+    "test": "2fed2875297cfd09f3a685622be7060a4e7ac3d944c9641097a9d1bf59095523"
+  }
+}

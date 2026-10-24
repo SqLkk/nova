@@ -107,43 +107,58 @@ export class ApiService {
   getRealTimeHierarchyStructure(): Observable<any> { return of({data: []}); }
   getRealTimeElementsStructure(): Observable<any> { return of({data: []}); }
   getSavedExplorationData(id: any): Observable<any> {
-    // Kayıtlı SQL sorgusunu preview endpoint'i üzerinden çalıştırır ve widget'ın
-    // beklediği {status, data:{rows, source, name}} zarfına reshape eder.
-    // Backend: POST /api/queries/<id>/preview → {success, data:{columns, rows, ...}}.
     if (!id) {
       return of({ status: 'error', data: null, message: 'No query id provided.' });
     }
-    return this.post<any>(`queries/${id}/preview`, { limit: 100 }).pipe(
+    const rawId = String(id).trim();
+    if (rawId.startsWith('py:') || rawId.startsWith('py_') || rawId.startsWith('ps_')) {
+      return this.runSavedPythonScript(rawId);
+    }
+    return this.post<any>(`queries/${rawId}/preview`, { limit: 250 }).pipe(
       map((result: any) => ({
         status: 'success',
         data: {
           rows: result?.rows || [],
           columns: result?.columns || [],
           source: 'sql',
-          name: 'Saved SQL Query'
+          name: result?.name || 'Saved SQL Query',
+          description: result?.description || '',
+          executionMs: result?.executionMs || 0
         }
       })),
-      catchError(() => of({ status: 'error', data: null, message: 'SQL preview failed.' }))
+      catchError((err) => of({ status: 'error', data: null, message: err?.error?.error || 'SQL preview failed.' }))
     );
   }
 
-  runSavedPythonScript(id: any): Observable<any> {
-    // Kayıtlı Python script'ini sandbox'ta çalıştırır (backend: POST /api/python/scripts/<id>/run)
-    // ve widget'ın beklediği {status, data:{rows, source, name}} zarfına reshape eder.
+  runSavedPythonScript(id: any, dataset = ''): Observable<any> {
     if (!id) {
       return of({ status: 'error', data: null, message: 'No script id provided.' });
     }
-    return this.post<any>(`python/scripts/${id}/run`, {}).pipe(
+    let scriptId = String(id).trim();
+    let ds = dataset;
+    if (scriptId.startsWith('py:')) {
+      const parts = scriptId.split(':');
+      scriptId = parts[1] || scriptId;
+      if (!ds && parts[2]) {
+        ds = parts[2];
+      }
+    }
+    return this.post<any>(`python/scripts/${scriptId}/run`, { dataset: ds }).pipe(
       map((result: any) => ({
         status: 'success',
         data: {
           rows: result?.rows || [],
           columns: result?.columns || [],
+          datasetName: result?.datasetName || ds || '',
+          datasetNames: result?.datasetNames || [],
+          datasets: result?.datasets || {},
           source: 'python',
-          name: result?.name || 'Python Script'
+          name: result?.name || 'Python Script',
+          description: result?.description || '',
+          executionMs: result?.executionMs || 0
         }
       })),
-      catchError(() => of({ status: 'error', data: null, message: 'Python run failed.' }))
+      catchError((err) => of({ status: 'error', data: null, message: err?.error?.error || 'Python run failed.' }))
     );
   }
 

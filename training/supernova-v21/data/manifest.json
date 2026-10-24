@@ -1,0 +1,91 @@
+{
+  "version": "2.1",
+  "total_examples": 3000,
+  "categories": {
+    "py_basic": 250,
+    "py_weighted": 300,
+    "py_merge": 300,
+    "py_fix": 150,
+    "sql": 500,
+    "path": 400,
+    "template": 400,
+    "forbidden": 250,
+    "missing_info": 250,
+    "tool_calling": 200
+  },
+  "splits": {
+    "train": 2408,
+    "valid": 296,
+    "test": 296
+  },
+  "scenario_groups": {
+    "total_scenarios": 20,
+    "train": [
+      "sc00_press",
+      "sc01_weld",
+      "sc02_paint",
+      "sc03_powertrain",
+      "sc04_battery",
+      "sc05_final_assm",
+      "sc06_stamping",
+      "sc07_casting",
+      "sc08_plastic",
+      "sc09_laser",
+      "sc10_surface",
+      "sc11_boiler",
+      "sc12_compressor",
+      "sc13_transformer",
+      "sc14_water_plant",
+      "sc15_cold_storage"
+    ],
+    "valid": [
+      "sc16_optical_qc",
+      "sc17_cleanroom"
+    ],
+    "test": [
+      "sc18_pack_line",
+      "sc19_intralog"
+    ]
+  },
+  "deduplication": {
+    "within_split_dupes": {
+      "train": 0,
+      "valid": 0,
+      "test": 0
+    },
+    "cross_split_dupes": 0
+  },
+  "fixture_validation": {
+    "total_verified": 3000,
+    "failed": 0
+  },
+  "token_lengths": {
+    "stats": {
+      "train": {
+        "count": 2408,
+        "min": 401,
+        "max": 977,
+        "avg": 575.0
+      },
+      "valid": {
+        "count": 296,
+        "min": 414,
+        "max": 975,
+        "avg": 578.3
+      },
+      "test": {
+        "count": 296,
+        "min": 414,
+        "max": 983,
+        "avg": 577.4
+      }
+    },
+    "exceeding_1024_count": 0
+  },
+  "seed": 42,
+  "sha256": {
+    "train": "2fe3a7703c1d5d656c43a3e378d8a9b7552a9bfa04815f7d5d83c913d8f32d0c",
+    "valid": "3119beb255f8d7ada9785c1b193091459b2d9c54e8c5c7a111c9964a2b3eec4d",
+    "test": "9a7fc4e3c7d057e0bd15dc522567c650064b484a86b735b380bbc392c87cb3c8"
+  }
+}

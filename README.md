@@ -29,4 +29,4 @@ npm start
 
 ## 👥 Contributors
 
-See [CONTRIBUTORS.md](file:///Users/utkukaraca/Library/CloudStorage/OneDrive-SiemensAG/Masa%C3%BCst%C3%BC/Development/super_nov4/CONTRIBUTORS.md) for the list of contributors.
+See [CONTRIBUTORS.md](CONTRIBUTORS.md) for the list of contributors.

@@ -13,7 +13,7 @@ Runs full-stack E2E tests against Supernova API endpoints:
 8. Path Definer Intelligent Search & Breadcrumb Resolution
 9. Dynamic Report Studio Execution (Excel Template Engine .xlsx Rendering)
 
-Author: Antigravity AI / Siemens Industrial SCADA & Data Analytics Platform
+Author: SuperNova Enterprise Industrial Intelligence & Data Analytics Platform
 """
 
 import os

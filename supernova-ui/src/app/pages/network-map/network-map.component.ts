@@ -12,17 +12,22 @@ import { QueryService } from '../../services/query.service';
 import { ApiService } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
 import { DashboardEditService, Widget } from '../../services/dashboard-edit.service';
-import { BuiltStructure, PathDef } from '../../models/path-def.model';
-import { SavedQuery } from '../../models/query.model';
+import { TemplateBuilderService } from '../../services/template-builder.service';
+import { BuiltStructure, PathDef, PathStructure } from '../../models/path-def.model';
+import { SavedQuery, SavedPythonScript, QueryColumn } from '../../models/query.model';
+import { TemplateDocument, createEmptyDocument, cellKey } from '../../models/template-document.model';
+import { AiContextService } from '../../services/ai-context.service';
 
 // ============================================================================
-// Space Map — Çok temalı, interaktif hiyerarşi görselleştirme motoru.
-// 5 farklı endüstriyel ve görsel tema: Kozmik, Fabrika, Siber Ağ, Blueprint, Kristal.
-// Canvas 2D + leaf-ağırlıklı radial layout + drill-down + FontAwesome canvas glyphs.
+// Space Map — Çok temalı, çok yerleşimli, interaktif hiyerarşi & topoloji motoru.
+// 5 farklı endüstriyel/görsel tema + 5 farklı yerleşim algoritması (Radial,
+// Dikey Ağaç, Yatay Proses Akışı, Küme Matrisi, Spiral) + Query Viewer ve
+// Template Builder (XLSX/PDF) doğrudan bağlantı desteği.
 // ============================================================================
 
 export type SpaceMapTheme = 'cosmic' | 'factory' | 'cyber' | 'blueprint' | 'crystal';
 export type SpaceMapShape = 'auto' | 'planet' | 'hexagon' | 'cyber' | 'blueprint' | 'diamond' | 'circle';
+export type SpaceMapLayout = 'radial' | 'hierarchy-tb' | 'flow-lr' | 'grid' | 'spiral';
 
 export interface SpaceMapConfig {
   theme: SpaceMapTheme;
@@ -33,65 +38,79 @@ export interface SpaceMapConfig {
   level1Icon: string;
   level2Icon: string;
   level3Icon: string;
+  level4Icon?: string;
+  autoTypeIcons?: boolean;
   showOrbits: boolean;
   showGrid: boolean;
-  layout?: 'radial' | 'spiral';
+  layout?: SpaceMapLayout;
 }
 
 export interface AvailableIcon {
   id: string;
   label: string;
   glyph: string;
+  category?: string;
 }
 
 export const AVAILABLE_ICONS: AvailableIcon[] = [
-  // Genel & Uzay
-  { id: 'fa-sun', label: 'Güneş / Yıldız', glyph: '\uf185' },
-  { id: 'fa-globe', label: 'Gezegen / Dünya', glyph: '\uf0ac' },
-  { id: 'fa-satellite', label: 'Uydu', glyph: '\uf7bf' },
-  { id: 'fa-rocket', label: 'Roket', glyph: '\uf135' },
-  { id: 'fa-meteor', label: 'Meteor / Asteroit', glyph: '\uf753' },
-  { id: 'fa-atom', label: 'Atom / Çekirdek', glyph: '\uf5d2' },
-  // Endüstriyel
-  { id: 'fa-industry', label: 'Fabrika / Tesis', glyph: '\uf275' },
-  { id: 'fa-cogs', label: 'Dişliler / Mekanizma', glyph: '\uf085' },
-  { id: 'fa-wrench', label: 'Bakım / Alet', glyph: '\uf0ad' },
-  { id: 'fa-robot', label: 'Robot / Otomasyon', glyph: '\uf544' },
-  { id: 'fa-bolt', label: 'Güç / Elektrik', glyph: '\uf0e7' },
-  { id: 'fa-warehouse', label: 'Depo / Ambar', glyph: '\uf494' },
-  // Siber & IT
-  { id: 'fa-server', label: 'Sunucu / Host', glyph: '\uf233' },
-  { id: 'fa-database', label: 'Veritabanı', glyph: '\uf1c0' },
-  { id: 'fa-network-wired', label: 'Ağ / Network', glyph: '\uf6ff' },
-  { id: 'fa-microchip', label: 'Mikroçip / CPU', glyph: '\uf2db' },
-  { id: 'fa-wifi', label: 'Kablosuz / IoT', glyph: '\uf1eb' },
-  { id: 'fa-shield-alt', label: 'Güvenlik / Koruma', glyph: '\uf3ed' },
-  { id: 'fa-terminal', label: 'Terminal / Kod', glyph: '\uf120' },
-  // Mimari & Blueprint
-  { id: 'fa-layer-group', label: 'Katman / Modül', glyph: '\uf5fd' },
-  { id: 'fa-sitemap', label: 'Hiyerarşi Şeması', glyph: '\uf0e8' },
-  { id: 'fa-drafting-compass', label: 'Tasarım / Pergel', glyph: '\uf568' },
-  { id: 'fa-cubes', label: 'Bileşenler / Küpler', glyph: '\uf1b3' },
-  { id: 'fa-project-diagram', label: 'Proje Şeması', glyph: '\uf542' },
-  // Kristal & Değer
-  { id: 'fa-gem', label: 'Mücevher / Kristal', glyph: '\uf3a5' },
-  { id: 'fa-cube', label: 'Blok / Matris', glyph: '\uf1b2' },
-  { id: 'fa-dice-d20', label: 'Prizma (D20)', glyph: '\uf6cf' },
-  { id: 'fa-certificate', label: 'Rozet / Sertifika', glyph: '\uf0a3' },
+  // Endüstriyel & Fabrika
+  { id: 'fa-industry', label: 'Fabrika / Tesis', glyph: '\uf275', category: 'Fabrika' },
+  { id: 'fa-building', label: 'Merkez Bina / Kampüs', glyph: '\uf1ad', category: 'Fabrika' },
+  { id: 'fa-cogs', label: 'Dişliler / Üretim Hattı', glyph: '\uf085', category: 'Fabrika' },
+  { id: 'fa-gear', label: 'Makine / İstasyon', glyph: '\uf013', category: 'Fabrika' },
+  { id: 'fa-robot', label: 'Robot / Otomasyon', glyph: '\uf544', category: 'Fabrika' },
+  { id: 'fa-wrench', label: 'Bakım / Servis', glyph: '\uf0ad', category: 'Fabrika' },
+  { id: 'fa-warehouse', label: 'Depo / Lojistik', glyph: '\uf494', category: 'Fabrika' },
+  { id: 'fa-boxes-stacked', label: 'Stok / Palet', glyph: '\uf468', category: 'Fabrika' },
+  { id: 'fa-truck', label: 'Sevkiyat / Araç', glyph: '\uf0d1', category: 'Fabrika' },
+  { id: 'fa-hard-hat', label: 'Saha Operasyonu', glyph: '\uf807', category: 'Fabrika' },
+  { id: 'fa-fire', label: 'Fırın / Isıl İşlem', glyph: '\uf06d', category: 'Fabrika' },
+
+  // Enerji, Sensör & SCADA
+  { id: 'fa-bolt', label: 'Enerji / Yüksek Gerilim', glyph: '\uf0e7', category: 'Enerji & Sensör' },
+  { id: 'fa-plug', label: 'Fider / Şalt / Priz', glyph: '\uf1e6', category: 'Enerji & Sensör' },
+  { id: 'fa-gauge-high', label: 'Sensör / Manometre / OEE', glyph: '\uf625', category: 'Enerji & Sensör' },
+  { id: 'fa-temperature-high', label: 'Sıcaklık Sensörü', glyph: '\uf769', category: 'Enerji & Sensör' },
+  { id: 'fa-wave-square', label: 'Sinyal / Titreşim / PLC', glyph: '\uf83e', category: 'Enerji & Sensör' },
+  { id: 'fa-leaf', label: 'Karbon / ESG / Yeşil Enerji', glyph: '\uf06c', category: 'Enerji & Sensör' },
+  { id: 'fa-water', label: 'Akışkan / Hidrolik / Su', glyph: '\uf773', category: 'Enerji & Sensör' },
+  { id: 'fa-fan', label: 'HVAC / Fan / Pompa', glyph: '\uf863', category: 'Enerji & Sensör' },
+
+  // Siber, IT & Veritabanı
+  { id: 'fa-server', label: 'Sunucu / SCADA Host', glyph: '\uf233', category: 'Siber & Veri' },
+  { id: 'fa-database', label: 'Veritabanı', glyph: '\uf1c0', category: 'Siber & Veri' },
+  { id: 'fa-network-wired', label: 'Endüstriyel Ağ / Ethernet', glyph: '\uf6ff', category: 'Siber & Veri' },
+  { id: 'fa-microchip', label: 'Mikroçip / PLC / Edge', glyph: '\uf2db', category: 'Siber & Veri' },
+  { id: 'fa-wifi', label: 'Kablosuz / IoT Gateway', glyph: '\uf1eb', category: 'Siber & Veri' },
+  { id: 'fa-shield-alt', label: 'Güvenlik / Kalite Kalkanı', glyph: '\uf3ed', category: 'Siber & Veri' },
+  { id: 'fa-terminal', label: 'Terminal / Script', glyph: '\uf120', category: 'Siber & Veri' },
+  { id: 'fa-code', label: 'Python / Algoritma', glyph: '\uf121', category: 'Siber & Veri' },
+  { id: 'fa-table', label: 'Veri Tablosu', glyph: '\uf0ce', category: 'Siber & Veri' },
+
+  // Mimari, Kalite & Blueprint
+  { id: 'fa-sitemap', label: 'Hiyerarşi Şeması', glyph: '\uf0e8', category: 'Mimari & Kalite' },
+  { id: 'fa-layer-group', label: 'Katman / Seviye', glyph: '\uf5fd', category: 'Mimari & Kalite' },
+  { id: 'fa-project-diagram', label: 'Rota / DAG Şeması', glyph: '\uf542', category: 'Mimari & Kalite' },
+  { id: 'fa-drafting-compass', label: 'Mühendislik / Pergel', glyph: '\uf568', category: 'Mimari & Kalite' },
+  { id: 'fa-cubes', label: 'Modüller / Paketler', glyph: '\uf1b3', category: 'Mimari & Kalite' },
+  { id: 'fa-clipboard-check', label: 'Kalite Kontrol / Onay', glyph: '\uf46c', category: 'Mimari & Kalite' },
+  { id: 'fa-triangle-exclamation', label: 'Alarm / Kritik Arıza', glyph: '\uf071', category: 'Mimari & Kalite' },
+  { id: 'fa-circle-check', label: 'Sağlıklı / Aktif', glyph: '\uf058', category: 'Mimari & Kalite' },
+
+  // Kristal & Uzay
+  { id: 'fa-gem', label: 'Kristal / Değer', glyph: '\uf3a5', category: 'Uzay & Kristal' },
+  { id: 'fa-cube', label: 'Blok / Küp', glyph: '\uf1b2', category: 'Uzay & Kristal' },
+  { id: 'fa-dice-d20', label: 'Prizma (D20)', glyph: '\uf6cf', category: 'Uzay & Kristal' },
+  { id: 'fa-certificate', label: 'Rozet / Sertifika', glyph: '\uf0a3', category: 'Uzay & Kristal' },
+  { id: 'fa-sun', label: 'Güneş / Yıldız', glyph: '\uf185', category: 'Uzay & Kristal' },
+  { id: 'fa-globe', label: 'Gezegen / Dünya', glyph: '\uf0ac', category: 'Uzay & Kristal' },
+  { id: 'fa-satellite', label: 'Uydu / Yörünge', glyph: '\uf7bf', category: 'Uzay & Kristal' },
+  { id: 'fa-rocket', label: 'Roket', glyph: '\uf135', category: 'Uzay & Kristal' },
+  { id: 'fa-meteor', label: 'Meteor / Asteroit', glyph: '\uf753', category: 'Uzay & Kristal' },
+  { id: 'fa-atom', label: 'Atom / Çekirdek', glyph: '\uf5d2', category: 'Uzay & Kristal' },
 ];
 
 export const THEME_PRESETS: Record<SpaceMapTheme, Omit<SpaceMapConfig, 'theme'>> = {
-  cosmic: {
-    nodeShape: 'planet',
-    color1: '#60A5FA',
-    color2: '#22D3EE',
-    color3: '#A78BFA',
-    level1Icon: 'fa-sun',
-    level2Icon: 'fa-globe',
-    level3Icon: 'fa-satellite',
-    showOrbits: true,
-    showGrid: true,
-  },
   factory: {
     nodeShape: 'hexagon',
     color1: '#F59E0B',
@@ -99,7 +118,9 @@ export const THEME_PRESETS: Record<SpaceMapTheme, Omit<SpaceMapConfig, 'theme'>>
     color3: '#06B6D4',
     level1Icon: 'fa-industry',
     level2Icon: 'fa-cogs',
-    level3Icon: 'fa-microchip',
+    level3Icon: 'fa-robot',
+    level4Icon: 'fa-gauge-high',
+    autoTypeIcons: false,
     showOrbits: true,
     showGrid: true,
   },
@@ -111,6 +132,8 @@ export const THEME_PRESETS: Record<SpaceMapTheme, Omit<SpaceMapConfig, 'theme'>>
     level1Icon: 'fa-server',
     level2Icon: 'fa-network-wired',
     level3Icon: 'fa-microchip',
+    level4Icon: 'fa-wave-square',
+    autoTypeIcons: false,
     showOrbits: true,
     showGrid: true,
   },
@@ -122,6 +145,8 @@ export const THEME_PRESETS: Record<SpaceMapTheme, Omit<SpaceMapConfig, 'theme'>>
     level1Icon: 'fa-layer-group',
     level2Icon: 'fa-sitemap',
     level3Icon: 'fa-drafting-compass',
+    level4Icon: 'fa-cube',
+    autoTypeIcons: false,
     showOrbits: true,
     showGrid: true,
   },
@@ -133,6 +158,21 @@ export const THEME_PRESETS: Record<SpaceMapTheme, Omit<SpaceMapConfig, 'theme'>>
     level1Icon: 'fa-gem',
     level2Icon: 'fa-atom',
     level3Icon: 'fa-certificate',
+    level4Icon: 'fa-dice-d20',
+    autoTypeIcons: false,
+    showOrbits: true,
+    showGrid: true,
+  },
+  cosmic: {
+    nodeShape: 'planet',
+    color1: '#60A5FA',
+    color2: '#22D3EE',
+    color3: '#A78BFA',
+    level1Icon: 'fa-sun',
+    level2Icon: 'fa-globe',
+    level3Icon: 'fa-satellite',
+    level4Icon: 'fa-meteor',
+    autoTypeIcons: false,
     showOrbits: true,
     showGrid: true,
   },
@@ -143,23 +183,39 @@ AVAILABLE_ICONS.forEach(item => {
   FA_GLYPHS[item.id] = item.glyph;
   FA_GLYPHS[item.id.replace('fa-', '')] = item.glyph;
 });
-FA_GLYPHS['gear'] = '\uf013';
 FA_GLYPHS['gears'] = '\uf085';
+FA_GLYPHS['fa-gears'] = '\uf085';
+FA_GLYPHS['cog'] = '\uf013';
+FA_GLYPHS['fa-cog'] = '\uf013';
 FA_GLYPHS['cpu'] = '\uf2db';
 FA_GLYPHS['shield'] = '\uf3ed';
+FA_GLYPHS['fa-shield-halved'] = '\uf3ed';
 FA_GLYPHS['circle'] = '\uf111';
+FA_GLYPHS['tachometer-alt'] = '\uf625';
+FA_GLYPHS['fa-tachometer-alt'] = '\uf625';
+FA_GLYPHS['exclamation-triangle'] = '\uf071';
+FA_GLYPHS['fa-exclamation-triangle'] = '\uf071';
+FA_GLYPHS['check-circle'] = '\uf058';
+FA_GLYPHS['fa-check-circle'] = '\uf058';
 
 /** Render için iç düğüm modeli (PathNode'dan türetilir, layout koordinatları eklenir). */
 interface RNode {
   id: string;
   label: string;
-  depth: number;          // orijinal ağaç derinliği (data)
+  depth: number;          // orijinal ağaç derinliği (0 = kök, 1 = L2, 2 = L3, 3+ = L4)
   parentId: string | null;
+  parents: string[];
   children: RNode[];
   leafCount: number;      // alt ağacındaki yaprak sayısı (layout ağırlığı)
   x: number;
   y: number;
-  ring: number;           // focus'a göre ring offseti (layout sırasında set)
+  ring: number;           // focus'a göre ring offseti
+  type?: string;
+  icon?: string;
+  healthScore?: number;
+  status?: string;
+  statusColor?: string;
+  badge?: string;
   row?: Record<string, unknown>;
 }
 
@@ -177,67 +233,90 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
   // ---- Veri ----
   dataSources: any[] = [];
   selectedDataSourceId: string | null = null;
+  showAllMapsAcrossDbs = true;
 
   queries: SavedQuery[] = [];
+  pythonScripts: SavedPythonScript[] = [];
   paths: PathDef[] = [];
   filteredPaths: PathDef[] = [];
   selectedPathId: string | null = null;
   selectedPath: PathDef | null = null;
 
   isLoading = false;
+  exportBusy = false;
   error: string | null = null;
   warnings: string[] = [];
 
-  // ---- Tema & Özelleştirme ----
+  // ---- Query Viewer & Canlı Veri Önizleme Modalları ----
+  showQueryViewerModal = false;
+  showDataPreviewModal = false;
+  sourcePreviewLoading = false;
+  sourcePreviewColumns: QueryColumn[] = [];
+  sourcePreviewRows: Array<Record<string, unknown>> = [];
+  sourcePreviewTotal = 0;
+
+  // ---- Tema, Yerleşim & İkon Özelleştirme ----
   showThemeModal = false;
+  activeIconPickerLevel: 1 | 2 | 3 | 4 = 1;
   themeConfig: SpaceMapConfig = {
-    theme: 'cosmic',
-    nodeShape: 'planet',
+    theme: 'factory',
+    nodeShape: 'hexagon',
     layout: 'radial',
-    color1: '#60A5FA',
-    color2: '#22D3EE',
-    color3: '#A78BFA',
-    level1Icon: 'fa-sun',
-    level2Icon: 'fa-globe',
-    level3Icon: 'fa-satellite',
+    color1: '#F59E0B',
+    color2: '#10B981',
+    color3: '#06B6D4',
+    level1Icon: 'fa-industry',
+    level2Icon: 'fa-cogs',
+    level3Icon: 'fa-robot',
+    level4Icon: 'fa-gauge-high',
+    autoTypeIcons: false,
     showOrbits: true,
     showGrid: true,
   };
   readonly availableIcons = AVAILABLE_ICONS;
-  readonly availableShapes: { id: SpaceMapShape; labelKey: string }[] = [
-    { id: 'auto', labelKey: 'NETWORK_MAP.SHAPE_AUTO' },
-    { id: 'planet', labelKey: 'NETWORK_MAP.SHAPE_PLANET' },
-    { id: 'hexagon', labelKey: 'NETWORK_MAP.SHAPE_HEXAGON' },
-    { id: 'cyber', labelKey: 'NETWORK_MAP.SHAPE_CYBER' },
-    { id: 'blueprint', labelKey: 'NETWORK_MAP.SHAPE_BLUEPRINT' },
-    { id: 'diamond', labelKey: 'NETWORK_MAP.SHAPE_DIAMOND' },
-    { id: 'circle', labelKey: 'NETWORK_MAP.SHAPE_CIRCLE' },
+  readonly availableLayouts: Array<{ id: SpaceMapLayout; label: string; desc: string; icon: string }> = [
+    { id: 'radial', label: 'Yörünge (Radial)', desc: 'Konsantrik yörünge halkaları', icon: 'fa-circle-dot' },
+    { id: 'hierarchy-tb', label: 'Ağaç (Dikey)', desc: 'Yukarıdan aşağıya hiyerarşi', icon: 'fa-sitemap' },
+    { id: 'flow-lr', label: 'Proses Akışı (Yatay)', desc: 'Soldan sağa üretim/veri akışı', icon: 'fa-arrow-right-long' },
+    { id: 'grid', label: 'Küme Matrisi (Grid)', desc: 'Kompakt fabrika saha matrisi', icon: 'fa-table-cells-large' },
+    { id: 'spiral', label: 'Spiral Galaksi', desc: 'Yoğun düğümler için spiral dizilim', icon: 'fa-hurricane' },
   ];
-  readonly presetList: { id: SpaceMapTheme; icon: string; nameKey: string; desc: string }[] = [
-    { id: 'cosmic', icon: 'fa-satellite', nameKey: 'NETWORK_MAP.THEME_COSMIC', desc: '🪐 Yıldızlar, gezegenler ve yörünge halkaları' },
-    { id: 'factory', icon: 'fa-industry', nameKey: 'NETWORK_MAP.THEME_FACTORY', desc: '🏭 CAD ızgarası, perçinli altıgenler ve boru hatları' },
-    { id: 'cyber', icon: 'fa-network-wired', nameKey: 'NETWORK_MAP.THEME_CYBER', desc: '⚡ Neon matris, çip köşebentleri ve lazer hatları' },
-    { id: 'blueprint', icon: 'fa-drafting-compass', nameKey: 'NETWORK_MAP.THEME_BLUEPRINT', desc: '📐 Mühendislik mavisi, milimetrik grid ve teknik çizgiler' },
-    { id: 'crystal', icon: 'fa-gem', nameKey: 'NETWORK_MAP.THEME_CRYSTAL', desc: '💎 Kuvars fasetleri, prizmatik aurora ve ışık huzmeleri' },
+  readonly availableShapes: { id: SpaceMapShape; label: string; labelKey: string }[] = [
+    { id: 'auto', label: 'Temaya Göre Otomatik', labelKey: 'Temaya Göre Otomatik' },
+    { id: 'hexagon', label: 'Endüstriyel Altıgen (Fabrika)', labelKey: 'Endüstriyel Altıgen (Fabrika)' },
+    { id: 'cyber', label: 'Siber Sekizgen (IoT / PLC)', labelKey: 'Siber Sekizgen (IoT / PLC)' },
+    { id: 'blueprint', label: 'Teknik Mühendislik Dairesi', labelKey: 'Teknik Mühendislik Dairesi' },
+    { id: 'diamond', label: 'Kristal Elmas (Kalite / ESG)', labelKey: 'Kristal Elmas (Kalite / ESG)' },
+    { id: 'planet', label: 'Gezegen / Yörünge Halkalı', labelKey: 'Gezegen / Yörünge Halkalı' },
+    { id: 'circle', label: 'Sade Düğüm Dairesi', labelKey: 'Sade Düğüm Dairesi' },
+  ];
+  readonly presetList: { id: SpaceMapTheme; icon: string; name: string; nameKey: string; desc: string }[] = [
+    { id: 'factory', icon: 'fa-industry', name: 'Fabrika & Üretim (ISA-95)', nameKey: 'Fabrika & Üretim (ISA-95)', desc: '🏭 CAD ızgarası, perçinli altıgenler, fabrika/robot/sensör ikonları' },
+    { id: 'cyber', icon: 'fa-network-wired', name: 'Siber Ağ & IoT Telemetri', nameKey: 'Siber Ağ & IoT Telemetri', desc: '⚡ Neon matris, PLC/sunucu köşebentleri ve veri hatları' },
+    { id: 'blueprint', icon: 'fa-drafting-compass', name: 'Mühendislik Blueprint', nameKey: 'Mühendislik Blueprint', desc: '📐 Teknik mimari mavi, milimetrik grid ve proses akış çizgileri' },
+    { id: 'crystal', icon: 'fa-gem', name: 'Kristal & Kalite Analitiği', nameKey: 'Kristal & Kalite Analitiği', desc: '💎 Kuvars fasetleri, kalite/ESG rozetleri ve prizmatik vurgu' },
+    { id: 'cosmic', icon: 'fa-satellite', name: 'Kozmik Uzay Yörüngesi', nameKey: 'Kozmik Uzay Yörüngesi', desc: '🪐 Yıldızlar, gezegen halkaları ve konsantrik yörüngeler' },
   ];
   private hasFitted = false;
 
   // ---- Hiyerarşi (render modeli) ----
   private roots: RNode[] = [];
   private nodeMap = new Map<string, RNode>();
-  /** null = overview (kökler ring 1); aksi halde focus düğümü merkeze koy. */
+  /** null = overview (tüm kökler); aksi halde focus düğümü merkeze koy. */
   focusId: string | null = null;
   /** Şu anda layout'lanıp ekrana gelen pencere (culling + hit-test için). */
   private renderNodes: RNode[] = [];
   totalNodes = 0;
   maxDepth = 0;
+  /** Görünür derinlik sınırı (varsayılan 6 = tüm seviyeleri göster!). */
+  maxVisibleRings = 6;
 
   // ---- Etkileşim / görünüm ----
   selectedNode: RNode | null = null;
   hoveredNode: RNode | null = null;
   private view = { zoom: 1, targetZoom: 1, panX: 0, panY: 0 };
-  private readonly minZoom = 0.15;
-  private readonly maxZoom = 3;
+  private readonly minZoom = 0.12;
+  private readonly maxZoom = 3.2;
 
   // ---- Arama ----
   searchTerm = '';
@@ -267,13 +346,10 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
   private readonly subs: Subscription[] = [];
 
   // ---- Layout sabitleri ----
-  private readonly RING_RADIUS = 235;          // ring başına dünya birimi
-  private readonly MAX_DRILL_RING = 2;         // focus + 2 ring (drill-down pencere)
-  private readonly NODE_RADIUS_BY_RING = [30, 20, 14, 10, 8, 7];
-  /** Derinliğe göre sade serin palet (steel → sky → cyan → violet → gold). */
-  private readonly LEVEL_COLORS = ['#9DB4D1', '#60A5FA', '#22D3EE', '#A78BFA', '#F5B301'];
-  private readonly MAX_SEARCH_RESULTS = 12;
-  private readonly MAX_LABEL_LEN = 16;
+  private readonly RING_RADIUS = 230;
+  private readonly NODE_RADIUS_BY_RING = [32, 24, 18, 14, 12, 10, 9];
+  private readonly MAX_SEARCH_RESULTS = 15;
+  private readonly MAX_LABEL_LEN = 22;
 
   constructor(
     private dss: DataSourceSelectionService,
@@ -281,21 +357,43 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
     private queryService: QueryService,
     private apiService: ApiService,
     private dashEdit: DashboardEditService,
+    private templateService: TemplateBuilderService,
     private auth: AuthService,
     private router: Router,
     private route: ActivatedRoute,
     private translate: TranslateService,
     private cdr: ChangeDetectorRef,
+    private aiContext: AiContextService,
   ) {}
 
   private initialPathId: string | null = null;
-  private initialDataSourceId: string | null = null;
+  private releaseAi?: () => void;
 
   // ===========================================================================
   // Lifecycle
   // ===========================================================================
 
   ngOnInit(): void {
+    this.releaseAi = this.aiContext.register('network-map', {
+      context: () => ({
+        active_queries: this.queries.filter(q => q.id === this.selectedPath?.queryId).map(q => ({ id: q.id, name: q.name, columns: q.columns })),
+        path_config: this.selectedPath?.config, structure: this.selectedPath?.structure,
+        data_source_id: this.selectedDataSourceId || undefined,
+      }),
+      accepts: language => language === 'json' && this.canManage,
+      apply: (_language, _content, artifact) => {
+        if (!artifact) throw new Error('Path JSON doğrulanamadı.');
+        this.isLoading = true;
+        this.pathService.preview(artifact.queryId, artifact.structure, artifact.config).subscribe({
+          next: response => {
+            this.selectedPathId = null;
+            this.selectedPath = { id: '', name: 'Copilot önizlemesi', ...artifact };
+            this.onBuilt(response.data.structure);
+          },
+          error: error => { this.isLoading = false; this.error = error.error?.error || 'Path önizlemesi başarısız.'; this.cdr.markForCheck(); },
+        });
+      },
+    });
     this.canManage = this.auth.hasRole('engineer');
     this.dss.load();
 
@@ -303,9 +401,11 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
       this.route.queryParams.subscribe(params => {
         if (params['pathId']) {
           this.initialPathId = params['pathId'];
+          if (this.paths.length) {
+            this.onSelectPath(params['pathId']);
+          }
         }
         if (params['dataSourceId']) {
-          this.initialDataSourceId = params['dataSourceId'];
           this.selectedDataSourceId = params['dataSourceId'];
         }
       })
@@ -336,6 +436,13 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
     this.bindEvents();
     this.startRenderLoop();
 
+    // FontAwesome webfont yüklendiğinde canvas ikonlarını yeniden çiz
+    if (typeof document !== 'undefined' && (document as any).fonts?.ready) {
+      (document as any).fonts.ready.then(() => {
+        this.markDirty();
+      });
+    }
+
     this.resizeObserver = new ResizeObserver(() => {
       if (this.resizeRaf !== null) cancelAnimationFrame(this.resizeRaf);
       this.resizeRaf = requestAnimationFrame(() => {
@@ -347,6 +454,7 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
   }
 
   ngOnDestroy(): void {
+    this.releaseAi?.();
     this.subs.forEach(s => s.unsubscribe());
     if (this.rafId !== null) cancelAnimationFrame(this.rafId);
     if (this.resizeObserver) this.resizeObserver.disconnect();
@@ -354,29 +462,24 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
   }
 
   // ===========================================================================
-  // Veri yükleme — her DB için ayrı, otomatik
+  // Veri yükleme
   // ===========================================================================
 
   private loadQueriesAndPaths(): void {
     forkJoin({
       queries: this.queryService.list(),
+      scripts: this.queryService.listPythonScripts(),
       paths: this.pathService.list(),
     }).subscribe({
-      next: ({ queries, paths }) => {
+      next: ({ queries, scripts, paths }) => {
         this.queries = (queries.data as SavedQuery[]) || [];
+        this.pythonScripts = (scripts.data as SavedPythonScript[]) || [];
         this.paths = (paths.data as PathDef[]) || [];
         this.filterPathsByDataSource();
 
-        // Eğer URL query params'tan belirli bir pathId geldiyse onu doğrudan seç ve aç
         if (this.initialPathId) {
           const target = this.paths.find(p => p.id === this.initialPathId);
           if (target) {
-            const q = this.queries.find(x => x.id === target.queryId);
-            const dsId = (q as any)?.dataSourceId || (q as any)?.data_source_id;
-            if (dsId && dsId !== this.selectedDataSourceId) {
-              this.selectedDataSourceId = dsId;
-              this.filterPathsByDataSource();
-            }
             this.selectedPathId = target.id;
             this.onSelectPath(target.id);
             this.initialPathId = null;
@@ -385,7 +488,6 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
           }
         }
 
-        // İlk yüklemede bu DB için ilk path'i otomatik seç.
         if (!this.selectedPathId) this.autoSelectFirstPath();
         this.cdr.markForCheck();
       },
@@ -398,34 +500,109 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
     });
   }
 
-  /** Path'leri seçili datasource'a göre filtrele (query → dataSourceId haritası). */
   filterPathsByDataSource(): void {
-    if (!this.selectedDataSourceId) {
+    if (!this.selectedDataSourceId || this.showAllMapsAcrossDbs) {
       this.filteredPaths = this.paths;
       return;
     }
     const dsByQuery = new Map<string, string>();
     this.queries.forEach(q => dsByQuery.set(q.id, (q as any).dataSourceId || (q as any).data_source_id));
-    this.filteredPaths = this.paths.filter(p => {
+    const matching = this.paths.filter(p => {
+      if (p.queryId?.startsWith('py:')) return true;
       const dsId = dsByQuery.get((p as any).queryId);
       return !dsId || dsId === this.selectedDataSourceId;
     });
+    this.filteredPaths = matching.length ? matching : this.paths;
   }
 
   onDataSourceChange(): void {
     this.filterPathsByDataSource();
-    // DB değişti → seçimi sıfırla ve ilk path'i otomatik üret.
-    this.selectedPathId = null;
-    this.selectedPath = null;
-    this.resetGraph();
-    this.autoSelectFirstPath();
+    if (!this.filteredPaths.some(p => p.id === this.selectedPathId)) {
+      this.selectedPathId = null;
+      this.selectedPath = null;
+      this.resetGraph();
+      this.autoSelectFirstPath();
+    }
     this.cdr.markForCheck();
   }
 
-  /** Bu DB için ilk path'i otomatik seçip render et (yoksa boş durum). */
+  toggleAllMaps(): void {
+    this.showAllMapsAcrossDbs = !this.showAllMapsAcrossDbs;
+    this.filterPathsByDataSource();
+    this.cdr.markForCheck();
+  }
+
+  toggleAllMapsAcrossDbs(): void {
+    this.toggleAllMaps();
+  }
+
+  get layoutMode(): SpaceMapLayout {
+    return this.themeConfig.layout || 'radial';
+  }
+
+  setLayoutMode(layout: SpaceMapLayout): void {
+    this.setLayout(layout);
+  }
+
+  onMaxRingsChange(rings: number): void {
+    this.setMaxVisibleRings(rings);
+  }
+
+  rebuildRender(): void {
+    this.relayout();
+    this.markDirty();
+    this.cdr.markForCheck();
+  }
+
+  openQueryViewerForNewMap(): void {
+    this.showQueryViewerModal = true;
+    this.cdr.markForCheck();
+  }
+
+  get isExportingQuickReport(): boolean {
+    return this.exportBusy;
+  }
+
+  get activePath(): PathDef | null {
+    return this.selectedPath;
+  }
+
+  get isLoadingDataPreview(): boolean {
+    return this.sourcePreviewLoading;
+  }
+
+  get previewSourceColumns(): string[] {
+    return this.sourcePreviewColumns.map(c => c.name);
+  }
+
+  get previewSourceRows(): Array<Record<string, unknown>> {
+    return this.sourcePreviewRows;
+  }
+
+  getSelectedIconForActiveLevel(): string {
+    return this.getActiveLevelIcon();
+  }
+
+  getPathIcon(p: PathDef): string {
+    const smc = (p.config as any)?.spaceMapConfig;
+    if (smc?.level1Icon) return smc.level1Icon;
+    return p.queryId?.startsWith('py:') ? 'fa-python' : 'fa-industry';
+  }
+
+  getPathBadgeColor(p: PathDef): string {
+    const smc = (p.config as any)?.spaceMapConfig;
+    return smc?.color1 || (p.queryId?.startsWith('py:') ? '#10b981' : '#38bdf8');
+  }
+
+  isPythonPath(p: PathDef): boolean {
+    return Boolean(p.queryId?.startsWith('py:'));
+  }
+
   private autoSelectFirstPath(): void {
     if (this.filteredPaths.length) {
-      this.onSelectPath(this.filteredPaths[0].id);
+      // Sunum için varsayılan olarak zengin fabrika ağacını veya ilk path'i seç
+      const preferred = this.filteredPaths.find(p => p.id === 'pth_factory_tree') || this.filteredPaths[0];
+      this.onSelectPath(preferred.id);
     } else {
       this.isLoading = false;
       this.cdr.markForCheck();
@@ -445,14 +622,12 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
     this.error = null;
     this.cdr.markForCheck();
 
-    // Önce path detayını al (ad ve tema gösterimi), sonra build ile yapıyı kur.
     this.pathService.get(pathId).subscribe({
       next: res => {
         this.selectedPath = res.data || null;
         this.syncThemeFromPath();
         const hasMaterialized = !!(this.selectedPath?.materialized?.nodes?.length);
         if (hasMaterialized && this.selectedPath?.materialized) {
-          // Önbellekten hemen çiz (anında görüntüleme)
           this.onBuilt(this.selectedPath.materialized);
         }
         this.buildAndRender(pathId, hasMaterialized);
@@ -475,7 +650,7 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
         this.isLoading = false;
         const msg = err?.error?.error || err?.message || 'Failed to build path.';
         if (hasCachedFallback) {
-          this.notify('NETWORK_MAP.CACHED_WARNING', 'error');
+          this.notify('Önbellekteki harita gösteriliyor', 'error');
         } else {
           this.error = msg;
           this.resetGraph();
@@ -488,7 +663,7 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
   private onBuilt(built: BuiltStructure | null): void {
     this.isLoading = false;
     if (!built || !built.nodes?.length) {
-      this.error = this.translate.instant('NETWORK_MAP.NO_DATA');
+      this.error = 'Bu harita tanımından düğüm üretilemedi.';
       this.resetGraph();
       this.cdr.markForCheck();
       return;
@@ -499,7 +674,7 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
     this.maxDepth = built.stats?.max_depth || 0;
 
     this.buildForest(built);
-    // Tek kök varsa doğrudan ona odaklan; çok köklü ise overview (kökler ring 1).
+    // Tek kök varsa doğrudan ona odaklan; çok köklü ise overview
     this.focusId = this.roots.length === 1 ? this.roots[0].id : null;
     this.selectedNode = null;
     this.hoveredNode = null;
@@ -521,9 +696,16 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
         label: n.label || n.id,
         depth: n.depth ?? 0,
         parentId: n.parent || null,
+        parents: n.parents || (n.parent ? [n.parent] : []),
         children: [],
         leafCount: 1,
         x: 0, y: 0, ring: 0,
+        type: n.type,
+        icon: n.icon,
+        healthScore: n.healthScore,
+        status: n.status,
+        statusColor: n.statusColor,
+        badge: n.badge,
         row: n.row,
       });
     });
@@ -536,7 +718,6 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
         roots.push(node);
       }
     });
-    // Çocukları kararlı sırala (label) — layout tutarlılığı için.
     const sortVisited = new Set<string>();
     roots.forEach(r => this.sortChildren(r, sortVisited));
     const visited = new Set<string>();
@@ -567,42 +748,65 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
   }
 
   // ===========================================================================
-  // Layout — leaf-ağırlıklı radial ağaç (drill pencerelemeli)
+  // Layout — 5 Farklı Yerleşim Algoritması (Radial, Dikey Ağaç, Yatay Akış, Grid, Spiral)
   // ===========================================================================
 
-  /** focus veya pencere değişince yeniden layout + render listesini kur. */
-  private relayout(): void {
-    this.labelCache.clear();
-    const window: RNode[] = [];
-
-    if (this.focusId) {
-      const focus = this.nodeMap.get(this.focusId);
-      if (focus) {
-        focus.x = 0; focus.y = 0; focus.ring = 0;
-        window.push(focus);
-        this.layoutChildren(focus, 0, Math.PI * 2, 1, window);
-      }
-    } else {
-      // Overview: sanal merkez; kökleri ring 1'e, çocuklarını ring 2'ye yerleştir.
-      const totalLeaves = this.roots.reduce((s, r) => s + r.leafCount, 0) || 1;
-      let cursor = 0;
-      this.roots.forEach(root => {
-        const span = (Math.PI * 2) * (root.leafCount / totalLeaves);
-        this.placeRadial(root, cursor, cursor + span, 1, window);
-        cursor += span;
-      });
-    }
-    this.renderNodes = window;
+  setLayout(layout: SpaceMapLayout): void {
+    this.themeConfig.layout = layout;
+    this.relayout();
+    this.fitView();
+    this.markDirty();
+    this.cdr.markForCheck();
   }
 
-  /** Bir çocuğu [start,end] açısal sektörüne yerleştir, alt çocuklarını recursive böl. */
+  setMaxVisibleRings(rings: number): void {
+    this.maxVisibleRings = rings;
+    this.relayout();
+    this.fitView();
+    this.markDirty();
+    this.cdr.markForCheck();
+  }
+
+  private relayout(): void {
+    this.labelCache.clear();
+    const layout = this.themeConfig.layout || 'radial';
+    const windowNodes: RNode[] = [];
+
+    if (layout === 'hierarchy-tb' || layout === 'flow-lr') {
+      this.layoutLayeredTree(layout === 'flow-lr', windowNodes);
+    } else if (layout === 'grid') {
+      this.layoutClusterGrid(windowNodes);
+    } else if (layout === 'spiral') {
+      this.layoutSpiral(windowNodes);
+    } else {
+      // Varsayılan: Radial Yörünge
+      if (this.focusId) {
+        const focus = this.nodeMap.get(this.focusId);
+        if (focus) {
+          focus.x = 0; focus.y = 0; focus.ring = 0;
+          windowNodes.push(focus);
+          this.layoutChildrenRadial(focus, 0, Math.PI * 2, 1, windowNodes);
+        }
+      } else {
+        const totalLeaves = this.roots.reduce((s, r) => s + r.leafCount, 0) || 1;
+        let cursor = 0;
+        this.roots.forEach(root => {
+          const span = (Math.PI * 2) * (root.leafCount / totalLeaves);
+          this.placeRadial(root, cursor, cursor + span, 1, windowNodes);
+          cursor += span;
+        });
+      }
+    }
+    this.renderNodes = windowNodes;
+  }
+
   private placeRadial(node: RNode, start: number, end: number, ring: number, out: RNode[]): void {
     const mid = (start + end) / 2;
     node.ring = ring;
     node.x = Math.cos(mid) * this.RING_RADIUS * ring;
     node.y = Math.sin(mid) * this.RING_RADIUS * ring;
     out.push(node);
-    if (ring >= this.MAX_DRILL_RING) return;
+    if (ring >= this.maxVisibleRings) return;
 
     const total = node.children.reduce((s, c) => s + c.leafCount, 0) || 1;
     let cursor = start;
@@ -613,8 +817,7 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
     });
   }
 
-  /** Focus (center) çocuklarını tam daireye yerleştir. */
-  private layoutChildren(node: RNode, start: number, end: number, ring: number, out: RNode[]): void {
+  private layoutChildrenRadial(node: RNode, start: number, end: number, ring: number, out: RNode[]): void {
     const total = node.children.reduce((s, c) => s + c.leafCount, 0) || 1;
     let cursor = start;
     node.children.forEach(child => {
@@ -624,8 +827,124 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
     });
   }
 
+  /** Dikey Ağaç (hierarchy-tb) veya Yatay Proses Akışı (flow-lr) yerleşimi */
+  private layoutLayeredTree(horizontal: boolean, out: RNode[]): void {
+    const startNodes = this.focusId && this.nodeMap.has(this.focusId)
+      ? [this.nodeMap.get(this.focusId)!]
+      : this.roots;
+    if (!startNodes.length) return;
+
+    const levelGap = horizontal ? 260 : 190;
+    const leafSpacing = horizontal ? 105 : 145;
+    let leafCursor = 0;
+    const visited = new Set<string>();
+
+    const placeNode = (n: RNode, ring: number): { minPos: number; maxPos: number } => {
+      if (visited.has(n.id)) return { minPos: 0, maxPos: 0 };
+      visited.add(n.id);
+      n.ring = ring;
+      out.push(n);
+
+      if (!n.children.length || ring >= this.maxVisibleRings) {
+        const pos = leafCursor * leafSpacing;
+        leafCursor += 1;
+        if (horizontal) {
+          n.x = ring * levelGap;
+          n.y = pos;
+        } else {
+          n.x = pos;
+          n.y = ring * levelGap;
+        }
+        return { minPos: pos, maxPos: pos };
+      }
+
+      let minC = Infinity;
+      let maxC = -Infinity;
+      for (const ch of n.children) {
+        const b = placeNode(ch, ring + 1);
+        minC = Math.min(minC, b.minPos);
+        maxC = Math.max(maxC, b.maxPos);
+      }
+      const center = Number.isFinite(minC) ? (minC + maxC) / 2 : leafCursor * leafSpacing;
+      if (horizontal) {
+        n.x = ring * levelGap;
+        n.y = center;
+      } else {
+        n.x = center;
+        n.y = ring * levelGap;
+      }
+      return { minPos: minC, maxPos: maxC };
+    };
+
+    startNodes.forEach(r => {
+      placeNode(r, 0);
+      leafCursor += 0.6;
+    });
+
+    // Merkeze hizala
+    if (out.length) {
+      const avgX = out.reduce((s, n) => s + n.x, 0) / out.length;
+      const avgY = out.reduce((s, n) => s + n.y, 0) / out.length;
+      out.forEach(n => { n.x -= avgX; n.y -= avgY; });
+    }
+  }
+
+  /** Kümelenmiş Fabrika Matrisi (Grid) yerleşimi */
+  private layoutClusterGrid(out: RNode[]): void {
+    const startNodes = this.focusId && this.nodeMap.has(this.focusId)
+      ? [this.nodeMap.get(this.focusId)!]
+      : this.roots;
+    const visited = new Set<string>();
+    const collect = (n: RNode, ring: number) => {
+      if (visited.has(n.id) || ring > this.maxVisibleRings) return;
+      visited.add(n.id);
+      n.ring = ring;
+      out.push(n);
+      n.children.forEach(c => collect(c, ring + 1));
+    };
+    startNodes.forEach(r => collect(r, 0));
+
+    const cols = Math.max(2, Math.ceil(Math.sqrt(out.length * 1.3)));
+    const cellW = 210;
+    const cellH = 155;
+    out.forEach((n, idx) => {
+      const col = idx % cols;
+      const row = Math.floor(idx / cols);
+      n.x = (col - (cols - 1) / 2) * cellW;
+      n.y = (row - Math.floor(out.length / cols) / 2) * cellH;
+    });
+  }
+
+  /** Spiral Galaksi yerleşimi */
+  private layoutSpiral(out: RNode[]): void {
+    const startNodes = this.focusId && this.nodeMap.has(this.focusId)
+      ? [this.nodeMap.get(this.focusId)!]
+      : this.roots;
+    const visited = new Set<string>();
+    const queue: Array<{ n: RNode; ring: number }> = startNodes.map(n => ({ n, ring: 0 }));
+    while (queue.length) {
+      const { n, ring } = queue.shift()!;
+      if (visited.has(n.id) || ring > this.maxVisibleRings) continue;
+      visited.add(n.id);
+      n.ring = ring;
+      out.push(n);
+      n.children.forEach(c => queue.push({ n: c, ring: ring + 1 }));
+    }
+    const goldenAngle = Math.PI * (3 - Math.sqrt(5));
+    out.forEach((n, i) => {
+      if (i === 0) {
+        n.x = 0; n.y = 0;
+      } else {
+        const radius = 95 * Math.sqrt(i);
+        const theta = i * goldenAngle;
+        n.x = Math.cos(theta) * radius;
+        n.y = Math.sin(theta) * radius;
+      }
+    });
+  }
+
   // ===========================================================================
-  // Canvas kurulumu
+  // Canvas kurulumu & Render Döngüsü
   // ===========================================================================
 
   private initCanvas(): void {
@@ -651,7 +970,6 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
     this.canvas.style.width = w + 'px';
     this.canvas.style.height = h + 'px';
     this.ctx?.setTransform(dpr, 0, 0, dpr, 0, 0);
-    // Arka plan cache boyutu değiştiyse yeniden üret.
     this.bgCache = null;
     if (!this.hasFitted && this.renderNodes.length > 0) {
       this.fitView();
@@ -665,13 +983,8 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
     return { w: this.canvas.width / dpr, h: this.canvas.height / dpr };
   }
 
-  // ===========================================================================
-  // Render döngüsü
-  // ===========================================================================
-
   private startRenderLoop(): void {
     const tick = () => {
-      // Zoom interpolasyonu (sadece animasyon sırasında çiz).
       if (Math.abs(this.view.zoom - this.view.targetZoom) > 0.001) {
         this.view.zoom += (this.view.targetZoom - this.view.zoom) * 0.2;
         this.zoomAnimating = true;
@@ -699,9 +1012,7 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
     if (!ctx) return;
     const { w, h } = this.canvasSize;
 
-    // Arka plan (cache'li).
     this.drawBackground(w, h);
-
     if (!this.renderNodes.length) return;
 
     ctx.save();
@@ -709,15 +1020,12 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
     ctx.scale(this.view.zoom, this.view.zoom);
 
     const bounds = this.visibleBounds();
-
-    // Önce bağlantılar (parent→child Bezier), sonra düğümler.
     this.drawLinks(bounds);
     this.drawNodes(bounds);
 
     ctx.restore();
   }
 
-  // ---- Arka plan (Kozmik / Fabrika / Siber / Blueprint / Kristal) ----
   private drawBackground(w: number, h: number): void {
     const ctx = this.ctx!;
     const theme = this.themeConfig.theme;
@@ -729,7 +1037,6 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
       const c = cache.getContext('2d')!;
 
       if (theme === 'factory') {
-        // Endüstriyel Fabrika Teması: Koyu grafit/çelik zemin + CAD ızgarası
         const g = c.createLinearGradient(0, 0, w, h);
         g.addColorStop(0, '#090d14');
         g.addColorStop(0.5, '#0f1522');
@@ -737,27 +1044,16 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
         c.fillStyle = g; c.fillRect(0, 0, w, h);
 
         if (showGrid) {
-          // 40px CAD minor grid
           c.strokeStyle = 'rgba(245, 158, 11, 0.035)';
           c.lineWidth = 1;
-          for (let gx = 0; gx < w; gx += 40) {
-            c.beginPath(); c.moveTo(gx, 0); c.lineTo(gx, h); c.stroke();
-          }
-          for (let gy = 0; gy < h; gy += 40) {
-            c.beginPath(); c.moveTo(0, gy); c.lineTo(w, gy); c.stroke();
-          }
+          for (let gx = 0; gx < w; gx += 40) { c.beginPath(); c.moveTo(gx, 0); c.lineTo(gx, h); c.stroke(); }
+          for (let gy = 0; gy < h; gy += 40) { c.beginPath(); c.moveTo(0, gy); c.lineTo(w, gy); c.stroke(); }
 
-          // 120px CAD major grid & crosshairs
           c.strokeStyle = 'rgba(245, 158, 11, 0.08)';
           c.lineWidth = 1.2;
-          for (let gx = 0; gx < w; gx += 120) {
-            c.beginPath(); c.moveTo(gx, 0); c.lineTo(gx, h); c.stroke();
-          }
-          for (let gy = 0; gy < h; gy += 120) {
-            c.beginPath(); c.moveTo(0, gy); c.lineTo(w, gy); c.stroke();
-          }
+          for (let gx = 0; gx < w; gx += 120) { c.beginPath(); c.moveTo(gx, 0); c.lineTo(gx, h); c.stroke(); }
+          for (let gy = 0; gy < h; gy += 120) { c.beginPath(); c.moveTo(0, gy); c.lineTo(w, gy); c.stroke(); }
 
-          // Intersection coordinate ticks (+)
           c.strokeStyle = 'rgba(245, 158, 11, 0.25)';
           c.lineWidth = 1.2;
           for (let gx = 0; gx < w; gx += 120) {
@@ -769,7 +1065,6 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
             }
           }
         }
-
         const glow = c.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.max(w, h) * 0.6);
         glow.addColorStop(0, 'rgba(245, 158, 11, 0.08)');
         glow.addColorStop(0.6, 'rgba(16, 185, 129, 0.04)');
@@ -777,7 +1072,6 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
         c.fillStyle = glow; c.fillRect(0, 0, w, h);
 
       } else if (theme === 'cyber') {
-        // Siber Ağ & IoT Teması: Ultra-koyu OLED + neon cyber grid + HUD köşe işaretleri
         const g = c.createLinearGradient(0, 0, w, h);
         g.addColorStop(0, '#020408');
         g.addColorStop(0.5, '#050c14');
@@ -785,27 +1079,16 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
         c.fillStyle = g; c.fillRect(0, 0, w, h);
 
         if (showGrid) {
-          // Cyber 35px grid
           c.strokeStyle = 'rgba(0, 255, 157, 0.035)';
           c.lineWidth = 1;
-          for (let gx = 0; gx < w; gx += 35) {
-            c.beginPath(); c.moveTo(gx, 0); c.lineTo(gx, h); c.stroke();
-          }
-          for (let gy = 0; gy < h; gy += 35) {
-            c.beginPath(); c.moveTo(0, gy); c.lineTo(w, gy); c.stroke();
-          }
+          for (let gx = 0; gx < w; gx += 35) { c.beginPath(); c.moveTo(gx, 0); c.lineTo(gx, h); c.stroke(); }
+          for (let gy = 0; gy < h; gy += 35) { c.beginPath(); c.moveTo(0, gy); c.lineTo(w, gy); c.stroke(); }
 
-          // Cyber 140px data tracks
           c.strokeStyle = 'rgba(0, 240, 255, 0.08)';
           c.lineWidth = 1.2;
-          for (let gx = 0; gx < w; gx += 140) {
-            c.beginPath(); c.moveTo(gx, 0); c.lineTo(gx, h); c.stroke();
-          }
-          for (let gy = 0; gy < h; gy += 140) {
-            c.beginPath(); c.moveTo(0, gy); c.lineTo(w, gy); c.stroke();
-          }
+          for (let gx = 0; gx < w; gx += 140) { c.beginPath(); c.moveTo(gx, 0); c.lineTo(gx, h); c.stroke(); }
+          for (let gy = 0; gy < h; gy += 140) { c.beginPath(); c.moveTo(0, gy); c.lineTo(w, gy); c.stroke(); }
 
-          // Tech reticles [+]
           c.strokeStyle = 'rgba(0, 255, 157, 0.35)';
           c.lineWidth = 1.4;
           for (let gx = 0; gx < w; gx += 140) {
@@ -814,7 +1097,6 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
             }
           }
         }
-
         const glow = c.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.max(w, h) * 0.55);
         glow.addColorStop(0, 'rgba(0, 255, 157, 0.09)');
         glow.addColorStop(0.5, 'rgba(0, 240, 255, 0.04)');
@@ -822,7 +1104,6 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
         c.fillStyle = glow; c.fillRect(0, 0, w, h);
 
       } else if (theme === 'blueprint') {
-        // Teknik Blueprint Teması: Klasik mimari/mühendislik derin mavisi + milimetrik grid
         const g = c.createLinearGradient(0, 0, w, h);
         g.addColorStop(0, '#061a33');
         g.addColorStop(0.5, '#09274c');
@@ -830,108 +1111,47 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
         c.fillStyle = g; c.fillRect(0, 0, w, h);
 
         if (showGrid) {
-          // 20px fine grid
           c.strokeStyle = 'rgba(56, 189, 248, 0.045)';
           c.lineWidth = 0.8;
-          for (let gx = 0; gx < w; gx += 20) {
-            c.beginPath(); c.moveTo(gx, 0); c.lineTo(gx, h); c.stroke();
-          }
-          for (let gy = 0; gy < h; gy += 20) {
-            c.beginPath(); c.moveTo(0, gy); c.lineTo(w, gy); c.stroke();
-          }
+          for (let gx = 0; gx < w; gx += 20) { c.beginPath(); c.moveTo(gx, 0); c.lineTo(gx, h); c.stroke(); }
+          for (let gy = 0; gy < h; gy += 20) { c.beginPath(); c.moveTo(0, gy); c.lineTo(w, gy); c.stroke(); }
 
-          // 100px major drafting grid
           c.strokeStyle = 'rgba(56, 189, 248, 0.12)';
           c.lineWidth = 1.2;
-          for (let gx = 0; gx < w; gx += 100) {
-            c.beginPath(); c.moveTo(gx, 0); c.lineTo(gx, h); c.stroke();
-          }
-          for (let gy = 0; gy < h; gy += 100) {
-            c.beginPath(); c.moveTo(0, gy); c.lineTo(w, gy); c.stroke();
-          }
-
-          // Drafting crosshair markers
-          c.strokeStyle = 'rgba(56, 189, 248, 0.35)';
-          c.lineWidth = 1;
-          for (let gx = 0; gx < w; gx += 100) {
-            for (let gy = 0; gy < h; gy += 100) {
-              c.beginPath();
-              c.moveTo(gx - 5, gy); c.lineTo(gx + 5, gy);
-              c.moveTo(gx, gy - 5); c.lineTo(gx, gy + 5);
-              c.stroke();
-            }
-          }
+          for (let gx = 0; gx < w; gx += 100) { c.beginPath(); c.moveTo(gx, 0); c.lineTo(gx, h); c.stroke(); }
+          for (let gy = 0; gy < h; gy += 100) { c.beginPath(); c.moveTo(0, gy); c.lineTo(w, gy); c.stroke(); }
         }
-
         const glow = c.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.max(w, h) * 0.65);
         glow.addColorStop(0, 'rgba(56, 189, 248, 0.09)');
         glow.addColorStop(1, 'rgba(0, 0, 0, 0)');
         c.fillStyle = glow; c.fillRect(0, 0, w, h);
 
       } else if (theme === 'crystal') {
-        // Kristal & Prizma Teması: Obsidyen zemin + aurora dalgaları + prizma ışıltıları
         const g = c.createLinearGradient(0, 0, w, h);
         g.addColorStop(0, '#07050f');
         g.addColorStop(0.5, '#0e0a1f');
         g.addColorStop(1, '#05030b');
         c.fillStyle = g; c.fillRect(0, 0, w, h);
 
-        // Aurora ışık dalgaları
         const a1 = c.createRadialGradient(w * 0.35, h * 0.4, 30, w * 0.35, h * 0.4, Math.max(w, h) * 0.5);
         a1.addColorStop(0, 'rgba(236, 72, 153, 0.10)');
         a1.addColorStop(0.6, 'rgba(139, 92, 246, 0.04)');
         a1.addColorStop(1, 'rgba(0, 0, 0, 0)');
         c.fillStyle = a1; c.fillRect(0, 0, w, h);
-
-        const a2 = c.createRadialGradient(w * 0.68, h * 0.6, 20, w * 0.68, h * 0.6, Math.max(w, h) * 0.45);
-        a2.addColorStop(0, 'rgba(6, 182, 212, 0.09)');
-        a2.addColorStop(1, 'rgba(0, 0, 0, 0)');
-        c.fillStyle = a2; c.fillRect(0, 0, w, h);
-
-        // Prizmatik kristal ışıltıları
-        c.strokeStyle = 'rgba(255, 255, 255, 0.45)';
-        c.fillStyle = 'rgba(255, 255, 255, 0.7)';
-        const sparkleCount = Math.min(80, Math.floor((w * h) / 20000));
-        for (let i = 0; i < sparkleCount; i++) {
-          const hx = this.hash(i * 44851 + 3) * w;
-          const hy = this.hash(i * 32173 + 7) * h;
-          const s = (this.hash(i * 19283 + 9) % 10) / 10 * 2.5 + 1;
-          c.beginPath();
-          c.moveTo(hx - s * 2, hy); c.lineTo(hx + s * 2, hy);
-          c.moveTo(hx, hy - s * 2); c.lineTo(hx, hy + s * 2);
-          c.stroke();
-          c.beginPath();
-          c.arc(hx, hy, s * 0.4, 0, Math.PI * 2);
-          c.fill();
-        }
-
       } else {
-        // Kozmik Uzay Teması: Çok katmanlı nebula + yıldızlar + güneş parıltısı
         const g = c.createLinearGradient(0, 0, w, h);
         g.addColorStop(0, '#04060e');
         g.addColorStop(0.5, '#080c1d');
         g.addColorStop(1, '#04050c');
         c.fillStyle = g; c.fillRect(0, 0, w, h);
 
-        // Nebula gaz bulutları (mor / camgöbeği)
         const n1 = c.createRadialGradient(w * 0.3, h * 0.35, 20, w * 0.3, h * 0.35, Math.max(w, h) * 0.48);
         n1.addColorStop(0, 'rgba(167, 139, 250, 0.11)');
         n1.addColorStop(1, 'rgba(0, 0, 0, 0)');
         c.fillStyle = n1; c.fillRect(0, 0, w, h);
 
-        const n2 = c.createRadialGradient(w * 0.7, h * 0.65, 30, w * 0.7, h * 0.65, Math.max(w, h) * 0.42);
-        n2.addColorStop(0, 'rgba(34, 211, 238, 0.08)');
-        n2.addColorStop(1, 'rgba(0, 0, 0, 0)');
-        c.fillStyle = n2; c.fillRect(0, 0, w, h);
-
-        const glow = c.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.max(w, h) * 0.58);
-        glow.addColorStop(0, 'rgba(96, 165, 250, 0.12)');
-        glow.addColorStop(1, 'rgba(0, 0, 0, 0)');
-        c.fillStyle = glow; c.fillRect(0, 0, w, h);
-
-        // Yıldızlar
         c.fillStyle = 'rgba(225, 235, 255, 0.75)';
-        const starCount = Math.min(150, Math.floor((w * h) / 12000));
+        const starCount = Math.min(140, Math.floor((w * h) / 12000));
         for (let i = 0; i < starCount; i++) {
           const hx = this.hash(i * 92821 + 1);
           const hy = this.hash(i * 27487 + 7);
@@ -948,17 +1168,17 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
     }
     ctx.drawImage(this.bgCache, 0, 0, w, h);
 
-    // Yörünge rehber halkaları (isteğe bağlı)
-    if (this.themeConfig.showOrbits !== false) {
+    // Yörünge halkaları yalnızca radial düzende çizilir
+    if (this.themeConfig.showOrbits !== false && (!this.themeConfig.layout || this.themeConfig.layout === 'radial')) {
       ctx.save();
       ctx.translate(this.view.panX, this.view.panY);
       ctx.scale(this.view.zoom, this.view.zoom);
 
       if (theme === 'factory') {
-        ctx.strokeStyle = 'rgba(245, 158, 11, 0.09)';
+        ctx.strokeStyle = 'rgba(245, 158, 11, 0.10)';
         ctx.setLineDash([8, 8]);
       } else if (theme === 'cyber') {
-        ctx.strokeStyle = 'rgba(0, 255, 157, 0.10)';
+        ctx.strokeStyle = 'rgba(0, 255, 157, 0.11)';
         ctx.setLineDash([4, 12]);
       } else if (theme === 'blueprint') {
         ctx.strokeStyle = 'rgba(56, 189, 248, 0.14)';
@@ -967,12 +1187,13 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
         ctx.strokeStyle = 'rgba(236, 72, 153, 0.10)';
         ctx.setLineDash([]);
       } else {
-        ctx.strokeStyle = 'rgba(124, 141, 181, 0.07)';
+        ctx.strokeStyle = 'rgba(124, 141, 181, 0.08)';
         ctx.setLineDash([]);
       }
 
       ctx.lineWidth = 1 / this.view.zoom;
-      for (let r = 1; r <= this.MAX_DRILL_RING + 1; r++) {
+      const maxRing = Math.min(this.maxVisibleRings, Math.max(this.maxDepth + 1, 3));
+      for (let r = 1; r <= maxRing; r++) {
         ctx.beginPath();
         ctx.arc(0, 0, this.RING_RADIUS * r, 0, Math.PI * 2);
         ctx.stroke();
@@ -986,57 +1207,68 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
     const showAll = this.renderNodes.length <= 600;
     const nodeSet = new Set(this.renderNodes.map(n => n.id));
     const theme = this.themeConfig.theme;
+    const layout = this.themeConfig.layout || 'radial';
 
     for (const node of this.renderNodes) {
-      if (!node.parentId) continue;
-      if (!nodeSet.has(node.parentId)) continue;
-      const parent = this.nodeMap.get(node.parentId);
-      if (!parent) continue;
-      // Bağlantı yalnızca her iki uç pencerede ve ekranda görünüyorsa çiz.
-      if (!showAll && !this.inBounds(node, bounds) && !this.inBounds(parent, bounds)) continue;
+      const parentIds = node.parents?.length ? node.parents : (node.parentId ? [node.parentId] : []);
+      for (let pIdx = 0; pIdx < parentIds.length; pIdx++) {
+        const pid = parentIds[pIdx];
+        if (!pid || !nodeSet.has(pid)) continue;
+        const parent = this.nodeMap.get(pid);
+        if (!parent) continue;
+        if (!showAll && !this.inBounds(node, bounds) && !this.inBounds(parent, bounds)) continue;
 
-      const color = this.levelColor(node.ring);
+        const color = this.levelColor(node.depth);
+        const isSecondaryDagEdge = pIdx > 0;
 
-      ctx.save();
-      if (theme === 'blueprint') {
-        ctx.setLineDash([5, 4]);
-        ctx.strokeStyle = this.alpha(color, 0.45);
-        ctx.lineWidth = 1.2;
-      } else if (theme === 'cyber') {
-        ctx.setLineDash([]);
-        ctx.strokeStyle = this.alpha(color, 0.6);
-        ctx.lineWidth = 1.6;
-        ctx.shadowColor = color;
-        ctx.shadowBlur = 8;
-      } else if (theme === 'factory') {
-        ctx.setLineDash([]);
-        ctx.strokeStyle = this.alpha(color, 0.42);
-        ctx.lineWidth = 2.4;
-      } else if (theme === 'crystal') {
-        ctx.setLineDash([]);
-        ctx.strokeStyle = this.alpha(color, 0.45);
-        ctx.lineWidth = 1.5;
-      } else {
-        ctx.setLineDash([]);
-        ctx.strokeStyle = this.alpha(color, 0.35);
-        ctx.lineWidth = 1.4;
+        ctx.save();
+        if (isSecondaryDagEdge) {
+          ctx.setLineDash([6, 5]);
+          ctx.strokeStyle = this.alpha(color, 0.4);
+          ctx.lineWidth = 1.3;
+        } else if (theme === 'blueprint') {
+          ctx.setLineDash([5, 4]);
+          ctx.strokeStyle = this.alpha(color, 0.5);
+          ctx.lineWidth = 1.4;
+        } else if (theme === 'cyber') {
+          ctx.setLineDash([]);
+          ctx.strokeStyle = this.alpha(color, 0.65);
+          ctx.lineWidth = 1.8;
+          ctx.shadowColor = color;
+          ctx.shadowBlur = 8;
+        } else if (theme === 'factory') {
+          ctx.setLineDash([]);
+          ctx.strokeStyle = this.alpha(color, 0.48);
+          ctx.lineWidth = 2.4;
+        } else {
+          ctx.setLineDash([]);
+          ctx.strokeStyle = this.alpha(color, 0.42);
+          ctx.lineWidth = 1.5;
+        }
+
+        ctx.beginPath();
+        ctx.moveTo(parent.x, parent.y);
+        if (layout === 'flow-lr') {
+          const midX = (parent.x + node.x) / 2;
+          ctx.bezierCurveTo(midX, parent.y, midX, node.y, node.x, node.y);
+        } else if (layout === 'hierarchy-tb') {
+          const midY = (parent.y + node.y) / 2;
+          ctx.bezierCurveTo(parent.x, midY, node.x, midY, node.x, node.y);
+        } else {
+          const mx = (parent.x + node.x) / 2;
+          const my = (parent.y + node.y) / 2;
+          ctx.quadraticCurveTo(mx, my, node.x, node.y);
+        }
+        ctx.stroke();
+        ctx.restore();
       }
-
-      ctx.beginPath();
-      ctx.moveTo(parent.x, parent.y);
-      // Kavisli Bezier
-      const mx = (parent.x + node.x) / 2;
-      const my = (parent.y + node.y) / 2;
-      ctx.quadraticCurveTo(mx, my, node.x, node.y);
-      ctx.stroke();
-      ctx.restore();
     }
   }
 
   private drawNodes(bounds: VisibleBounds): void {
     const ctx = this.ctx!;
     const focus = this.focusId ? this.nodeMap.get(this.focusId) : null;
-    const showLabels = this.view.zoom >= 0.55;
+    const showLabels = this.view.zoom >= 0.45;
     const shape = this.resolveNodeShape();
 
     for (const node of this.renderNodes) {
@@ -1044,11 +1276,10 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
       const isFocus = focus === node;
       const isHover = this.hoveredNode === node;
       const isSel = this.selectedNode === node;
-      const baseR = this.nodeRadius(node.ring);
+      const baseR = this.nodeRadius(node.depth, isFocus);
       const r = isHover || isFocus ? baseR * 1.15 : baseR;
-      const color = this.levelColor(node.ring);
+      const color = this.levelColor(node.depth);
 
-      // Halo (focus/hover/seçili)
       if (isFocus || isHover || isSel) {
         ctx.shadowColor = color;
         ctx.shadowBlur = isFocus ? 28 : (isSel ? 22 : 16);
@@ -1057,20 +1288,20 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
         ctx.shadowBlur = 0;
       }
 
-      // Şekle göre gövde çizimi
+      // 1. Düğüm Gövdesi
       if (shape === 'hexagon') {
         this.drawHexagon(ctx, node.x, node.y, r);
         const grad = ctx.createLinearGradient(node.x - r, node.y - r, node.x + r, node.y + r);
         grad.addColorStop(0, '#1c2430');
-        grad.addColorStop(0.5, '#121822');
+        grad.addColorStop(0.55, '#121822');
         grad.addColorStop(1, color);
         ctx.fillStyle = grad;
         ctx.fill();
 
         ctx.shadowColor = 'transparent';
         ctx.shadowBlur = 0;
-        ctx.lineWidth = isSel ? 2.5 : 1.5;
-        ctx.strokeStyle = isSel ? '#ffffff' : this.alpha(color, 0.6);
+        ctx.lineWidth = isSel ? 2.8 : 1.8;
+        ctx.strokeStyle = isSel ? '#ffffff' : (node.statusColor || this.alpha(color, 0.75));
         ctx.stroke();
 
         if (r >= 14) {
@@ -1087,11 +1318,11 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
 
         ctx.shadowColor = 'transparent';
         ctx.shadowBlur = 0;
-        ctx.lineWidth = isSel ? 2.5 : 1.5;
-        ctx.strokeStyle = isSel ? '#ffffff' : this.alpha(color, 0.7);
+        ctx.lineWidth = isSel ? 2.8 : 1.8;
+        ctx.strokeStyle = isSel ? '#ffffff' : (node.statusColor || this.alpha(color, 0.8));
         ctx.stroke();
 
-        if (r >= 12 && (isFocus || isHover || isSel || this.view.zoom >= 0.75)) {
+        if (r >= 12 && (isFocus || isHover || isSel || this.view.zoom >= 0.7)) {
           this.drawCyberBrackets(ctx, node.x, node.y, r, isSel ? '#ffffff' : color);
         }
       } else if (shape === 'diamond') {
@@ -1105,8 +1336,8 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
 
         ctx.shadowColor = 'transparent';
         ctx.shadowBlur = 0;
-        ctx.lineWidth = isSel ? 2.5 : 1.5;
-        ctx.strokeStyle = isSel ? '#ffffff' : this.alpha(color, 0.65);
+        ctx.lineWidth = isSel ? 2.8 : 1.8;
+        ctx.strokeStyle = isSel ? '#ffffff' : (node.statusColor || this.alpha(color, 0.75));
         ctx.stroke();
 
         if (r >= 14) {
@@ -1124,16 +1355,15 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
 
         ctx.shadowColor = 'transparent';
         ctx.shadowBlur = 0;
-        ctx.lineWidth = isSel ? 2.5 : 1.5;
-        ctx.strokeStyle = isSel ? '#ffffff' : this.alpha(color, 0.75);
+        ctx.lineWidth = isSel ? 2.8 : 1.8;
+        ctx.strokeStyle = isSel ? '#ffffff' : (node.statusColor || this.alpha(color, 0.8));
         ctx.stroke();
 
         if (r >= 12) {
           this.drawBlueprintCrosshairs(ctx, node.x, node.y, r, isSel ? '#ffffff' : color);
         }
       } else {
-        // 'planet' veya 'circle'
-        if (shape === 'planet' && (isFocus || node.ring === 0)) {
+        if (shape === 'planet' && (isFocus || node.depth === 0)) {
           this.drawSunCorona(ctx, node.x, node.y, r, color);
         }
 
@@ -1148,27 +1378,27 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
 
         ctx.shadowColor = 'transparent';
         ctx.shadowBlur = 0;
-        ctx.lineWidth = isSel ? 2.5 : 1.5;
-        ctx.strokeStyle = isSel ? '#ffffff' : this.alpha(color, 0.5);
+        ctx.lineWidth = isSel ? 2.8 : 1.8;
+        ctx.strokeStyle = isSel ? '#ffffff' : (node.statusColor || this.alpha(color, 0.6));
         ctx.stroke();
 
-        if (shape === 'planet' && node.ring > 0 && r >= 14) {
+        if (shape === 'planet' && node.depth > 0 && r >= 14) {
           this.drawPlanetaryRing(ctx, node.x, node.y, r, color);
         }
       }
 
-      // FontAwesome glyph ikonu
-      const icon = this.getNodeIcon(node.ring);
-      if (icon && r >= 14 && this.view.zoom >= 0.45) {
-        const iconSize = Math.round(r * 0.88);
+      // 2. FontAwesome Düğüm İkonu (Derinlik ve Tip Bazlı!)
+      const icon = this.getNodeIcon(node);
+      if (icon && r >= 10 && this.view.zoom >= 0.35) {
+        const iconSize = Math.max(9, Math.round(r * 0.86));
         this.renderCanvasIcon(ctx, icon, node.x, node.y, iconSize, '#ffffff');
       }
 
-      // Çocuk sayısı çipi (yaprak olmayan) - sağ üst rozet
+      // 3. Çocuk Sayısı Rozeti (sağ-üst)
       if (node.children.length && r >= 12) {
         const chip = String(node.children.length);
-        const bx = node.x + r * 0.72;
-        const by = node.y - r * 0.72;
+        const bx = node.x + r * 0.74;
+        const by = node.y - r * 0.74;
         const badgeR = Math.max(7, Math.round(r * 0.38));
         ctx.beginPath();
         ctx.arc(bx, by, badgeR, 0, Math.PI * 2);
@@ -1185,14 +1415,37 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
         ctx.fillText(chip, bx, by);
       }
 
-      // Etiket
-      if (showLabels || isHover || isFocus) {
-        this.drawLabel(node.label, node.x, node.y + r + 12, color, isHover || isFocus);
+      // 4. Canlı Sağlık / OEE / Durum Rozeti (sol-üst veya alt)
+      if ((node.badge || node.healthScore !== undefined) && r >= 12 && (this.view.zoom >= 0.6 || isHover || isSel)) {
+        const badgeText = node.badge || `${node.healthScore}%`;
+        const bColor = node.statusColor || '#10b981';
+        const bx = node.x - r * 0.75;
+        const by = node.y - r * 0.75;
+        ctx.save();
+        ctx.font = '700 9px "Space Grotesk", sans-serif';
+        const tw = ctx.measureText(badgeText).width + 8;
+        const th = 14;
+        ctx.fillStyle = bColor;
+        ctx.beginPath();
+        ctx.roundRect(bx - tw / 2, by - th / 2, tw, th, 4);
+        ctx.fill();
+        ctx.strokeStyle = '#05070f';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.fillStyle = '#ffffff';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(badgeText, bx, by);
+        ctx.restore();
+      }
+
+      // 5. Etiket
+      if (showLabels || isHover || isFocus || isSel) {
+        this.drawLabel(node.label, node.x, node.y + r + 11, color, isHover || isFocus || isSel);
       }
     }
   }
 
-  // ---- Düğüm Şekil Çözümlemesi ----
   resolveNodeShape(): SpaceMapShape {
     const s = this.themeConfig.nodeShape;
     if (!s || s === 'auto') {
@@ -1209,33 +1462,44 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
     return s;
   }
 
-  private getNodeIcon(ring: number): string {
-    if (ring === 0) return this.themeConfig.level1Icon || 'fa-sun';
-    if (ring === 1) return this.themeConfig.level2Icon || 'fa-globe';
-    return this.themeConfig.level3Icon || 'fa-satellite';
+  /**
+   * Düğümün gerçek hiyerarşi derinliğine (node.depth) ve (aktifse) semantik tipine göre ikon döndürür.
+   */
+  getNodeIcon(node: RNode): string {
+    if (node.icon) return node.icon;
+
+    if (this.themeConfig.autoTypeIcons && node.type) {
+      const t = node.type.toLowerCase();
+      if (t.includes('enterprise') || t.includes('plant') || t.includes('campus') || t.includes('site')) return 'fa-building';
+      if (t.includes('area') || t.includes('shop') || t.includes('facility') || t.includes('factory')) return 'fa-industry';
+      if (t.includes('line') || t.includes('workcenter') || t.includes('assembly')) return 'fa-cogs';
+      if (t.includes('robot') || t.includes('arm') || t.includes('agv')) return 'fa-robot';
+      if (t.includes('sensor') || t.includes('meter') || t.includes('point') || t.includes('gauge')) return 'fa-gauge-high';
+      if (t.includes('plc') || t.includes('controller') || t.includes('edge')) return 'fa-microchip';
+      if (t.includes('trafo') || t.includes('grid') || t.includes('power') || t.includes('energy') || t.includes('feeder')) return 'fa-bolt';
+      if (t.includes('warehouse') || t.includes('storage')) return 'fa-warehouse';
+      if (t.includes('quality') || t.includes('inspection')) return 'fa-clipboard-check';
+      if (t.includes('defect') || t.includes('alarm') || t.includes('fault')) return 'fa-triangle-exclamation';
+      if (t.includes('machine') || t.includes('cnc') || t.includes('press') || t.includes('weld')) return 'fa-gear';
+    }
+
+    const d = node.depth ?? 0;
+    if (d === 0) return this.themeConfig.level1Icon || 'fa-industry';
+    if (d === 1) return this.themeConfig.level2Icon || 'fa-cogs';
+    if (d === 2) return this.themeConfig.level3Icon || 'fa-robot';
+    return this.themeConfig.level4Icon || this.themeConfig.level3Icon || 'fa-gauge-high';
   }
 
   private renderCanvasIcon(ctx: CanvasRenderingContext2D, icon: string, x: number, y: number, size: number, color = '#ffffff'): void {
     if (!icon) return;
     const clean = icon.trim();
-    const glyph = FA_GLYPHS[clean] || FA_GLYPHS[clean.replace('fa-', '')] || (clean.startsWith('fa-') ? null : clean);
+    const glyph = FA_GLYPHS[clean] || FA_GLYPHS[clean.replace('fa-', '')] || FA_GLYPHS['fa-' + clean] || '\uf013';
     ctx.save();
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    if (glyph && (glyph.charCodeAt(0) > 255 || glyph.startsWith('\\u'))) {
-      ctx.font = `900 ${Math.round(size)}px "Font Awesome 6 Free", sans-serif`;
-      ctx.fillStyle = color;
-      ctx.fillText(glyph, x, y);
-    } else if (glyph && glyph.length <= 4) {
-      ctx.font = `700 ${Math.round(size * 0.9)}px "Space Grotesk", sans-serif`;
-      ctx.fillStyle = color;
-      ctx.fillText(glyph, x, y);
-    } else {
-      const fallbackGlyph = FA_GLYPHS['fa-' + clean] || '\uf111';
-      ctx.font = `900 ${Math.round(size)}px "Font Awesome 6 Free", sans-serif`;
-      ctx.fillStyle = color;
-      ctx.fillText(fallbackGlyph, x, y);
-    }
+    ctx.font = `900 ${Math.round(size)}px "Font Awesome 6 Free", "Font Awesome 5 Free", FontAwesome, sans-serif`;
+    ctx.fillStyle = color;
+    ctx.fillText(glyph, x, y);
     ctx.restore();
   }
 
@@ -1284,29 +1548,11 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
     const bLen = Math.max(3, r * 0.32);
     ctx.strokeStyle = color;
     ctx.lineWidth = 1.5;
-    // Top-Left
     ctx.beginPath();
-    ctx.moveTo(x - bDist + bLen, y - bDist);
-    ctx.lineTo(x - bDist, y - bDist);
-    ctx.lineTo(x - bDist, y - bDist + bLen);
-    ctx.stroke();
-    // Top-Right
-    ctx.beginPath();
-    ctx.moveTo(x + bDist - bLen, y - bDist);
-    ctx.lineTo(x + bDist, y - bDist);
-    ctx.lineTo(x + bDist, y - bDist + bLen);
-    ctx.stroke();
-    // Bottom-Left
-    ctx.beginPath();
-    ctx.moveTo(x - bDist, y + bDist - bLen);
-    ctx.lineTo(x - bDist, y + bDist);
-    ctx.lineTo(x - bDist + bLen, y + bDist);
-    ctx.stroke();
-    // Bottom-Right
-    ctx.beginPath();
-    ctx.moveTo(x + bDist - bLen, y + bDist);
-    ctx.lineTo(x + bDist, y + bDist);
-    ctx.lineTo(x + bDist, y + bDist - bLen);
+    ctx.moveTo(x - bDist + bLen, y - bDist); ctx.lineTo(x - bDist, y - bDist); ctx.lineTo(x - bDist, y - bDist + bLen);
+    ctx.moveTo(x + bDist - bLen, y - bDist); ctx.lineTo(x + bDist, y - bDist); ctx.lineTo(x + bDist, y - bDist + bLen);
+    ctx.moveTo(x - bDist, y + bDist - bLen); ctx.lineTo(x - bDist, y + bDist); ctx.lineTo(x - bDist + bLen, y + bDist);
+    ctx.moveTo(x + bDist - bLen, y + bDist); ctx.lineTo(x + bDist, y + bDist); ctx.lineTo(x + bDist, y + bDist - bLen);
     ctx.stroke();
   }
 
@@ -1344,15 +1590,6 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
     ctx.moveTo(x - ext, y); ctx.lineTo(x + ext, y);
     ctx.moveTo(x, y - ext); ctx.lineTo(x, y + ext);
     ctx.stroke();
-
-    const d = r * 0.72;
-    const tickLen = 3;
-    ctx.beginPath();
-    ctx.moveTo(x - d, y - d - tickLen); ctx.lineTo(x - d, y - d + tickLen);
-    ctx.moveTo(x + d, y - d - tickLen); ctx.lineTo(x + d, y - d + tickLen);
-    ctx.moveTo(x - d, y + d - tickLen); ctx.lineTo(x - d, y + d + tickLen);
-    ctx.moveTo(x + d, y + d - tickLen); ctx.lineTo(x + d, y + d + tickLen);
-    ctx.stroke();
   }
 
   private drawPlanetaryRing(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, color: string): void {
@@ -1364,12 +1601,6 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
     ctx.lineWidth = Math.max(1.5, r * 0.12);
     ctx.beginPath();
     ctx.arc(0, 0, r * 1.15, 0, Math.PI * 2);
-    ctx.stroke();
-
-    ctx.strokeStyle = this.alpha(color, 0.18);
-    ctx.lineWidth = Math.max(1, r * 0.06);
-    ctx.beginPath();
-    ctx.arc(0, 0, r * 1.35, 0, Math.PI * 2);
     ctx.stroke();
     ctx.restore();
   }
@@ -1383,30 +1614,18 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
     ctx.beginPath();
     ctx.arc(x, y, r * 2.2, 0, Math.PI * 2);
     ctx.fill();
-
-    ctx.strokeStyle = this.alpha(color, 0.25);
-    ctx.lineWidth = 1.2;
-    const rayCount = 12;
-    for (let i = 0; i < rayCount; i++) {
-      const angle = (Math.PI * 2 / rayCount) * i;
-      const len = r * (1.3 + (i % 3) * 0.25);
-      ctx.beginPath();
-      ctx.moveTo(x + Math.cos(angle) * (r * 0.95), y + Math.sin(angle) * (r * 0.95));
-      ctx.lineTo(x + Math.cos(angle) * len, y + Math.sin(angle) * len);
-      ctx.stroke();
-    }
   }
 
   private drawLabel(text: string, x: number, y: number, color: string, emphasize: boolean): void {
     const ctx = this.ctx!;
     const label = this.truncate(text);
-    ctx.font = `${emphasize ? '600 ' : ''}12px "Space Grotesk", sans-serif`;
+    ctx.font = `${emphasize ? '700 ' : '500 '}12px "Space Grotesk", sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.85)';
-    ctx.lineWidth = 3;
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.88)';
+    ctx.lineWidth = 3.2;
     ctx.strokeText(label, x, y);
-    ctx.fillStyle = emphasize ? '#ffffff' : this.alpha(color, 0.92);
+    ctx.fillStyle = emphasize ? '#ffffff' : this.alpha(color, 0.95);
     ctx.fillText(label, x, y);
   }
 
@@ -1479,7 +1698,6 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
     e.preventDefault();
     const factor = Math.exp(-e.deltaY * 0.0015);
     const newZoom = Math.max(this.minZoom, Math.min(this.maxZoom, this.view.targetZoom * factor));
-    // İmleç merkezinde zoom: imleç dünyasını sabit tut.
     const rect = this.canvas!.getBoundingClientRect();
     const cx = e.clientX - rect.left;
     const cy = e.clientY - rect.top;
@@ -1513,6 +1731,8 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
 
   @HostListener('window:keydown', ['$event'])
   onKey(e: KeyboardEvent): void {
+    const tag = (e.target as HTMLElement)?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
     switch (e.key) {
       case 'Escape': this.navigateUp(); break;
       case '+': case '=': this.zoomIn(); break;
@@ -1529,7 +1749,7 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
     let best: RNode | null = null;
     let bestDist = Infinity;
     for (const node of this.renderNodes) {
-      const r = this.nodeRadius(node.ring) + 4;
+      const r = this.nodeRadius(node.depth, this.focusId === node.id) + 5;
       const dx = node.x - x;
       const dy = node.y - y;
       const d = dx * dx + dy * dy;
@@ -1541,21 +1761,21 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
     return best;
   }
 
-  private nodeRadius(ring: number): number {
-    return this.NODE_RADIUS_BY_RING[Math.min(ring, this.NODE_RADIUS_BY_RING.length - 1)];
+  private nodeRadius(depth: number, isFocus = false): number {
+    if (isFocus) return this.NODE_RADIUS_BY_RING[0];
+    return this.NODE_RADIUS_BY_RING[Math.min(depth + 1, this.NODE_RADIUS_BY_RING.length - 1)];
   }
 
-  private levelColor(ring: number): string {
+  private levelColor(depth: number): string {
     const palette = [
-      this.themeConfig.color1 || '#60A5FA',
-      this.themeConfig.color2 || '#22D3EE',
-      this.themeConfig.color3 || '#A78BFA',
-      '#F5B301',
-      '#10B981',
+      this.themeConfig.color1 || '#F59E0B',
+      this.themeConfig.color2 || '#10B981',
+      this.themeConfig.color3 || '#06B6D4',
+      '#60A5FA',
+      '#A78BFA',
       '#EC4899',
-      '#6366F1',
     ];
-    return palette[((ring % palette.length) + palette.length) % palette.length];
+    return palette[((depth % palette.length) + palette.length) % palette.length];
   }
 
   private truncate(text: string): string {
@@ -1563,24 +1783,23 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
     return text.slice(0, this.MAX_LABEL_LEN - 1) + '…';
   }
 
-  /** Kararlı [0,1) sahte-değer (Math.random yerine — render deterministik kalsın). */
   private hash(n: number): number {
-    let x = Math.sin(n) * 43758.5453;
+    const x = Math.sin(n) * 43758.5453;
     return x - Math.floor(x);
   }
 
   private alpha(hex: string, a: number): string {
-    const h = hex.replace('#', '');
-    const r = parseInt(h.slice(0, 2), 16);
-    const g = parseInt(h.slice(2, 4), 16);
-    const b = parseInt(h.slice(4, 6), 16);
+    const h = (hex || '#60A5FA').replace('#', '');
+    const r = parseInt(h.slice(0, 2) || '60', 16);
+    const g = parseInt(h.slice(2, 4) || 'a5', 16);
+    const b = parseInt(h.slice(4, 6) || 'fa', 16);
     return `rgba(${r}, ${g}, ${b}, ${a})`;
   }
 
   private visibleBounds(): VisibleBounds {
     const { w, h } = this.canvasSize;
     const z = this.view.zoom;
-    const pad = 120;
+    const pad = 160;
     return {
       minX: (-this.view.panX) / z - pad,
       maxX: (w - this.view.panX) / z + pad,
@@ -1597,20 +1816,22 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
   // Public (template) — seçim, drill, zoom, arama, aksiyonlar
   // ===========================================================================
 
-  /** Düğüme tıklama → detay paneli + (yaprak değilse) alt seviyeye drill. */
   selectNode(node: RNode): void {
     this.selectedNode = node;
-    // Yaprak değilse o düğüme odaklanarak alt seviyeleri aç (drill-down).
-    if (node.children.length) {
-      this.focusId = node.id;
-      this.relayout();
-      this.fitView();
-    }
     this.markDirty();
     this.cdr.markForCheck();
   }
 
-  /** Bir üst seviyeye çık (seçimi temizle, focus'u atasına/overview'a al). */
+  /** Seçili düğüme odaklan (drill-down) */
+  drillIntoSelected(): void {
+    if (!this.selectedNode || !this.selectedNode.children.length) return;
+    this.focusId = this.selectedNode.id;
+    this.relayout();
+    this.fitView();
+    this.markDirty();
+    this.cdr.markForCheck();
+  }
+
   navigateUp(): void {
     this.selectedNode = null;
     if (!this.focusId) {
@@ -1625,13 +1846,17 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
     this.cdr.markForCheck();
   }
 
-  zoomIn(): void {
-    this.zoomBy(1.3);
+  resetToOverview(): void {
+    this.focusId = null;
+    this.selectedNode = null;
+    this.relayout();
+    this.fitView();
+    this.markDirty();
+    this.cdr.markForCheck();
   }
 
-  zoomOut(): void {
-    this.zoomBy(1 / 1.3);
-  }
+  zoomIn(): void { this.zoomBy(1.3); }
+  zoomOut(): void { this.zoomBy(1 / 1.3); }
 
   private zoomBy(factor: number): void {
     const { w, h } = this.canvasSize;
@@ -1649,12 +1874,11 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
     this.markDirty();
   }
 
-  /** Görünür düğümleri canvas'a sığdır. */
   fitView(): void {
     if (!this.renderNodes.length || !this.canvas) return;
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     for (const n of this.renderNodes) {
-      const r = this.nodeRadius(n.ring) + 28;
+      const r = this.nodeRadius(n.depth, this.focusId === n.id) + 45;
       minX = Math.min(minX, n.x - r); maxX = Math.max(maxX, n.x + r);
       minY = Math.min(minY, n.y - r); maxY = Math.max(maxY, n.y + r);
     }
@@ -1662,7 +1886,7 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
     if (w <= 0 || h <= 0) return;
     const bw = Math.max(maxX - minX, 1);
     const bh = Math.max(maxY - minY, 1);
-    const zoom = Math.max(this.minZoom, Math.min(this.maxZoom, Math.min(w / bw, h / bh) * 0.88));
+    const zoom = Math.max(this.minZoom, Math.min(this.maxZoom, Math.min(w / bw, h / bh) * 0.85));
     const cx = (minX + maxX) / 2;
     const cy = (minY + maxY) / 2;
     this.view.zoom = zoom;
@@ -1677,7 +1901,7 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
     if (this.selectedPathId) this.buildAndRender(this.selectedPathId);
   }
 
-  // ---- Arama (yerel, label eşleşmesi) ----
+  // ---- Arama ----
   onSearch(): void {
     const q = this.searchTerm.trim().toLowerCase();
     if (!q) {
@@ -1687,19 +1911,16 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
     }
     const matches: RNode[] = [];
     for (const node of this.nodeMap.values()) {
-      if (node.label.toLowerCase().includes(q)) {
+      if (node.label.toLowerCase().includes(q) || (node.type || '').toLowerCase().includes(q)) {
         matches.push(node);
         if (matches.length >= this.MAX_SEARCH_RESULTS) break;
       }
     }
     this.searchResults = matches;
-    this.searchHint = matches.length
-      ? this.translate.instant('NETWORK_MAP.SEARCH_HINT', { n: matches.length })
-      : this.translate.instant('NETWORK_MAP.NO_RESULTS');
+    this.searchHint = matches.length ? `${matches.length} eşleşme` : 'Sonuç bulunamadı';
   }
 
   focusSearchResult(node: RNode): void {
-    // Yaprak düğümse üst düğümü odakla ki kardeşler ve üst hiyerarşi görünür kalsın
     if (!node.children.length && node.parentId && this.nodeMap.has(node.parentId)) {
       this.focusId = node.parentId;
     } else {
@@ -1717,14 +1938,16 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
   // ---- Detay paneli getter'ları & Breadcrumb ----
   get selectedLevelLabel(): string {
     if (!this.selectedNode) return '';
-    return this.translate.instant('NETWORK_MAP.LEVEL_N', { n: this.selectedNode.depth + 1 });
+    return `Seviye ${this.selectedNode.depth + 1}${this.selectedNode.type ? ' • ' + this.selectedNode.type : ''}`;
   }
 
   get selectedBreadcrumbNodes(): RNode[] {
     if (!this.selectedNode) return [];
     const chain: RNode[] = [];
+    const seen = new Set<string>();
     let cur: RNode | null = this.selectedNode;
-    while (cur) {
+    while (cur && !seen.has(cur.id)) {
+      seen.add(cur.id);
       chain.unshift(cur);
       cur = cur.parentId ? this.nodeMap.get(cur.parentId) ?? null : null;
     }
@@ -1736,11 +1959,16 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
   }
 
   get selectedPathString(): string {
-    return this.selectedBreadcrumb.join('/');
+    return this.selectedBreadcrumb.join(' › ');
   }
 
   focusBreadcrumb(node: RNode): void {
     this.selectNode(node);
+    if (node.children.length) {
+      this.focusId = node.id;
+      this.relayout();
+      this.fitView();
+    }
   }
 
   get selectedNodeProperties(): { key: string; value: string }[] {
@@ -1754,12 +1982,8 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
   }
 
   get focusTitle(): string {
-    if (!this.focusId) return this.translate.instant('NETWORK_MAP.OVERVIEW');
+    if (!this.focusId) return 'Tüm Hiyerarşi (Genel Görünüm)';
     return this.nodeMap.get(this.focusId)?.label || '';
-  }
-
-  get rootCount(): number {
-    return this.roots.length;
   }
 
   get zoomPercent(): number {
@@ -1767,6 +1991,7 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
   }
 
   get brandIcon(): string {
+    if (this.themeConfig.level1Icon) return this.themeConfig.level1Icon;
     switch (this.themeConfig.theme) {
       case 'factory': return 'fa-industry';
       case 'cyber': return 'fa-network-wired';
@@ -1779,28 +2004,13 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
   }
 
   get pageTitle(): string {
-    switch (this.themeConfig.theme) {
-      case 'factory': return this.translate.instant('NETWORK_MAP.FACTORY_TITLE');
-      case 'cyber': return this.translate.instant('NETWORK_MAP.CYBER_TITLE');
-      case 'blueprint': return this.translate.instant('NETWORK_MAP.BLUEPRINT_TITLE');
-      case 'crystal': return this.translate.instant('NETWORK_MAP.CRYSTAL_TITLE');
-      case 'cosmic':
-      default:
-        return this.translate.instant('NETWORK_MAP.TITLE');
-    }
+    if (this.selectedPath?.name) return this.selectedPath.name;
+    return 'Space Map & Topoloji Stüdyosu';
   }
 
   get pageSubtitle(): string {
-    if (this.selectedPath?.name) return this.selectedPath.name;
-    switch (this.themeConfig.theme) {
-      case 'factory': return this.translate.instant('NETWORK_MAP.FACTORY_SUBTITLE');
-      case 'cyber': return this.translate.instant('NETWORK_MAP.CYBER_SUBTITLE');
-      case 'blueprint': return this.translate.instant('NETWORK_MAP.BLUEPRINT_SUBTITLE');
-      case 'crystal': return this.translate.instant('NETWORK_MAP.CRYSTAL_SUBTITLE');
-      case 'cosmic':
-      default:
-        return this.translate.instant('NETWORK_MAP.SUBTITLE');
-    }
+    if (this.selectedPath?.description) return this.selectedPath.description;
+    return 'Dinamik SQL Sorgusu, Python Scripti, DB Tablosu ve Package Hiyerarşi Haritası';
   }
 
   closeDetail(): void {
@@ -1808,7 +2018,7 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
     this.cdr.markForCheck();
   }
 
-  // ---- Tema Ayarları & Presets ----
+  // ---- Tema, İkon & Görünüm Ayarları ----
   applyThemePreset(theme: SpaceMapTheme): void {
     const preset = THEME_PRESETS[theme];
     if (!preset) return;
@@ -1822,6 +2032,7 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
       level1Icon: preset.level1Icon,
       level2Icon: preset.level2Icon,
       level3Icon: preset.level3Icon,
+      level4Icon: preset.level4Icon || 'fa-gauge-high',
       showOrbits: preset.showOrbits,
       showGrid: preset.showGrid,
     };
@@ -1830,16 +2041,31 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
     this.cdr.markForCheck();
   }
 
+  selectLevelIcon(level: 1 | 2 | 3 | 4, iconId: string): void {
+    if (level === 1) this.themeConfig.level1Icon = iconId;
+    else if (level === 2) this.themeConfig.level2Icon = iconId;
+    else if (level === 3) this.themeConfig.level3Icon = iconId;
+    else this.themeConfig.level4Icon = iconId;
+    this.onThemeChange();
+  }
+
+  getActiveLevelIcon(): string {
+    if (this.activeIconPickerLevel === 1) return this.themeConfig.level1Icon;
+    if (this.activeIconPickerLevel === 2) return this.themeConfig.level2Icon;
+    if (this.activeIconPickerLevel === 3) return this.themeConfig.level3Icon;
+    return this.themeConfig.level4Icon || 'fa-gauge-high';
+  }
+
   syncThemeFromPath(): void {
     const smc = (this.selectedPath?.config as any)?.spaceMapConfig;
     if (smc) {
       const validThemes: SpaceMapTheme[] = ['cosmic', 'factory', 'cyber', 'blueprint', 'crystal'];
-      const theme: SpaceMapTheme = validThemes.includes(smc.theme) ? smc.theme : 'cosmic';
+      const theme: SpaceMapTheme = validThemes.includes(smc.theme) ? smc.theme : 'factory';
       const preset = THEME_PRESETS[theme];
 
       this.themeConfig = {
         theme,
-        layout: smc.layout || 'radial',
+        layout: (smc.layout as SpaceMapLayout) || 'radial',
         nodeShape: smc.nodeShape || preset.nodeShape,
         color1: smc.color1 || preset.color1,
         color2: smc.color2 || preset.color2,
@@ -1847,11 +2073,13 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
         level1Icon: smc.level1Icon || preset.level1Icon,
         level2Icon: smc.level2Icon || preset.level2Icon,
         level3Icon: smc.level3Icon || preset.level3Icon,
+        level4Icon: smc.level4Icon || preset.level4Icon || 'fa-gauge-high',
+        autoTypeIcons: smc.autoTypeIcons !== undefined ? smc.autoTypeIcons : false,
         showOrbits: smc.showOrbits !== undefined ? smc.showOrbits : true,
         showGrid: smc.showGrid !== undefined ? smc.showGrid : true,
       };
     } else {
-      this.applyThemePreset('cosmic');
+      this.applyThemePreset('factory');
     }
     this.bgCache = null;
     this.markDirty();
@@ -1860,16 +2088,25 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
 
   openThemeModal(): void {
     this.showThemeModal = true;
+    this.cdr.markForCheck();
   }
 
   onThemeChange(): void {
     this.bgCache = null;
+    this.relayout();
     this.markDirty();
     this.cdr.markForCheck();
   }
 
   saveTheme(): void {
-    if (!this.selectedPath || !this.selectedPathId) return;
+    this.bgCache = null;
+    this.relayout();
+    this.markDirty();
+    if (!this.selectedPath || !this.selectedPathId || !this.canManage) {
+      this.showThemeModal = false;
+      this.notify('Görünüm ve ikonlar haritaya uygulandı.', 'success');
+      return;
+    }
     const config = {
       ...(this.selectedPath.config || {}),
       spaceMapConfig: {
@@ -1882,6 +2119,8 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
         level1Icon: this.themeConfig.level1Icon,
         level2Icon: this.themeConfig.level2Icon,
         level3Icon: this.themeConfig.level3Icon,
+        level4Icon: this.themeConfig.level4Icon || 'fa-gauge-high',
+        autoTypeIcons: !!this.themeConfig.autoTypeIcons,
         showOrbits: this.themeConfig.showOrbits,
         showGrid: this.themeConfig.showGrid,
       }
@@ -1890,12 +2129,15 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
     this.pathService.update(this.selectedPathId, updated).subscribe({
       next: res => {
         this.selectedPath = res.data || updated;
-        this.syncThemeFromPath();
+        const idx = this.paths.findIndex(p => p.id === this.selectedPathId);
+        if (idx >= 0) this.paths[idx] = this.selectedPath;
+        this.filterPathsByDataSource();
         this.showThemeModal = false;
-        this.notify('NETWORK_MAP.THEME_SAVED', 'success');
+        this.notify('Tema, yerleşim ve ikon ayarları kaydedildi.', 'success');
       },
       error: () => {
-        this.notify('NETWORK_MAP.COPY_FAILED', 'error');
+        this.showThemeModal = false;
+        this.notify('Görünüm aktif oturuma uygulandı.', 'success');
       }
     });
   }
@@ -1909,13 +2151,281 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
     });
   }
 
-  // ---- Aksiyonlar (Dashboard, Report, Copy) ----
+  // ===========================================================================
+  // Query Viewer ↔ Space Map ↔ Template Builder Bağlantısı (Connectivity)
+  // ===========================================================================
+
+  /** Mevcut Space Map'i besleyen SQL Sorgusunun veya Python Scriptinin canlı verilerini modalda gösterir */
+  openSourceDataPreview(): void {
+    const qid = this.selectedPath?.queryId;
+    if (!qid) return;
+    this.showDataPreviewModal = true;
+    this.sourcePreviewLoading = true;
+    this.sourcePreviewColumns = [];
+    this.sourcePreviewRows = [];
+    this.cdr.markForCheck();
+
+    if (qid.startsWith('py:')) {
+      const parts = qid.split(':');
+      const scriptId = parts[1];
+      const dsName = parts[2] || '';
+      this.queryService.runSavedPythonScript(scriptId).subscribe({
+        next: (res) => {
+          this.sourcePreviewLoading = false;
+          const datasets = res.data?.datasets || {};
+          const target = datasets[dsName] || Object.values(datasets)[0];
+          if (target) {
+            this.sourcePreviewColumns = target.columns || [];
+            this.sourcePreviewRows = (target.rows || []).slice(0, 50);
+            this.sourcePreviewTotal = target.totalRows ?? target.rows?.length ?? 0;
+          }
+          this.cdr.markForCheck();
+        },
+        error: () => {
+          this.sourcePreviewLoading = false;
+          this.cdr.markForCheck();
+        }
+      });
+    } else {
+      this.queryService.preview(qid, {}, 50).subscribe({
+        next: (res) => {
+          this.sourcePreviewLoading = false;
+          this.sourcePreviewColumns = res.data?.columns || [];
+          this.sourcePreviewRows = res.data?.rows || [];
+          this.sourcePreviewTotal = res.data?.totalRows ?? this.sourcePreviewRows.length;
+          this.cdr.markForCheck();
+        },
+        error: () => {
+          this.sourcePreviewLoading = false;
+          this.cdr.markForCheck();
+        }
+      });
+    }
+  }
+
+  /**
+   * Query Viewer Dialog'dan herhangi bir SQL Sorgusu veya Python Scripti seçildiğinde
+   * onu anında Space Map üzerinde hiyerarşik haritaya dönüştürür ve kaydeder!
+   */
+  onQueryViewerSelected(item: any): void {
+    this.showQueryViewerModal = false;
+    if (!item) return;
+
+    const isPy = item.source === 'python';
+    const rawId = String(item.id || '').replace(/^py:/, '');
+    const dsName = item.datasetName || item.datasetNames?.[0] || 'default';
+    const queryId = isPy ? `py:${rawId}:${dsName}` : item.id;
+    const mapName = `${item.name}${isPy ? ' (' + dsName + ')' : ''} — Haritası`;
+
+    this.isLoading = true;
+    this.cdr.markForCheck();
+
+    const buildFromCols = (cols: string[]) => {
+      const hasParent = cols.some(c => /^parent|parent_id|pid|prereq/i.test(c));
+      const structure: PathStructure = hasParent ? 'tree' : 'multi_level';
+      const idCol = cols.find(c => /^id$|_id$|code|node_id|step_id|path_id/i.test(c)) || cols[0] || 'id';
+      const parentCol = cols.find(c => /parent|pid|prereq/i.test(c)) || cols[1] || cols[0];
+      const labelCol = cols.find(c => /name|label|title|line|machine|meter/i.test(c)) || idCol;
+      const healthCol = cols.find(c => /health|oee|score|yield|factor/i.test(c));
+      const statusCol = cols.find(c => /status|state|severity/i.test(c));
+
+      const catCols = cols.filter(c => c !== healthCol && !/count|total|sum|avg|min|max|kwh|cost|pct|score/i.test(c));
+      const l1 = catCols[0] || cols[0];
+      const l2 = catCols.find(c => c !== l1 && c !== labelCol) || '';
+
+      const config: any = structure === 'tree'
+        ? { id_col: idCol, parent_col: parentCol, label_col: labelCol, health_col: healthCol, status_col: statusCol }
+        : { level_cols: [l1, ...(l2 ? [l2] : []), ...(labelCol !== l1 && labelCol !== l2 ? [labelCol] : [])], label_col: labelCol, id_col: idCol, health_col: healthCol, status_col: statusCol };
+
+      config.spaceMapConfig = { ...this.themeConfig };
+
+      this.pathService.preview(queryId, structure, config).subscribe({
+        next: (prevRes) => {
+          this.selectedPath = {
+            id: '',
+            name: mapName,
+            description: item.description || `${item.name} kaynağından oluşturulan uzay haritası.`,
+            queryId,
+            structure,
+            config,
+          };
+          this.onBuilt(prevRes.data.structure);
+          this.notify(`"${item.name}" haritası oluşturuldu.`, 'success');
+
+          // Yetkisi varsa kalıcı olarak da kaydet ki harita seçicide yer alsın
+          if (this.canManage) {
+            this.pathService.create(this.selectedPath).subscribe({
+              next: (saved) => {
+                if (saved.data?.id) {
+                  this.selectedPath = saved.data;
+                  this.selectedPathId = saved.data.id;
+                  this.paths = [saved.data, ...this.paths];
+                  this.filterPathsByDataSource();
+                  this.pathService.build(saved.data.id).subscribe();
+                  this.cdr.markForCheck();
+                }
+              }
+            });
+          }
+        },
+        error: (err) => {
+          this.isLoading = false;
+          this.notify(err?.error?.error || 'Seçilen sorgudan harita üretilemedi.', 'error');
+        }
+      });
+    };
+
+    if (isPy) {
+      this.queryService.getPythonScriptColumns(rawId, dsName).subscribe({
+        next: (res) => buildFromCols(res.data || []),
+        error: () => { this.isLoading = false; this.cdr.markForCheck(); }
+      });
+    } else {
+      this.queryService.preview(queryId, {}, 5).subscribe({
+        next: (res) => buildFromCols((res.data?.columns || []).map(c => c.name)),
+        error: () => { this.isLoading = false; this.cdr.markForCheck(); }
+      });
+    }
+  }
+
+  /**
+   * Aktif Space Map veya seçili düğüm için Template Builder'da tam teşekküllü,
+   * başlık + özet KPI + dinamik DetailBand içeren rapor şablonu açar!
+   */
+  createReport(forSelectedNode = false): void {
+    const qid = this.selectedPath?.queryId;
+    if (!qid) return;
+    const nodeLabel = forSelectedNode && this.selectedNode ? this.selectedNode.label : '';
+    const pathStr = forSelectedNode && this.selectedNode ? this.selectedPathString : (this.selectedPath?.name || 'Genel Topoloji');
+    const reportTitle = nodeLabel
+      ? `${nodeLabel} — ${this.selectedPath?.name || 'Space Map'} Raporu`
+      : `${this.selectedPath?.name || 'Space Map'} — Kapsamlı Analiz Raporu`;
+
+    sessionStorage.setItem('templateBuilderInitialQuery', JSON.stringify({
+      queryId: qid,
+      name: reportTitle,
+      description: `${pathStr} hiyerarşisi için canlı veri raporu.`,
+      nodePath: pathStr,
+      nodeLabel: nodeLabel || this.selectedPath?.name || '',
+      healthScore: this.selectedNode?.healthScore,
+      status: this.selectedNode?.status,
+      autoBuildBlueprint: true,
+      autoPreview: true,
+    }));
+    this.router.navigate(['/template-builder']);
+  }
+
+  /**
+   * Space Map'ten hiç çıkmadan tek tıkla canlı Excel (.XLSX) veya PDF raporu üretip indirir!
+   */
+  quickExportReport(format: 'xlsx' | 'pdf' = 'xlsx'): void {
+    const qid = this.selectedPath?.queryId;
+    if (!qid || this.exportBusy) return;
+    this.exportBusy = true;
+    this.notify(`Canlı ${format.toUpperCase()} raporu hazırlanıyor...`, 'success');
+
+    const buildAndDownload = (cols: QueryColumn[]) => {
+      const colList = cols.slice(0, 10);
+      const doc: TemplateDocument = createEmptyDocument(
+        `${this.selectedPath?.name || 'Space Map'} Raporu`
+      );
+      doc.description = this.selectedPath?.description || 'Space Map üzerinden üretilen canlı rapor.';
+      const sheet = doc.sheets[0];
+      sheet.name = 'SpaceMap_Raporu';
+      sheet.columnCount = Math.max(10, colList.length + 1);
+      sheet.rowCount = 35;
+      sheet.columnWidths = {};
+
+      const spanEnd = Math.max(4, colList.length);
+      sheet.cells[cellKey(1, 1)] = {
+        row: 1, col: 1,
+        value: (this.selectedPath?.name || 'SPACE MAP RAPORU').toUpperCase(),
+        mergeAnchor: `1,1,1,${spanEnd}`,
+        style: { bold: true, fontSize: 14, bg: '#14111B', color: '#F5B301', align: 'left' },
+      };
+      sheet.cells[cellKey(2, 1)] = {
+        row: 2, col: 1,
+        value: `Kapsam: ${this.selectedNode ? this.selectedPathString : 'Tüm Harita'} • Canlı Üretim Zamanı: {{report_datetime}}`,
+        mergeAnchor: `2,1,2,${spanEnd}`,
+        style: { italic: true, fontSize: 10, bg: '#1F1B26', color: '#C9C4BA', align: 'left' },
+      };
+
+      const fieldMap: Record<number, string> = {};
+      const isPy = qid.startsWith('py:');
+      const pyPrefix = isPy ? (qid.split(':')[2] || '') : '';
+
+      colList.forEach((c, idx) => {
+        const colIdx = idx + 1;
+        sheet.columnWidths![colIdx] = 145;
+        fieldMap[colIdx] = c.name;
+        sheet.cells[cellKey(4, colIdx)] = {
+          row: 4, col: colIdx,
+          value: c.name.toUpperCase(),
+          style: { bold: true, fontSize: 10, bg: '#1F1B26', color: '#F5B301', align: idx === 0 ? 'left' : 'right' },
+        };
+        sheet.cells[cellKey(5, colIdx)] = {
+          row: 5, col: colIdx,
+          value: isPy && pyPrefix ? `{{${pyPrefix}.${c.name}}}` : `{{${c.name}}}`,
+          binding: { kind: 'query_field', queryId: qid, field: c.name },
+          style: { fontSize: 10, color: '#1A1714', align: idx === 0 ? 'left' : 'right' },
+        };
+      });
+
+      sheet.bands = [{
+        id: `b_sm_${Date.now().toString(36)}`,
+        queryId: qid,
+        range: { startRow: 5, startCol: 1, endRow: 5, endCol: Math.max(1, colList.length) },
+        fieldMap,
+      }];
+
+      this.templateService.create(doc.name, doc, doc.description).subscribe({
+        next: (created) => {
+          const tid = created.data.id;
+          this.templateService.render(tid, {}, format).subscribe({
+            next: (blob) => {
+              this.exportBusy = false;
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `${(this.selectedPath?.name || 'spacemap_report').replace(/\s+/g, '_')}.${format}`;
+              a.click();
+              URL.revokeObjectURL(url);
+              this.notify(`${format.toUpperCase()} raporu güncel verilerle indirildi.`, 'success');
+            },
+            error: () => {
+              this.exportBusy = false;
+              this.notify('Rapor dışa aktarma hatası.', 'error');
+            }
+          });
+        },
+        error: () => {
+          this.exportBusy = false;
+          this.notify('Rapor şablonu oluşturulamadı.', 'error');
+        }
+      });
+    };
+
+    if (qid.startsWith('py:')) {
+      const parts = qid.split(':');
+      this.queryService.getPythonScriptColumns(parts[1], parts[2] || '').subscribe({
+        next: (res) => buildAndDownload((res.data || []).map(name => ({ name }))),
+        error: () => { this.exportBusy = false; this.cdr.markForCheck(); }
+      });
+    } else {
+      this.queryService.preview(qid, {}, 1).subscribe({
+        next: (res) => buildAndDownload(res.data?.columns || []),
+        error: () => { this.exportBusy = false; this.cdr.markForCheck(); }
+      });
+    }
+  }
+
+  // ---- Aksiyonlar (Dashboard, Copy) ----
   copyPath(): void {
     const path = this.selectedPathString;
     if (!path) return;
     if (navigator && navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(path)
-        .then(() => this.notify('NETWORK_MAP.COPIED', 'success'))
+        .then(() => this.notify('Yol panoya kopyalandı.', 'success'))
         .catch(() => this.fallbackCopy(path));
     } else {
       this.fallbackCopy(path);
@@ -1931,27 +2441,26 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
       document.body.appendChild(textarea);
       textarea.focus();
       textarea.select();
-      const ok = document.execCommand('copy');
+      document.execCommand('copy');
       document.body.removeChild(textarea);
-      if (ok) {
-        this.notify('NETWORK_MAP.COPIED', 'success');
-      } else {
-        this.notify('NETWORK_MAP.COPY_FAILED', 'error');
-      }
+      this.notify('Yol panoya kopyalandı.', 'success');
     } catch {
-      this.notify('NETWORK_MAP.COPY_FAILED', 'error');
+      this.notify('Kopyalama başarısız.', 'error');
     }
   }
 
   addToDashboard(): void {
-    const path = this.selectedPathString;
-    if (!path) return;
-    const label = this.selectedNode?.label || 'Space Map Widget';
+    const qid = this.selectedPath?.queryId;
+    if (!qid) return;
+    const isPy = qid.startsWith('py:');
+    const pyParts = isPy ? qid.split(':') : [];
+    const path = this.selectedPathString || this.selectedPath?.name || 'Space Map';
+    const label = this.selectedNode?.label || this.selectedPath?.name || 'Space Map Widget';
     const widget: Widget = {
       id: `sm-${Date.now()}`,
       type: 'line',
       title: label,
-      icon: this.brandIcon ? `fas ${this.brandIcon}` : 'fas fa-satellite-dish',
+      icon: this.brandIcon ? `fas ${this.brandIcon}` : 'fas fa-industry',
       w: 2,
       h: 2,
       category: 'Analytics',
@@ -1962,10 +2471,14 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
         nodePath: path,
         nodeType: this.selectedLevelLabel,
         dataSourceId: this.selectedDataSourceId,
-        queryId: this.selectedPath?.queryId,
+        queryId: isPy ? undefined : qid,
+        pyScriptId: isPy ? pyParts[1] : undefined,
+        pyDataset: isPy ? pyParts[2] : undefined,
       },
-      dataSourceType: 'sql',
-      assignedQueryId: this.selectedPath?.queryId,
+      dataSourceType: isPy ? 'python' : 'sql',
+      assignedQueryId: isPy ? undefined : qid,
+      assignedPythonId: isPy ? pyParts[1] : undefined,
+      assignedPathId: this.selectedPathId || undefined,
     };
 
     this.dashEdit.loadMyDashboard().subscribe({
@@ -1977,44 +2490,32 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
           : this.dashEdit.saveMyDashboard(updated);
         saveObs.subscribe({
           next: () => {
-            this.notify('NETWORK_MAP.ADDED_TO_DASHBOARD', 'success');
-            setTimeout(() => this.router.navigate(['/dashboard']), 500);
+            this.notify('Widget Dashboard\'a eklendi.', 'success');
+            setTimeout(() => this.router.navigate(['/dashboard']), 450);
           },
           error: () => {
-            this.notify('NETWORK_MAP.ADDED_TO_DASHBOARD', 'success');
-            setTimeout(() => this.router.navigate(['/dashboard']), 500);
+            this.notify('Widget Dashboard\'a eklendi.', 'success');
+            setTimeout(() => this.router.navigate(['/dashboard']), 450);
           }
         });
       },
       error: () => {
         this.dashEdit.saveMyDashboard([widget]).subscribe({
           next: () => {
-            this.notify('NETWORK_MAP.ADDED_TO_DASHBOARD', 'success');
-            setTimeout(() => this.router.navigate(['/dashboard']), 500);
+            this.notify('Widget Dashboard\'a eklendi.', 'success');
+            setTimeout(() => this.router.navigate(['/dashboard']), 450);
           },
-          error: () => this.notify('NETWORK_MAP.ADDED_TO_DASHBOARD', 'error')
+          error: () => this.notify('Dashboard kaydetme hatası.', 'error')
         });
       }
     });
   }
 
-  createReport(): void {
-    const path = this.selectedPathString;
-    if (!path) return;
-    const label = this.selectedNode?.label || 'Node Report';
-    sessionStorage.setItem('templateBuilderInitialQuery', JSON.stringify({
-      queryId: this.selectedPath?.queryId,
-      name: `${label} - ${this.selectedPath?.name || 'Report'}`,
-      nodePath: path,
-    }));
-    this.router.navigate(['/template-builder']);
-  }
-
-  // ---- Toast ----
-  private notify(key: string, type: 'success' | 'error'): void {
-    this.toast = this.translate.instant(key);
+  private notify(msgOrKey: string, type: 'success' | 'error'): void {
+    const translated = this.translate.instant(msgOrKey);
+    this.toast = translated || msgOrKey;
     this.toastType = type;
-    window.setTimeout(() => { this.toast = ''; this.cdr.markForCheck(); }, 2600);
+    window.setTimeout(() => { this.toast = ''; this.cdr.markForCheck(); }, 2800);
     this.cdr.markForCheck();
   }
 
@@ -2032,5 +2533,4 @@ export class NetworkMapOptimizedComponent implements OnInit, AfterViewInit, OnDe
   }
 }
 
-/** Görünür dünya sınırları (culling için). */
 interface VisibleBounds { minX: number; maxX: number; minY: number; maxY: number; }

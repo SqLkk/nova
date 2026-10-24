@@ -1,0 +1,15 @@
+{
+  "loss": 0.4218149781227112,
+  "ppl": 1.5247263908444322,
+  "duration_seconds": 850.2215103329945,
+  "peak_memory_bytes": 6135050666,
+  "records": 80,
+  "data_file": "/Users/utkukaraca/Library/CloudStorage/OneDrive-SiemensAG/Masaüstü/Development/super_nov4/training/supernova-v22/data/valid_fixed.jsonl",
+  "data_sha256": "8aa81d8132c134381445058fe19a37fd37d272b440f92bc86e4f9bacb9ef75aa",
+  "model": "/Users/utkukaraca/.cache/huggingface/hub/models--mlx-community--Qwen3.5-9B-MLX-4bit/snapshots/938d8919941c6e7efd3c7150eff7fe9d12afa631",
+  "adapter": "/Users/utkukaraca/Library/CloudStorage/OneDrive-SiemensAG/Masaüstü/Development/super_nov4/training/supernova-v21/adapter150",
+  "weights_sha256": "1310e6d0d5cf3553f3e834ad9cdf603e8d5fbc4035dbe315ed93f707e92baaad",
+  "enable_thinking": false,
+  "mask_prompt": true,
+  "max_seq_length": 1024
+}

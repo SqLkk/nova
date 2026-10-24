@@ -3,7 +3,7 @@
  * kayıtlı tanımlar (PathDef). Backend path_engine.py ile birebir eşleşir.
  */
 
-export type PathStructure = 'tree' | 'binary_tree' | 'sequence' | 'grouped' | 'dag';
+export type PathStructure = 'tree' | 'binary_tree' | 'sequence' | 'grouped' | 'dag' | 'multi_level';
 
 /** Kolon eşlemesi + ayarlar (yapı tipine göre farklı alanlar kullanılır). */
 export interface PathConfig {
@@ -25,6 +25,13 @@ export interface PathConfig {
   order_col?: string;
   /** grouped: gruplama kolonu. */
   group_col?: string;
+  /** multi_level / grouped: alt grup veya çoklu seviye kolonları */
+  subgroup_col?: string;
+  level1_col?: string;
+  level2_col?: string;
+  level3_col?: string;
+  level_cols?: string[];
+  root_label?: string;
   /** Hedef veri / eşleşme kolonu (örn. pointid) */
   target_col?: string;
   /** Canlı sağlık puanı kolonu (örn. health_score, oee_percent) */
@@ -35,6 +42,24 @@ export interface PathConfig {
   badge_col?: string;
   /** Renk kolonu */
   color_col?: string;
+  /** İkon kolonu */
+  icon_col?: string;
+  /** Space Map görsel/tema/ikon/layout ayarları */
+  spaceMapConfig?: {
+    theme?: 'cosmic' | 'factory' | 'cyber' | 'blueprint' | 'crystal';
+    nodeShape?: 'auto' | 'planet' | 'hexagon' | 'cyber' | 'blueprint' | 'diamond' | 'circle';
+    layout?: 'radial' | 'hierarchy-tb' | 'flow-lr' | 'grid' | 'spiral';
+    color1?: string;
+    color2?: string;
+    color3?: string;
+    level1Icon?: string;
+    level2Icon?: string;
+    level3Icon?: string;
+    level4Icon?: string;
+    autoTypeIcons?: boolean;
+    showOrbits?: boolean;
+    showGrid?: boolean;
+  };
 }
 
 /** Yapıdaki tek düğüm. */
@@ -47,6 +72,7 @@ export interface PathNode {
   /** Kök → bu düğüm id zinciri. */
   path: string[];
   type: string;
+  icon?: string;
   children: string[];
   /** Canlı sağlık ve durum rozetleri */
   healthScore?: number;

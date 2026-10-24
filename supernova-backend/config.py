@@ -88,6 +88,14 @@ def _bool(name: str, default: bool) -> bool:
     return default
 
 
+def _float(name: str, default: float) -> float:
+    try:
+        value = float(os.environ.get(name, default))
+        return value if value == value and abs(value) != float('inf') else default
+    except (TypeError, ValueError):
+        return default
+
+
 def _list(name: str, default: list) -> list:
     raw = os.environ.get(name)
     if not raw:
@@ -181,6 +189,21 @@ class Config:
         self.PERSIST_QUERY_COLUMNS_META = _bool("NOVA_PERSIST_QUERY_COLUMNS_META", False)
         # Demo parola reset'i yalnızca development'ta. production/staging'de kapalı.
         self.RESET_DEMO_PASSWORDS = _bool("NOVA_RESET_DEMO_PASSWORDS", self.IS_DEVELOPMENT)
+
+        # --- Tak-çıkar yerel AI; başlangıçta modele bağlantı kurulmaz. ---
+        self.AI_ENABLED = _bool("AI_ENABLED", False)
+        self.AI_PROVIDER = _str("AI_PROVIDER", "openai").lower()
+        self.AI_BASE_URL = _str("AI_BASE_URL", "http://localhost:11434/v1").rstrip('/')
+        self.AI_MODEL_NAME = _str("AI_MODEL_NAME", "qwen3.5:9b")
+        self.AI_API_KEY = _str("AI_API_KEY", "")
+        self.AI_TEMPERATURE = max(0.0, min(2.0, _float("AI_TEMPERATURE", 0.2)))
+        self.AI_TIMEOUT_SECONDS = max(1.0, min(300.0, _float("AI_TIMEOUT_SECONDS", 120)))
+        self.AI_MAX_TOKENS = max(128, min(8192, _int("AI_MAX_TOKENS", 2048)))
+        self.AI_MAX_CONCURRENT = max(1, min(8, _int("AI_MAX_CONCURRENT", 2)))
+        self.AI_MEMORY_ENABLED = _bool("AI_MEMORY_ENABLED", True)
+        self.AI_TOOLS_ENABLED = _bool("AI_TOOLS_ENABLED", True)
+        # Mock açıkça development'ta etkinleştirilir; gerçek modelmiş gibi sunulmaz.
+        self.AI_MOCK_MODE = _bool("AI_MOCK_MODE", False) and self.IS_DEVELOPMENT
 
         # Fail-fast doğrulama (en sonda).
         self.validate()

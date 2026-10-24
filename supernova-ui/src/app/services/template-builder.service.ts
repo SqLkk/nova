@@ -30,6 +30,45 @@ export interface TemplateRecord extends TemplateSummary {
   model: TemplateDocument;
 }
 
+export interface EvaluatedQueryStat {
+  queryId: string;
+  name: string;
+  description?: string;
+  kind: 'sql' | 'python';
+  rowCount: number;
+  executionMs: number;
+  error?: string;
+}
+
+export interface EvaluatedTemplateResult {
+  id?: string;
+  name: string;
+  description?: string;
+  evaluatedAt: string;
+  sheets: Array<{
+    id: string;
+    name: string;
+    rowCount: number;
+    colCount: number;
+    rowHeights?: Record<number, number>;
+    colWidths?: Record<number, number>;
+    merges?: any[];
+    bands?: Array<{
+      id: string;
+      queryId: string;
+      startRow: number;
+      endRow: number;
+      startCol: number;
+      endCol: number;
+      rowCount: number;
+      totalQueryRows: number;
+    }>;
+    charts?: any[];
+    cells: Record<string, any>;
+  }>;
+  queryStats: EvaluatedQueryStat[];
+}
+
 /**
  * Excel-benzeri şablon servisi.
  * Backend: /api/templates — TemplateDocument JSON olarak saklanır ve
@@ -81,8 +120,33 @@ export class TemplateBuilderService {
     );
   }
 
-  /** Şablonu çalıştır → .xlsx blob (component indirmeyi tetikler). */
-  render(id: string, params: Record<string, Record<string, unknown>> = {}): Observable<Blob> {
-    return this.http.post(`${this.base}/${id}/render?format=xlsx`, { params }, { responseType: 'blob' });
+  /** Şablonu çalıştır → .xlsx veya .pdf blob (component indirmeyi tetikler). */
+  render(id: string, params: Record<string, Record<string, unknown>> = {}, format: 'xlsx' | 'pdf' = 'xlsx'): Observable<Blob> {
+    return this.http.post(`${this.base}/${id}/render?format=${format}`, { params }, { responseType: 'blob' });
+  }
+
+  /** Şablon modelini canlı çalıştırıp tarayıcı önizlemesi için değerlendirilmiş (expanded) hücre ve satırları getirir. */
+  evaluate(
+    model: TemplateDocument,
+    params: Record<string, Record<string, unknown>> = {},
+    maxBandRows = 100
+  ): Observable<ApiEnvelope<EvaluatedTemplateResult>> {
+    return this.http.post<ApiEnvelope<EvaluatedTemplateResult>>(`${this.base}/evaluate`, {
+      model,
+      params,
+      maxBandRows,
+    });
+  }
+
+  /** Kayıtlı bir şablonu ID ile canlı çalıştırıp değerlendirilmiş önizlemesini getirir. */
+  evaluateById(
+    id: string,
+    params: Record<string, Record<string, unknown>> = {},
+    maxBandRows = 100
+  ): Observable<ApiEnvelope<EvaluatedTemplateResult>> {
+    return this.http.post<ApiEnvelope<EvaluatedTemplateResult>>(`${this.base}/${id}/evaluate`, {
+      params,
+      maxBandRows,
+    });
   }
 }

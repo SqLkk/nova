@@ -1,0 +1,61 @@
+{
+  "dataset_manifest_sha256": "68a07f630c09dad673491bb0b4650ac2276aa9a3044bd8efe432817ee5182a04",
+  "fixed_validation_sha256": "06c87622a32c33f81881733b3643d1c8c8748cbe7272f2afd72bdd7df34a5d2e",
+  "tokenizer_audit_sha256": "404d889a5d0760df51f0251bfd047031bf867d3c1dcf06e6a53e207b4560bee2",
+  "enable_thinking": false,
+  "validation_count": 20,
+  "full_fixed_validation_count": 80,
+  "smoke_only": false,
+  "optimizer_resume": false,
+  "settings": {
+    "model": "/Users/utkukaraca/.cache/huggingface/hub/models--mlx-community--Qwen3.5-9B-MLX-4bit/snapshots/938d8919941c6e7efd3c7150eff7fe9d12afa631",
+    "train": true,
+    "fine_tune_type": "lora",
+    "optimizer": "adam",
+    "optimizer_config": {
+      "adam": {},
+      "adamw": {},
+      "muon": {},
+      "sgd": {},
+      "adafactor": {}
+    },
+    "data": "/Users/utkukaraca/Library/CloudStorage/OneDrive-SiemensAG/Masau\u0308stu\u0308/Development/super_nov4/training/supernova-v23/data",
+    "seed": 42,
+    "num_layers": 1,
+    "batch_size": 1,
+    "iters": 600,
+    "val_batches": -1,
+    "learning_rate": 8e-06,
+    "steps_per_report": 25,
+    "steps_per_eval": 150,
+    "resume_adapter_file": null,
+    "adapter_path": "/Users/utkukaraca/Library/CloudStorage/OneDrive-SiemensAG/Masau\u0308stu\u0308/Development/super_nov4/training/supernova-v23/adapter600",
+    "save_every": 150,
+    "test": false,
+    "test_batches": 500,
+    "max_seq_length": 1024,
+    "config": "/Users/utkukaraca/Library/CloudStorage/OneDrive-SiemensAG/Masau\u0308stu\u0308/Development/super_nov4/optional-ai/training/v23.yaml",
+    "grad_checkpoint": true,
+    "grad_accumulation_steps": 1,
+    "clear_cache_threshold": 0,
+    "lr_schedule": {
+      "name": "cosine_decay",
+      "arguments": [
+        8e-06,
+        560,
+        1e-06
+      ],
+      "warmup": 40,
+      "warmup_init": 1e-06
+    },
+    "lora_parameters": {
+      "rank": 4,
+      "dropout": 0.05,
+      "scale": 16.0
+    },
+    "mask_prompt": true,
+    "report_to": null,
+    "project_name": null,
+    "trust_remote_code": false
+  }
+}

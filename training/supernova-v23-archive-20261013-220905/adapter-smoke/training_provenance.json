@@ -1,0 +1,51 @@
+{
+  "dataset_manifest_sha256": "a1f814b568476af453508b00448d98cf7938ff3f6600dd1b479d2f1f6ba1801a",
+  "fixed_validation_sha256": "b3a363a224a833c9d85f581f10911b31df713ef1a0d4dcdc260063c81da5cc3d",
+  "tokenizer_audit_sha256": "2183c15161314f64c34685d4b694c9534f5b562bdafb499ac507eb2a33e12d54",
+  "enable_thinking": false,
+  "validation_count": 4,
+  "smoke_only": true,
+  "optimizer_resume": false,
+  "settings": {
+    "model": "/Users/utkukaraca/.cache/huggingface/hub/models--mlx-community--Qwen3.5-9B-MLX-4bit/snapshots/938d8919941c6e7efd3c7150eff7fe9d12afa631",
+    "train": true,
+    "fine_tune_type": "lora",
+    "optimizer": "adam",
+    "optimizer_config": {
+      "adam": {},
+      "adamw": {},
+      "muon": {},
+      "sgd": {},
+      "adafactor": {}
+    },
+    "data": "/Users/utkukaraca/Library/CloudStorage/OneDrive-SiemensAG/Masau\u0308stu\u0308/Development/super_nov4/training/supernova-v23/data",
+    "seed": 42,
+    "num_layers": 1,
+    "batch_size": 1,
+    "iters": 10,
+    "val_batches": -1,
+    "learning_rate": 5e-06,
+    "steps_per_report": 1,
+    "steps_per_eval": 600,
+    "resume_adapter_file": null,
+    "adapter_path": "/Users/utkukaraca/Library/CloudStorage/OneDrive-SiemensAG/Masau\u0308stu\u0308/Development/super_nov4/training/supernova-v23/adapter-smoke",
+    "save_every": 600,
+    "test": false,
+    "test_batches": 500,
+    "max_seq_length": 1024,
+    "config": "/Users/utkukaraca/Library/CloudStorage/OneDrive-SiemensAG/Masau\u0308stu\u0308/Development/super_nov4/optional-ai/training/v23.yaml",
+    "grad_checkpoint": true,
+    "grad_accumulation_steps": 1,
+    "clear_cache_threshold": 0,
+    "lr_schedule": null,
+    "lora_parameters": {
+      "rank": 4,
+      "dropout": 0.05,
+      "scale": 8.0
+    },
+    "mask_prompt": true,
+    "report_to": null,
+    "project_name": null,
+    "trust_remote_code": false
+  }
+}

@@ -58,8 +58,8 @@ export class AlarmsService {
     {
       id: 'alm_4',
       severity: 'warning',
-      source: 'Siemens S7-1500 Master PLC',
-      message: 'Profinet I/O istasyon 08 yanıt süresi gecikmesi (45ms). Paket kaybı riski',
+      source: 'Apex AX-1500 Master PLC',
+      message: 'Endüstriyel Ethernet I/O istasyon 08 yanıt süresi gecikmesi (45ms). Paket kaybı riski',
       timestamp: new Date(Date.now() - 1000 * 60 * 65).toISOString(),
       status: 'active',
       location: 'Tesis Alpha - Hat Otomasyonu',

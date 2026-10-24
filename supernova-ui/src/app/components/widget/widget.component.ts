@@ -376,9 +376,9 @@ export class WidgetComponent implements OnInit, OnDestroy, OnChanges {
         data: [] as number[], // Tip güvenli başlangıç - boş number array
         label: 'Live Data',
         fill: true,
-        tension: 0.4,
-        borderColor: '#4FD1C5',
-        backgroundColor: 'rgba(79, 209, 197, 0.2)',
+        tension: 0.38,
+        borderColor: '#F5B301',
+        backgroundColor: 'rgba(245, 179, 1, 0.16)',
         pointRadius: 0
       }
     ]
@@ -387,12 +387,13 @@ export class WidgetComponent implements OnInit, OnDestroy, OnChanges {
   chartOptions: ChartOptions = {
     responsive: true,
     maintainAspectRatio: false,
+    resizeDelay: 50,
     layout: {
       padding: {
         top: 8,
         right: 12,
-        bottom: 8,
-        left: 16
+        bottom: 6,
+        left: 12
       }
     },
     interaction: {
@@ -402,12 +403,12 @@ export class WidgetComponent implements OnInit, OnDestroy, OnChanges {
     scales: {
       x: { 
         display: true,
-        offset: false, // Line'ların chart kenarlarına kadar uzanması için
-        type: 'category', // Category scale - tam genişlik için
-        bounds: 'data', // Data sınırlarını sıkı takip et
+        offset: false,
+        type: 'category',
+        bounds: 'data',
         grid: {
-          color: 'rgba(200, 200, 200, 0.03)', // Çok çok açık grid
-          lineWidth: 0.5, // İnce grid çizgileri
+          color: 'rgba(163, 154, 137, 0.07)',
+          lineWidth: 1,
           drawTicks: false,
           tickLength: 0
         },
@@ -415,26 +416,26 @@ export class WidgetComponent implements OnInit, OnDestroy, OnChanges {
           display: false
         },
         ticks: {
-          color: 'rgba(180, 180, 180, 0.9)',
+          color: 'rgba(163, 154, 137, 0.88)',
           font: {
-            size: 11, // X ekseni için daha büyük font
-            family: "'Poppins', 'Helvetica', 'Arial', sans-serif",
-            weight: 'bold'
+            size: 10.5,
+            family: "'Inter', -apple-system, sans-serif",
+            weight: 'normal'
           },
           autoSkip: true,
-          maxTicksLimit: 8,
+          maxTicksLimit: 7,
           padding: 4
         }
       },
       y: {
         display: true,
         position: 'left',
-        offset: false, // Y ekseni için de line'ların chart kenarlarına kadar uzanması
-        beginAtZero: false, // Dinamik scaling için false
-        grace: '10%', // Ekstra padding — line'lar taşmasın
+        offset: false,
+        beginAtZero: false,
+        grace: '10%',
         grid: {
-          color: 'rgba(200, 200, 200, 0.03)', // Çok çok açık grid
-          lineWidth: 0.5, // İnce grid çizgileri  
+          color: 'rgba(163, 154, 137, 0.08)',
+          lineWidth: 1,
           drawTicks: false,
           tickLength: 0
         },
@@ -442,102 +443,101 @@ export class WidgetComponent implements OnInit, OnDestroy, OnChanges {
           display: false
         },
         ticks: {
-          color: 'rgba(180, 180, 180, 0.9)',
+          color: 'rgba(163, 154, 137, 0.88)',
           font: {
-            size: 12, // Daha büyük font
-            family: "'Poppins', 'Helvetica', 'Arial', sans-serif",
-            weight: 'bold'
+            size: 11,
+            family: "'Inter', -apple-system, sans-serif",
+            weight: 'normal'
           },
-          padding: 8,
+          padding: 6,
           autoSkip: true,
-          maxTicksLimit: 8,
+          maxTicksLimit: 6,
           callback: (value: any) => this.formatTickValue(value)
         }
       }
     },
     animation: {
-      duration: 800, // Smooth animasyon
-      easing: 'easeInOutQuart' // Modern easing
+      duration: 550,
+      easing: 'easeOutQuart'
     },
     transitions: {
       active: {
         animation: {
-          duration: 300,
+          duration: 220,
           easing: 'easeOutQuart'
         }
       }
     },
     elements: {
       line: { 
-        borderWidth: 2.5, // Biraz daha ince ama görünür
-        tension: 0.4, // Daha smooth eğriler
+        borderWidth: 2.2,
+        tension: 0.36,
         borderCapStyle: 'round',
         borderJoinStyle: 'round',
         cubicInterpolationMode: 'monotone',
-        fill: false // Clean lines
+        fill: false
       },
       point: { 
-        radius: 0, // NOKTALARI TAMAMEN GIZLE
-        hoverRadius: 4, // Hover'da küçük nokta göster
-        hitRadius: 12, // Geniş tıklama alanı
+        radius: 0,
+        hoverRadius: 4,
+        hitRadius: 12,
         borderWidth: 0,
         hoverBorderWidth: 2,
         backgroundColor: 'transparent',
-        hoverBackgroundColor: 'rgba(79, 209, 197, 0.9)', // Hover'da güzel renk
+        hoverBackgroundColor: '#F5B301',
         borderColor: 'transparent',
-        hoverBorderColor: '#FFFFFF'
+        hoverBorderColor: '#14111B'
       }
     },
     plugins: {
       legend: { 
-        display: false // Path labels line ucunda gösterilecek
+        display: false
       },
       tooltip: {
         enabled: true,
-        backgroundColor: 'rgba(15, 17, 21, 0.96)',
-        titleColor: '#FFFFFF',
-        bodyColor: 'rgba(255, 255, 255, 0.92)',
-        borderColor: 'rgba(79, 209, 197, 0.8)',
-        borderWidth: 2,
-        cornerRadius: 12,
-        padding: 16,
+        backgroundColor: 'rgba(20, 17, 27, 0.96)',
+        titleColor: '#F4F1EA',
+        bodyColor: 'rgba(201, 196, 186, 0.95)',
+        borderColor: 'rgba(245, 179, 1, 0.45)',
+        borderWidth: 1,
+        cornerRadius: 10,
+        padding: 12,
         mode: 'index',
         intersect: false,
         position: 'nearest',
         titleFont: {
-          size: 12,
-          family: "'Poppins', sans-serif",
+          size: 11.5,
+          family: "'Space Grotesk', 'Inter', sans-serif",
           weight: 'bold'
         },
         bodyFont: {
           size: 11,
-          family: "'Poppins', sans-serif", 
+          family: "'Inter', sans-serif", 
           weight: 'normal'
         },
-        displayColors: true, // Path renklerini göster
-        usePointStyle: true, // Line style ile göster
-        caretSize: 8,
-        caretPadding: 10,
+        displayColors: true,
+        usePointStyle: true,
+        caretSize: 6,
+        caretPadding: 8,
         callbacks: {
           title: (context: any[]) => {
-            return `⏰ ${context[0].label}`;
+            return `${context[0].label}`;
           },
           label: (context: any) => {
             const pathName = context.dataset.label || `Path ${context.datasetIndex + 1}`;
             const value = context.parsed.y;
             const unit = context.dataset.unit || '';
             
-            // Path ismini kısalt ve güzel göster
             const displayName = pathName.length > 25 
               ? pathName.substring(0, 25) + '...' 
               : pathName;
             
-            return `📊 ${displayName}: ${this.formatValue(value)}${unit}`;
+            return ` ${displayName}: ${this.formatValue(value)}${unit}`;
           },
           beforeBody: (context: any[]) => {
             if (context.length > 1) {
               const tooltipLabel = this.translateService?.instant('HARDCODED.ACTIVE_PATHS_TOOLTIP') || 'active sources';
-              return [`📈 ${context.length} ${tooltipLabel}`];
+              return [`${context.length} ${tooltipLabel}`];
             }
             return [];
           }
@@ -553,23 +553,25 @@ export class WidgetComponent implements OnInit, OnDestroy, OnChanges {
     scales: {
       x: {
         grid: {
-          color: 'rgba(200, 200, 200, 0.15)'
+          color: 'rgba(163, 154, 137, 0.12)'
         },
         ticks: {
-          color: 'rgba(200, 200, 200, 0.9)',
+          color: 'rgba(201, 196, 186, 0.9)',
           font: {
-            size: 12
+            size: 12,
+            family: "'Inter', sans-serif"
           }
         }
       },
       y: {
         grid: {
-          color: 'rgba(200, 200, 200, 0.15)'
+          color: 'rgba(163, 154, 137, 0.12)'
         },
         ticks: {
-          color: 'rgba(200, 200, 200, 0.9)',
+          color: 'rgba(201, 196, 186, 0.9)',
           font: {
-            size: 12
+            size: 12,
+            family: "'Inter', sans-serif"
           }
         }
       }
@@ -579,24 +581,29 @@ export class WidgetComponent implements OnInit, OnDestroy, OnChanges {
         display: true,
         position: 'top',
         labels: {
-          color: 'white',
+          color: '#F4F1EA',
           font: {
-            size: 14
+            size: 13,
+            family: "'Inter', sans-serif"
           }
         }
       },
       tooltip: {
-        backgroundColor: 'rgba(20, 20, 20, 0.95)', // Daha koyu background
+        backgroundColor: 'rgba(20, 17, 27, 0.96)',
+        titleColor: '#F4F1EA',
+        bodyColor: '#C9C4BA',
         titleFont: {
-          size: 16, // Daha büyük title
+          size: 14,
+          family: "'Space Grotesk', 'Inter', sans-serif",
           weight: 'bold'
         },
         bodyFont: {
-          size: 14 // Daha büyük body
+          size: 13,
+          family: "'Inter', sans-serif"
         },
-        padding: 12, // Daha fazla padding
-        cornerRadius: 8,
-        borderColor: 'rgba(255, 255, 255, 0.1)',
+        padding: 12,
+        cornerRadius: 10,
+        borderColor: 'rgba(245, 179, 1, 0.4)',
         borderWidth: 1
       }
     }
@@ -676,6 +683,12 @@ export class WidgetComponent implements OnInit, OnDestroy, OnChanges {
     // Formula değiştiğinde veriyi yeniden yükle
     if (changes['formula'] && !changes['formula'].isFirstChange()) {
       console.log(`📐 [WIDGET] Formula changed via @Input: "${this.formula}"`);
+      this.updateChartWithActivePaths();
+    }
+
+    // Kolon eşlemeleri (sqlValueColumn / sqlLabelColumn) değiştiğinde grafiği güncelle
+    if ((changes['sqlValueColumn'] && !changes['sqlValueColumn'].isFirstChange()) ||
+        (changes['sqlLabelColumn'] && !changes['sqlLabelColumn'].isFirstChange())) {
       this.updateChartWithActivePaths();
     }
 
@@ -1783,11 +1796,13 @@ export class WidgetComponent implements OnInit, OnDestroy, OnChanges {
     });
   }
 
-  /** Satır listesini (SQL/Python) widget grafiğine dönüştürür — kompakt, SQL
-   *  yoluna dokunmadan Python widget'ları için. Boş/sayısal-uyumsuz durumları
-   *  nazikçe ele alır. */
+  /** Satır listesini (SQL/Python) widget grafiğine ve tablo görünümüne dönüştürür.
+   *  Kullanıcının seçtiği sqlValueColumn / sqlLabelColumn eşlemelerini ve özel
+   *  görsel widget'ları (data-table, timeline, status-board, map-view) destekler. */
   private _renderRowsCompact(rows: any[], label: string): void {
     if (!rows || rows.length === 0) {
+      this.sqlTableRows = [];
+      this.sqlTableColumns = [];
       this.currentValue = 0;
       this.chartData.labels = ['No Data'];
       this.chartData.datasets = [{
@@ -1799,13 +1814,32 @@ export class WidgetComponent implements OnInit, OnDestroy, OnChanges {
       return;
     }
     const columns = Object.keys(rows[0] || {});
+    this.sqlTableRows = rows;
+    this.sqlTableColumns = columns;
+
+    // Özel görsel widget'lara satırları aktar
+    if (this.widgetType === 'timeline') {
+      this.mapSqlRowsToTimeline(rows);
+    } else if (this.widgetType === 'status-board') {
+      this.mapSqlRowsToScadaCells(rows);
+    } else if (this.widgetType === 'map-view') {
+      this.mapSqlRowsToShipments(rows);
+    }
+
     const isNum = (v: any): boolean => {
       if (typeof v === 'number') return !isNaN(v);
       if (typeof v === 'string') return /^-?\d+(\.\d+)?$/.test(v.trim());
       return false;
     };
-    const numericCol = columns.find(c => rows.slice(0, 5).some(r => isNum(r[c]))) || columns[0];
-    const labelCol = columns.find(c => c !== numericCol && /time|date|name|label|path/i.test(c)) || columns[0];
+
+    const numericCol = (this.sqlValueColumn && columns.includes(this.sqlValueColumn))
+      ? this.sqlValueColumn
+      : (columns.find(c => rows.slice(0, 5).some(r => isNum(r[c]))) || columns[0]);
+
+    const labelCol = (this.sqlLabelColumn && columns.includes(this.sqlLabelColumn))
+      ? this.sqlLabelColumn
+      : (columns.find(c => c !== numericCol && /time|date|name|label|path|line|shift|area|machine|point/i.test(c)) || columns[0]);
+
     const toNum = (v: any): number => {
       if (typeof v === 'number') return isNaN(v) ? 0 : v;
       if (typeof v === 'string') { const n = parseFloat(v); return isNaN(n) ? 0 : n; }
@@ -3831,9 +3865,14 @@ export class WidgetComponent implements OnInit, OnDestroy, OnChanges {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const w = canvas.width = canvas.offsetWidth;
-    const h = canvas.height = canvas.offsetHeight;
-    if (w <= 0 || h <= 0) return;
+    const parent = canvas.parentElement;
+    const targetW = parent ? parent.clientWidth : canvas.offsetWidth;
+    const targetH = parent ? parent.clientHeight : canvas.offsetHeight;
+    if (targetW <= 0 || targetH <= 0) return;
+    if (canvas.width !== targetW) canvas.width = targetW;
+    if (canvas.height !== targetH) canvas.height = targetH;
+    const w = targetW;
+    const h = targetH;
 
     // Clear
     ctx.clearRect(0, 0, w, h);

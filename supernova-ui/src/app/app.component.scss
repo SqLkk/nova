@@ -23,3 +23,8 @@
 
 // Not: Global scrollbar ve yüzey kuralları styles.scss içinde merkezî olarak
 // tanımlıdır (token tabanlı). Burada tekrar tanımlamaya gerek yoktur.
+@media (min-width: 1101px) {
+  .app-layout { transition: background-color 0.25s ease, padding-right 0.28s cubic-bezier(.16, 1, .3, 1); }
+  .app-layout.copilot-docked { padding-right: 430px; }
+  .app-layout.copilot-docked.copilot-wide { padding-right: 520px; }
+}

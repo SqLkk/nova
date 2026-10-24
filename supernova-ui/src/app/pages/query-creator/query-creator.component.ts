@@ -1,14 +1,16 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit, OnDestroy } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
 import { QueryService } from '../../services/query.service';
-import { SavedQuery, QueryResult } from '../../models/query.model';
+import { SavedQuery, QueryResult, SharingRoleOption, SharingUserOption } from '../../models/query.model';
 import { DataSource } from '../../models/data-source.model';
 import { DataSourceSelectionService } from '../../services/data-source-selection.service';
-import { Subscription } from 'rxjs';
+import { Subscription, firstValueFrom } from 'rxjs';
 import { ConfirmService } from '../../services/confirm.service';
 import { PathService } from '../../services/path.service';
 import { PathDef } from '../../models/path-def.model';
+import { AiContextService } from '../../services/ai-context.service';
+import { AiCoworkerService } from '../../services/ai-coworker.service';
 
 export interface TableInfo {
   id: string;
@@ -37,6 +39,16 @@ export class QueryCreatorComponent implements OnInit, OnDestroy {
   querySql = '';
   allowedRoles = '';
   allowedUsers = '';
+  selectedRoleKeys: string[] = ['admin', 'superuser', 'engineer', 'operator', 'viewer'];
+  selectedUsernames: string[] = [];
+  availableRoles: SharingRoleOption[] = [
+    { id: 'r_super', key: 'superuser', name: 'Superuser' },
+    { id: 'r_admin', key: 'admin', name: 'Admin' },
+    { id: 'r_engineer', key: 'engineer', name: 'Engineer' },
+    { id: 'r_operator', key: 'operator', name: 'Operator' },
+    { id: 'r_viewer', key: 'viewer', name: 'Viewer' },
+  ];
+  availableUsers: SharingUserOption[] = [];
   showSaveModal = false;
   
   // Parameter Modal state
@@ -93,14 +105,62 @@ export class QueryCreatorComponent implements OnInit, OnDestroy {
     private http: HttpClient,
     private dss: DataSourceSelectionService,
     private confirmService: ConfirmService,
-    private pathService: PathService
+    private pathService: PathService,
+    private aiContext: AiContextService,
+    private aiCoworker: AiCoworkerService,
+    private cdr: ChangeDetectorRef,
   ) {}
 
   private dssSub?: Subscription;
+  private releaseAi?: () => void;
+  private releaseCoworker?: () => void;
 
   ngOnInit(): void {
+    this.releaseAi = this.aiContext.register('query-creator', {
+      context: () => ({
+        current_code: this.querySql.slice(0, 24000), data_source_id: this.selectedDataSourceId,
+        active_queries: this.queries.filter(q => q.id === this.activeQueryId).map(q => ({ id: q.id, name: q.name, columns: q.columns })),
+        selected_table: this.selectedTable,
+      }),
+      accepts: language => language === 'sql',
+      apply: (_language, content) => { this.querySql = content; this.previewResult = null; this.errorMessage = ''; this.cdr.markForCheck(); },
+    });
+    this.releaseCoworker = this.aiCoworker.registerQueryStudio({
+      prepareLiveQuery: (dataSourceId, name, description) => {
+        if (dataSourceId) this.selectedDataSourceId = dataSourceId;
+        this.queryName = name;
+        this.queryDescription = description || '';
+        this.errorMessage = '';
+        this.previewResult = null;
+        this.activeBottomTab = 'results';
+        this.cdr.markForCheck();
+      },
+      setSqlText: (sql) => {
+        this.querySql = sql;
+        this.cdr.markForCheck();
+      },
+      executeLiveQuery: async () => {
+        const dsId = this.selectedDataSourceId || 'ds_apex_factory';
+        this.executing = true;
+        this.errorMessage = '';
+        this.activeBottomTab = 'results';
+        this.cdr.markForCheck();
+        try {
+          const res = await firstValueFrom(this.queryService.previewAdhoc(dsId, this.querySql, {}, 100));
+          if (res?.success && res.data) {
+            this.previewResult = res.data;
+            return { rowCount: res.data.totalRows || res.data.rows?.length || 0, executionMs: res.data.executionMs || 0 };
+          }
+          return { rowCount: 0, executionMs: 0 };
+        } finally {
+          this.executing = false;
+          this.cdr.markForCheck();
+        }
+      },
+    });
     this.loadDataSources();
     this.loadQueries();
+    this.loadSharingOptions();
 
     // Shared DB seçimine abone ol — aktif saved query düzenlenmiyorsa DS'yi güncelle.
     this.dssSub = this.dss.selectedId$.subscribe(id => {
@@ -111,7 +171,23 @@ export class QueryCreatorComponent implements OnInit, OnDestroy {
     });
   }
 
+  loadSharingOptions(): void {
+    this.queryService.getSharingOptions().subscribe({
+      next: (res) => {
+        if (res?.data?.roles?.length) {
+          this.availableRoles = res.data.roles;
+        }
+        if (res?.data?.users?.length) {
+          this.availableUsers = res.data.users;
+        }
+      },
+      error: () => {}
+    });
+  }
+
   ngOnDestroy(): void {
+    this.releaseAi?.();
+    this.releaseCoworker?.();
     this.dssSub?.unsubscribe();
   }
 
@@ -161,11 +237,19 @@ export class QueryCreatorComponent implements OnInit, OnDestroy {
     this.queryDescription = query.description || '';
     this.querySql = query.sql;
     this.selectedDataSourceId = query.dataSourceId;
-    this.allowedRoles = (query.allowedRoles || []).join(', ');
-    this.allowedUsers = (query.allowedUsers || []).join(', ');
+    this.selectedRoleKeys = (query.allowedRoles && query.allowedRoles.length)
+      ? [...query.allowedRoles]
+      : ['admin', 'superuser', 'engineer', 'operator', 'viewer'];
+    this.selectedUsernames = [...(query.allowedUsers || [])];
+    this.allowedRoles = this.selectedRoleKeys.join(', ');
+    this.allowedUsers = this.selectedUsernames.join(', ');
     this.previewResult = null;
     this.errorMessage = '';
     this.loadTables();
+    // Auto-run preview if query has no :param placeholders so results appear immediately on click
+    if (this.querySql && !/:[a-zA-Z0-9_]+/.test(this.querySql)) {
+      this.executeWithParams({});
+    }
   }
 
   onDataSourceChange(): void {
@@ -386,7 +470,9 @@ export class QueryCreatorComponent implements OnInit, OnDestroy {
     this.queryName = '';
     this.queryDescription = '';
     this.querySql = '';
-    this.allowedRoles = '';
+    this.selectedRoleKeys = ['admin', 'superuser', 'engineer', 'operator', 'viewer'];
+    this.selectedUsernames = [];
+    this.allowedRoles = this.selectedRoleKeys.join(', ');
     this.allowedUsers = '';
     this.previewResult = null;
     this.errorMessage = '';
@@ -394,6 +480,39 @@ export class QueryCreatorComponent implements OnInit, OnDestroy {
       this.selectedDataSourceId = this.dataSources[0].id;
       this.loadTables();
     }
+  }
+
+  toggleRole(roleKey: string): void {
+    const idx = this.selectedRoleKeys.indexOf(roleKey);
+    if (idx >= 0) {
+      this.selectedRoleKeys.splice(idx, 1);
+    } else {
+      this.selectedRoleKeys.push(roleKey);
+    }
+    this.allowedRoles = this.selectedRoleKeys.join(', ');
+  }
+
+  isRoleSelected(roleKey: string): boolean {
+    return this.selectedRoleKeys.includes(roleKey);
+  }
+
+  selectAllRoles(): void {
+    this.selectedRoleKeys = this.availableRoles.map(r => r.key);
+    this.allowedRoles = this.selectedRoleKeys.join(', ');
+  }
+
+  toggleUser(username: string): void {
+    const idx = this.selectedUsernames.indexOf(username);
+    if (idx >= 0) {
+      this.selectedUsernames.splice(idx, 1);
+    } else {
+      this.selectedUsernames.push(username);
+    }
+    this.allowedUsers = this.selectedUsernames.join(', ');
+  }
+
+  isUserSelected(username: string): boolean {
+    return this.selectedUsernames.includes(username);
   }
 
   loadPathDefs(): void {
@@ -532,12 +651,12 @@ export class QueryCreatorComponent implements OnInit, OnDestroy {
     }
 
     const payload: Partial<SavedQuery> = {
-      name: this.queryName,
-      description: this.queryDescription,
+      name: this.queryName.trim(),
+      description: this.queryDescription.trim(),
       sql: this.querySql,
       dataSourceId: this.selectedDataSourceId,
-      allowedRoles: this.allowedRoles.split(',').map(s => s.trim()).filter(s => s),
-      allowedUsers: this.allowedUsers.split(',').map(s => s.trim()).filter(s => s)
+      allowedRoles: this.selectedRoleKeys.length ? this.selectedRoleKeys : ['admin', 'superuser', 'engineer', 'operator', 'viewer'],
+      allowedUsers: this.selectedUsernames
     };
 
     if (this.activeQueryId) {

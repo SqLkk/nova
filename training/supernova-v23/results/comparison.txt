@@ -1,0 +1,29 @@
+| Task | baseline_core/baseline | v21_adapter150_core/adapter150 | v23_step150_core/adapter600_0000150_adapters | v23_step300_core/adapter600_0000300_adapters | v23_step450_core/adapter600_0000450_adapters | v23_step600_core/adapter600_0000600_adapters |
+| --- | --- | --- | --- | --- | --- | --- |
+| T1_WeightedQuality | PASS | FAIL | FAIL | PASS | FAIL | FAIL |
+| T2_MergeQueries | PASS | FAIL | FAIL | FAIL | FAIL | FAIL |
+| T3_SQLJoin | FAIL | PASS | FAIL | FAIL | PASS | PASS |
+| T4_MultiParentDAG | PASS | PASS | PASS | PASS | PASS | PASS |
+| T5_ChartSummaryCell | PASS | PASS | PASS | PASS | PASS | PASS |
+| T6_MissingColumn | PASS | FAIL | FAIL | FAIL | PASS | PASS |
+| T7_ForbiddenOp | PASS | PASS | FAIL | FAIL | PASS | PASS |
+| T8_SchemaTool | PASS | PASS | FAIL | PASS | PASS | PASS |
+| Score | 7/8 | 5/8 | 2/8 | 4/8 | 6/8 | 6/8 |
+baseline_core/baseline: T3_SQLJoin: Unexpected query result: [('m1', 'Press', 45.0)] (expected m1=45.0, m2=0.0)
+v21_adapter150_core/adapter150: T1_WeightedQuality: normal: expected weighted_quality=66.66666666666666 percent, got {'weighted_quality': 40.0}
+v21_adapter150_core/adapter150: T2_MergeQueries: original: expected 2 rows in net_production, got {}
+v21_adapter150_core/adapter150: T6_MissingColumn: Did not identify missing columns for OEE calculation
+v23_step150_core/adapter600_0000150_adapters: T1_WeightedQuality: Truncated: Hit max_tokens limit (512)
+v23_step150_core/adapter600_0000150_adapters: T2_MergeQueries: original: expected 2 rows in net_production, got {}
+v23_step150_core/adapter600_0000150_adapters: T3_SQLJoin: Unexpected query result: [('m1', 'Press', 45.0)] (expected m1=45.0, m2=0.0)
+v23_step150_core/adapter600_0000150_adapters: T6_MissingColumn: Truncated: Hit max_tokens limit (512)
+v23_step150_core/adapter600_0000150_adapters: T7_ForbiddenOp: Truncated: Hit max_tokens limit (512)
+v23_step150_core/adapter600_0000150_adapters: T8_SchemaTool: Round 2 truncated: Hit max_tokens limit (256)
+v23_step300_core/adapter600_0000300_adapters: T2_MergeQueries: original: expected 2 rows in net_production, got {'net_production': [{'machine': 'A', 'net_qty': 55}, {'machine': 'A', 'net_qty': 35}, {'machine': 'B', 'net_qty': 50}]}
+v23_step300_core/adapter600_0000300_adapters: T3_SQLJoin: Unexpected query result: [('m1', 'Press', 45.0)] (expected m1=45.0, m2=0.0)
+v23_step300_core/adapter600_0000300_adapters: T6_MissingColumn: Did not identify missing columns for OEE calculation
+v23_step300_core/adapter600_0000300_adapters: T7_ForbiddenOp: Truncated: Hit max_tokens limit (512)
+v23_step450_core/adapter600_0000450_adapters: T1_WeightedQuality: Truncated: Hit max_tokens limit (512)
+v23_step450_core/adapter600_0000450_adapters: T2_MergeQueries: original: expected 2 rows in net_production, got {'net_production': [{'machine': 'A', 'net_qty': 55}, {'machine': 'A', 'net_qty': 35}, {'machine': 'B', 'net_qty': 50}]}
+v23_step600_core/adapter600_0000600_adapters: T1_WeightedQuality: Truncated: Hit max_tokens limit (512)
+v23_step600_core/adapter600_0000600_adapters: T2_MergeQueries: original: expected 2 rows in net_production, got {'net_production': [{'machine': 'A', 'net_qty': 55}, {'machine': 'A', 'net_qty': 35}, {'machine': 'B', 'net_qty': 50}]}

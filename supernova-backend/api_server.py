@@ -31,6 +31,14 @@ import passwords
 import secrets_util
 from cache import metadata_cache
 from config import config
+try:
+    from ai_api import register_ai, index_saved_example
+except Exception as _ai_import_err:
+    logging.getLogger(__name__).warning("Opsiyonel AI modülü yüklenmedi (Tak-Çıkar modu): %s", _ai_import_err)
+    def register_ai(*_args, **_kwargs):  # type: ignore[misc]
+        return None
+    def index_saved_example(*_args, **_kwargs):  # type: ignore[misc]
+        return None
 
 app = Flask(__name__)
 # Flask/oturum imzası config'ten (NOVA_FLASK_SECRET). Hardcoded DEĞİL.
@@ -60,10 +68,12 @@ logger = logging.getLogger(__name__)
 
 # Token gerektirmeyen (herkese açık) yollar. (refresh/logout kendi içinde
 # refresh token'ı doğrular; erişim token'ı gerekmez.)
-PUBLIC_PATHS = {'/health', '/api/auth/login', '/api/auth/refresh', '/api/auth/logout'}
+PUBLIC_PATHS = {'/health', '/api/auth/login', '/api/auth/refresh', '/api/auth/logout', '/api/ai/health'}
 
 # CORS allowlist config'ten (NOVA_CORS_ORIGINS). Joker ('*') güvenlik açısından reddedilir.
 _ALLOWED_ORIGINS = {o for o in config.CORS_ALLOWED_ORIGINS if o and o != '*'}
+if config.IS_DEVELOPMENT:
+    _ALLOWED_ORIGINS.update({'http://localhost:4200', 'http://127.0.0.1:4200', 'http://localhost:4201', 'http://127.0.0.1:4201'})
 
 
 @app.after_request
@@ -82,7 +92,7 @@ def _after_request(response):
     response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
     response.headers['Cross-Origin-Opener-Policy'] = 'same-origin'
     # API yanıtları (token/rapor içerebilir) ara önbelleğe alınmasın.
-    response.headers['Cache-Control'] = 'no-store'
+    response.headers['Cache-Control'] = 'no-store, no-transform' if response.mimetype == 'text/event-stream' else 'no-store'
     response.headers['Pragma'] = 'no-cache'
     # HSTS yalnızca TLS arkasında ve config açıkken gönderilir (plain HTTP'de
     # asla — ilk ziyarette downgrade tuzağına yol açar).
@@ -90,6 +100,9 @@ def _after_request(response):
         response.headers['Strict-Transport-Security'] = (
             f'max-age={config.HSTS_MAX_AGE}; includeSubDomains')
     return response
+
+
+_revoked_user_ids = set()
 
 
 @app.before_request
@@ -116,7 +129,19 @@ def _auth_guard():
     if not payload:
         return _err('Session invalid or expired.', 401)
 
-    g.uid = payload.get('uid')
+    uid = payload.get('uid')
+    if uid in _revoked_user_ids:
+        return _err('Session invalid or expired.', 401)
+    if uid:
+        try:
+            with get_db()._conn() as conn:
+                urow = conn.execute('SELECT is_active FROM users WHERE id = ?', (uid,)).fetchone()
+            if urow is not None and not urow['is_active']:
+                return _err('Account is deactivated.', 401)
+        except Exception:
+            pass
+
+    g.uid = uid
     g.username = payload.get('u')
     g.role = payload.get('role')
     g.level = payload.get('level', 0)  # kolaylık için token'dan; güvenlik için DB'den tekrar çözülür
@@ -184,7 +209,22 @@ def _query_columns(row: dict) -> list:
     cols = json.loads(row.get('columns_meta') or '[]')
     if cols:
         return cols
-    return metadata_cache.get(f"qcols:{row.get('id')}") or []
+    cached = metadata_cache.get(f"qcols:{row.get('id')}")
+    if cached:
+        return cached
+    ds_id = row.get('data_source_id')
+    if ds_id and row.get('sql_text'):
+        ds = _full_data_source(ds_id)
+        if ds and (ds.get('db_type') or '').lower() == 'sqlite':
+            try:
+                res = execute_query(ds, row['sql_text'], {}, limit=1)
+                raw_cols = res.get('columns') or []
+                if raw_cols:
+                    metadata_cache.set(f"qcols:{row.get('id')}", raw_cols)
+                    return raw_cols
+            except Exception:
+                pass
+    return []
 
 
 def _query_to_dict(row: dict) -> dict:
@@ -207,13 +247,12 @@ def _can_access_query(row: dict) -> bool:
 
     Kural: admin/superuser her şeyi; sahip her zaman; değilse
     rolü allowed_roles içinde veya kimliği (username/uid) allowed_users içinde olmalı.
-    Fail-closed: ACL boşsa ve sahip değilse erişim yok.
     """
     role = getattr(g, 'role', None)
-    if role in ('admin', 'superuser'):
+    if role in ('admin', 'superuser') or _user_level() >= ROLE_LEVELS.get('admin', 80):
         return True
     owner = row.get('owner_id') or row.get('user_id')
-    if owner == 'system' or (owner and owner == getattr(g, 'uid', None)):
+    if not owner or owner == 'system' or owner == getattr(g, 'uid', None):
         return True
     allowed_roles = json.loads(row.get('allowed_roles') or '[]')
     allowed_users = json.loads(row.get('allowed_users') or '[]')
@@ -230,9 +269,11 @@ def _can_access_query(row: dict) -> bool:
 
 def _can_modify_query(row: dict) -> bool:
     """Nesne düzenleme/silme: sahip veya admin."""
-    if getattr(g, 'role', None) in ('admin', 'superuser'):
+    if getattr(g, 'role', None) in ('admin', 'superuser') or _user_level() >= ROLE_LEVELS.get('admin', 80):
         return True
     owner = row.get('owner_id') or row.get('user_id')
+    if owner == 'system' and getattr(g, 'role', None) == 'engineer':
+        return True
     return bool(owner) and owner == getattr(g, 'uid', None)
 
 
@@ -668,13 +709,27 @@ def get_users():
                    FROM users u LEFT JOIN roles r ON r.id = u.role_id
                    ORDER BY r.level DESC, u.username''')]
         else:
-            # user:view izni yoksa sadece kendi kaydını döndür (paylaşım seçicileri için).
+            # Paylaşım seçicileri için aktif kullanıcıların temel kimlik bilgilerini döndür (e-posta hariç).
             users = [dict(row) for row in conn.execute(
-                '''SELECT u.id, u.username, u.display_name, u.email, u.role, u.is_active,
+                '''SELECT u.id, u.username, u.display_name, '' AS email, u.role, u.is_active,
                           r.key AS role_key, r.level
-                   FROM users u LEFT JOIN roles r ON r.id = u.role_id WHERE u.id = ?''',
-                (_user_id(),))]
+                   FROM users u LEFT JOIN roles r ON r.id = u.role_id
+                   WHERE u.is_active = 1
+                   ORDER BY r.level DESC, u.username''')]
     return jsonify({"success": True, "data": users})
+
+
+@app.route('/api/sharing/options', methods=['GET'])
+def get_sharing_options():
+    """Sorgu, Python script, şablon ve dashboard paylaşım pencereleri için aktif rol ve kullanıcı listesi."""
+    db = get_db()
+    with db._conn() as conn:
+        roles = [dict(r) for r in conn.execute(
+            'SELECT id, key, name, color, level FROM roles WHERE is_active = 1 ORDER BY level DESC')]
+        users = [dict(u) for u in conn.execute(
+            '''SELECT id, username, display_name AS displayName, role
+               FROM users WHERE is_active = 1 ORDER BY username''')]
+    return jsonify({"success": True, "data": {"roles": roles, "users": users}})
 
 
 @app.route('/api/datasources', methods=['GET'])
@@ -906,9 +961,7 @@ def api_check_relationship(ds_id):
 @app.route('/api/datasources/<ds_id>/functions', methods=['GET'])
 def api_get_functions(ds_id):
     try:
-        ds = _full_data_source(ds_id)
-        if not ds:
-            return _err("Data source not found", 404)
+        ds = _full_data_source(ds_id) or {'type': 'sqlite'}
         results = get_functions(ds)
         return jsonify({"success": True, "data": results})
     except Exception as e:
@@ -1330,6 +1383,7 @@ def create_query():
                 (qid, name, body.get('description', ''), ds_id, body['sql'], params, _user_id(), allowed_roles, allowed_users))
         except Exception as exc:
             return _err("Sorgu oluşturulamadı (isim benzersiz olmalı).", 409)
+    index_saved_example(config, db, 'sql', _load_query_row(qid))
     return jsonify({"success": True, "data": _query_to_dict(_load_query_row(qid))}), 201
 
 
@@ -1345,9 +1399,12 @@ def update_query(qid):
     name = (body.get('name') or existing['name']).strip()
     sql = body.get('sql', existing['sql_text'])
     ds_id = body.get('dataSourceId', existing['data_source_id'])
-    params = json.dumps(body.get('parameters') or json.loads(existing.get('parameters') or '[]'))
-    allowed_roles = json.dumps(body.get('allowedRoles') or json.loads(existing.get('allowed_roles') or '[]'))
-    allowed_users = json.dumps(body.get('allowedUsers') or json.loads(existing.get('allowed_users') or '[]'))
+    params_raw = body.get('parameters') if body.get('parameters') is not None else json.loads(existing.get('parameters') or '[]')
+    roles_raw = body.get('allowedRoles') if body.get('allowedRoles') is not None else json.loads(existing.get('allowed_roles') or '[]')
+    users_raw = body.get('allowedUsers') if body.get('allowedUsers') is not None else json.loads(existing.get('allowed_users') or '[]')
+    params = json.dumps(params_raw)
+    allowed_roles = json.dumps(roles_raw)
+    allowed_users = json.dumps(users_raw)
 
     db = get_db()
     with db._conn() as conn:
@@ -1355,7 +1412,27 @@ def update_query(qid):
             '''UPDATE queries SET name=?, description=?, data_source_id=?, sql_text=?, parameters=?, allowed_roles=?, allowed_users=?, updated_at=datetime('now')
                WHERE id=?''',
             (name, body.get('description', existing.get('description', '')), ds_id, sql, params, allowed_roles, allowed_users, qid))
+    index_saved_example(config, db, 'sql', _load_query_row(qid))
     return jsonify({"success": True, "data": _query_to_dict(_load_query_row(qid))})
+
+
+@app.route('/api/queries/<qid>/sharing', methods=['PUT'])
+def update_query_sharing(qid):
+    """Sorgu ACL: allowed_roles / allowed_users (sahip / admin / share:queries)."""
+    body = request.get_json(silent=True) or {}
+    existing = _load_query_row(qid)
+    if not existing:
+        return _err("Query not found.", 404)
+    if not (_can_modify_query(existing) or _has_perm('share:queries')):
+        return _err("Paylaşım düzenleme yetkiniz yok.", 403)
+    allowed_roles = body.get('allowedRoles') or body.get('allowed_roles') or []
+    allowed_users = body.get('allowedUsers') or body.get('allowed_users') or []
+    db = get_db()
+    with db._conn() as conn:
+        conn.execute(
+            '''UPDATE queries SET allowed_roles=?, allowed_users=?, updated_at=datetime('now') WHERE id=?''',
+            (json.dumps(allowed_roles), json.dumps(allowed_users), qid))
+    return jsonify({"success": True})
 
 
 @app.route('/api/queries/<qid>', methods=['DELETE'])
@@ -1386,12 +1463,14 @@ def preview_query(qid):
     except QueryExecutionError as exc:
         return _err(str(exc), 422)
 
-    # Sütun metadatası: lisans politikasına göre ya kalıcı yaz ya da RAM'de tut.
-    # Varsayılan (config.PERSIST_QUERY_COLUMNS_META=False) DB'ye YAZMAZ; bunun
-    # yerine process-içi önbellekte tutar (kaynak DB verisi çoğaltılmaz).
+    result['name'] = row.get('name') or qid
+    result['description'] = row.get('description') or ''
+    result['dataSourceId'] = row.get('data_source_id') or ''
+
     if result.get('columns'):
-        cols_json = json.dumps(result['columns'])
-        if getattr(config, 'PERSIST_QUERY_COLUMNS_META', False):
+        cols_json = json.dumps(result['columns'], ensure_ascii=False)
+        existing_meta = row.get('columns_meta') or ''
+        if getattr(config, 'PERSIST_QUERY_COLUMNS_META', False) or existing_meta in ('', '[]'):
             db = get_db()
             with db._conn() as conn:
                 conn.execute('UPDATE queries SET columns_meta=?, updated_at=datetime(\'now\') WHERE id=?',
@@ -1443,16 +1522,19 @@ def get_query_columns(qid):
     return jsonify({"success": True, "data": []})
 
 
-def _collect_sql_data(sql_query_ids: list, filters: dict) -> dict:
+def _collect_sql_data(sql_query_ids: list, filters: dict, bypass_query_acl: bool = False) -> dict:
     """Bağımlı SQL sorgularını çalıştırıp satırları topla.
 
-    Güvenlik: yalnızca mevcut kullanıcının ERİŞEBİLDİĞİ sorguların verisi inject
-    edilir (RBAC). Erişilemeyen sorgu sessizce atlanır → veri sızıntısı yok.
+    Güvenlik: ad-hoc çalıştırmada yalnızca kullanıcının erişebildiği sorguların verisi
+    inject edilir (RBAC). Kayıtlı ve paylaşılan script çalıştırılırken (bypass_query_acl=True),
+    script'e erişim zaten doğrulanmıştır ve script'in bağlı olduğu sorgular çözülür.
     """
     sql_data = {}
     for q_id in sql_query_ids or []:
         q_row = _load_query_row(q_id)
-        if not q_row or not _can_access_query(q_row):
+        if not q_row:
+            continue
+        if not bypass_query_acl and not _can_access_query(q_row):
             continue
         q_ds = _full_data_source(q_row['data_source_id'])
         if q_ds:
@@ -1507,8 +1589,6 @@ def _run_python_raw(code: str, sql_data: dict, filters: dict):
     try:
         with tempfile.TemporaryDirectory(prefix='nov4_sandbox_') as tmpdir:
             if _SANDBOX_USER:
-                # Sandbox kullanıcısı chdir yapabilsin diye geçici dizini aç.
-                # Yorumlayıcı dosya yazmaz, bu yüzden 0777 cwd güvenlidir.
                 os.chmod(tmpdir, 0o777)
             result = subprocess.run(
                 _sandbox_argv(),
@@ -1539,22 +1619,29 @@ def _run_sandboxed_python(code: str, sql_data: dict, filters: dict):
     return jsonify({"success": True, "data": result})
 
 
+def _can_use_python_workspace() -> bool:
+    return (
+        getattr(g, 'role', None) in ('admin', 'superuser', 'engineer')
+        or _has_perm('page:python-workspace')
+        or _user_level() >= ROLE_LEVELS.get('engineer', 60)
+    )
 
 
 @app.route('/api/python/run', methods=['POST'])
 def run_python_adhoc():
     """Ayrı Python Workspace sayfası için ad-hoc Python çalıştırma.
 
-    Gövde: { code, sqlQueryIds, params }. Bağımlı SQL sorguları (yalnızca
-    kullanıcının erişebildikleri) sql_data olarak inject edilir; kod izole
-    sandbox'ta koşar. Satır verisi önbelleğe alınmaz.
+    Gövde: { code, sqlQueryIds, params } veya kayıtlı script için { scriptId }.
+    Bağımlı SQL sorguları (yalnızca kullanıcının erişebildikleri) sql_data olarak
+    inject edilir; kod izole sandbox'ta koşar. Satır verisi önbelleğe alınmaz.
     """
-    # Savunma derinliği: Python Workspace admin/mühendis ayrıcalığı (UI pageKey
-    # guard'ı ile tutarlı).
-    if getattr(g, 'role', None) not in ('admin', 'superuser', 'engineer'):
-        return _err("You do not have permission to run Python code.", 403)
     body = request.get_json(silent=True) or {}
+    saved_sid = (body.get('scriptId') or body.get('script_id') or '').strip()
     code = body.get('code', '')
+    if saved_sid and not str(code).strip():
+        return run_saved_python_script(saved_sid)
+    if not _can_use_python_workspace():
+        return _err("You do not have permission to run ad-hoc Python code.", 403)
     if not str(code).strip():
         return _err("Python code is empty.", 400)
     sql_query_ids = body.get('sqlQueryIds', []) or []
@@ -1572,38 +1659,59 @@ def _load_script_row(sid: str):
     with db._conn() as conn:
         row = conn.execute(
             'SELECT id, name, description, code, sql_query_ids, owner_id, '
-            'allowed_roles, allowed_users FROM python_scripts WHERE id = ?', (sid,)).fetchone()
+            'allowed_roles, allowed_users, created_at, updated_at FROM python_scripts WHERE id = ?', (sid,)).fetchone()
     return dict(row) if row else None
 
+
+def _extract_script_dataset_names(code: str) -> list:
+    """Script içindeki out('dataset_name', ...) çağrılarını statik olarak tespit eder."""
+    if not code:
+        return []
+    found = []
+    for m in re.finditer(r"""\bout\s*\(\s*['"]([^'"]+)['"]""", code):
+        ds_name = m.group(1).strip()
+        if ds_name and ds_name not in found:
+            found.append(ds_name)
+    return found
+
+
 def _script_to_dict(row: dict) -> dict:
+    sid = row['id']
+    cached_meta = metadata_cache.get(f"pycols:{sid}") or []
+    ds_names = _extract_script_dataset_names(row.get('code') or '')
     return {
-        'id': row['id'],
+        'id': sid,
         'name': row['name'],
         'description': row.get('description', ''),
         'code': row['code'],
         'sqlQueryIds': json.loads(row.get('sql_query_ids') or '[]'),
+        'datasetNames': ds_names,
+        'datasetsMeta': cached_meta,
         'owner': row.get('owner_id', ''),
         'allowedRoles': json.loads(row.get('allowed_roles') or '[]'),
-        'allowedUsers': json.loads(row.get('allowed_users') or '[]')
+        'allowedUsers': json.loads(row.get('allowed_users') or '[]'),
+        'createdAt': row.get('created_at', ''),
+        'updatedAt': row.get('updated_at', ''),
     }
+
 
 @app.route('/api/python/scripts', methods=['GET'])
 def list_scripts():
-    if getattr(g, 'role', None) not in ('admin', 'superuser', 'engineer'):
-        return _err("You do not have permission to view Python scripts.", 403)
+    """Kullanıcının erişim yetkisi olan kayıtlı Python script'lerini listeler.
+    (Dashboard, Template Builder, Query Viewer ve Python Workspace tarafından kullanılır.)
+    """
     db = get_db()
     with db._conn() as conn:
         rows = [dict(r) for r in conn.execute(
             'SELECT id, name, description, code, sql_query_ids, owner_id, '
             'allowed_roles, allowed_users, is_active, created_at, updated_at '
-            'FROM python_scripts ORDER BY name')]
+            'FROM python_scripts WHERE is_active = 1 ORDER BY name')]
     visible = [r for r in rows if _can_access_query(r)]
     return jsonify({"success": True, "data": [_script_to_dict(r) for r in visible]})
 
+
 @app.route('/api/python/scripts/<sid>', methods=['GET'])
 def get_script(sid):
-    if getattr(g, 'role', None) not in ('admin', 'superuser', 'engineer'):
-        return _err("You do not have permission to view Python scripts.", 403)
     row = _load_script_row(sid)
     if not row:
         return _err("Script not found.", 404)
@@ -1611,9 +1719,10 @@ def get_script(sid):
         return _err("You do not have permission to view this script.", 403)
     return jsonify({"success": True, "data": _script_to_dict(row)})
 
+
 @app.route('/api/python/scripts', methods=['POST'])
 def create_script():
-    if getattr(g, 'role', None) not in ('admin', 'superuser', 'engineer'):
+    if not _can_use_python_workspace():
         return _err("You do not have permission to create Python scripts.", 403)
     body = request.get_json(silent=True) or {}
     name = (body.get('name') or '').strip()
@@ -1624,7 +1733,8 @@ def create_script():
 
     sid = (body.get('id') or '').strip() or _new_id('ps_')
     sql_query_ids = json.dumps(body.get('sqlQueryIds') or [])
-    allowed_roles = json.dumps(body.get('allowedRoles') or [])
+    default_roles = ['admin', 'superuser', 'engineer', 'operator', 'viewer']
+    allowed_roles = json.dumps(body.get('allowedRoles') if body.get('allowedRoles') is not None else default_roles)
     allowed_users = json.dumps(body.get('allowedUsers') or [])
 
     db = get_db()
@@ -1636,11 +1746,13 @@ def create_script():
                 (sid, name, body.get('description', ''), body['code'], sql_query_ids, _user_id(), allowed_roles, allowed_users))
         except Exception as exc:
             return _err("Script oluşturulamadı (isim benzersiz olmalı).", 409)
+    index_saved_example(config, db, 'python', _load_script_row(sid))
     return jsonify({"success": True, "data": _script_to_dict(_load_script_row(sid))}), 201
+
 
 @app.route('/api/python/scripts/<sid>', methods=['PUT'])
 def update_script(sid):
-    if getattr(g, 'role', None) not in ('admin', 'superuser', 'engineer'):
+    if not _can_use_python_workspace():
         return _err("You do not have permission to edit Python scripts.", 403)
     body = request.get_json(silent=True) or {}
     existing = _load_script_row(sid)
@@ -1651,9 +1763,12 @@ def update_script(sid):
 
     name = (body.get('name') or existing['name']).strip()
     code = body.get('code', existing['code'])
-    sql_query_ids = json.dumps(body.get('sqlQueryIds') or json.loads(existing.get('sql_query_ids') or '[]'))
-    allowed_roles = json.dumps(body.get('allowedRoles') or json.loads(existing.get('allowed_roles') or '[]'))
-    allowed_users = json.dumps(body.get('allowedUsers') or json.loads(existing.get('allowed_users') or '[]'))
+    sqids_raw = body.get('sqlQueryIds') if body.get('sqlQueryIds') is not None else json.loads(existing.get('sql_query_ids') or '[]')
+    roles_raw = body.get('allowedRoles') if body.get('allowedRoles') is not None else json.loads(existing.get('allowed_roles') or '[]')
+    users_raw = body.get('allowedUsers') if body.get('allowedUsers') is not None else json.loads(existing.get('allowed_users') or '[]')
+    sql_query_ids = json.dumps(sqids_raw)
+    allowed_roles = json.dumps(roles_raw)
+    allowed_users = json.dumps(users_raw)
 
     db = get_db()
     with db._conn() as conn:
@@ -1661,11 +1776,33 @@ def update_script(sid):
             '''UPDATE python_scripts SET name=?, description=?, code=?, sql_query_ids=?, allowed_roles=?, allowed_users=?, updated_at=datetime('now')
                WHERE id=?''',
             (name, body.get('description', existing.get('description', '')), code, sql_query_ids, allowed_roles, allowed_users, sid))
+    metadata_cache.invalidate(f"pycols:{sid}")
+    index_saved_example(config, db, 'python', _load_script_row(sid))
     return jsonify({"success": True, "data": _script_to_dict(_load_script_row(sid))})
+
+
+@app.route('/api/python/scripts/<sid>/sharing', methods=['PUT'])
+def update_script_sharing(sid):
+    """Python Script ACL: allowed_roles / allowed_users (sahip / admin / share:python_scripts)."""
+    body = request.get_json(silent=True) or {}
+    existing = _load_script_row(sid)
+    if not existing:
+        return _err("Script not found.", 404)
+    if not (_can_modify_query(existing) or _has_perm('share:python_scripts')):
+        return _err("Paylaşım düzenleme yetkiniz yok.", 403)
+    allowed_roles = body.get('allowedRoles') or body.get('allowed_roles') or []
+    allowed_users = body.get('allowedUsers') or body.get('allowed_users') or []
+    db = get_db()
+    with db._conn() as conn:
+        conn.execute(
+            '''UPDATE python_scripts SET allowed_roles=?, allowed_users=?, updated_at=datetime('now') WHERE id=?''',
+            (json.dumps(allowed_roles), json.dumps(allowed_users), sid))
+    return jsonify({"success": True})
+
 
 @app.route('/api/python/scripts/<sid>', methods=['DELETE'])
 def delete_script(sid):
-    if getattr(g, 'role', None) not in ('admin', 'superuser', 'engineer'):
+    if not _can_use_python_workspace():
         return _err("You do not have permission to delete Python scripts.", 403)
     existing = _load_script_row(sid)
     if not existing:
@@ -1678,16 +1815,13 @@ def delete_script(sid):
     return jsonify({"success": True, "deleted": cur.rowcount > 0})
 
 
-@app.route('/api/python/scripts/<sid>/run', methods=['POST'])
+@app.route('/api/python/scripts/<sid>/run', methods=['POST', 'GET'])
 def run_saved_python_script(sid):
-    """Kayıtlı Python script'ini izole sandbox'ta çalıştır → widget verisi.
+    """Kayıtlı Python script'ini izole sandbox'ta çalıştır → widget / önizleme verisi.
 
-    Widget tek bir seri bekler; script birden fazla veri kümesi üretirse ilkini
-    alırız. Savunma derinliği: ad-hoc /python/run ile aynı rol gate'i +
-    nesne-seviyesi ACL (_can_access_query). Satır verisi önbelleğe alınmaz.
+    Nesne-seviyesi ACL (_can_access_query) ile korunur; paylaşılan script'ler
+    operatör/viewer dahil yetkili tüm kullanıcıların dashboard ve raporlarında çalışır.
     """
-    if getattr(g, 'role', None) not in ('admin', 'superuser', 'engineer'):
-        return _err("You do not have permission to run Python code.", 403)
     row = _load_script_row(sid)
     if not row:
         return _err("Script not found.", 404)
@@ -1695,27 +1829,86 @@ def run_saved_python_script(sid):
         return _err("You do not have permission to run this script.", 403)
     body = request.get_json(silent=True) or {}
     filters = body.get('params') or body.get('filters') or {}
-    sql_data = _collect_sql_data(json.loads(row.get('sql_query_ids') or '[]'), filters)
+    requested_ds = (body.get('dataset') or request.args.get('dataset') or '').strip()
+
+    t0 = datetime.now()
+    sql_data = _collect_sql_data(json.loads(row.get('sql_query_ids') or '[]'), filters, bypass_query_acl=True)
     ok, result = _run_python_raw(row['code'], sql_data, filters)
+    exec_ms = int((datetime.now() - t0).total_seconds() * 1000)
     if not ok:
         return _err(str(result), 422)
+
     # result: {'dataset_adı': {'columns': [...], 'rows': [...]}, ...}
     rows, columns, dataset_name = [], [], ''
+    datasets_meta = []
+    normalized_datasets = {}
     if isinstance(result, dict) and result:
-        first_key = next(iter(result))
-        first_ds = result[first_key] or {}
-        rows = first_ds.get('rows') or []
-        columns = first_ds.get('columns') or []
-        dataset_name = str(first_key)
+        for ds_k, ds_v in result.items():
+            ds_obj = ds_v or {}
+            ds_rows = ds_obj.get('rows') or []
+            raw_cols = ds_obj.get('columns') or (list(ds_rows[0].keys()) if ds_rows else [])
+            col_objs = [c if isinstance(c, dict) else {'name': str(c), 'dataType': 'string'} for c in raw_cols]
+            normalized_datasets[str(ds_k)] = {
+                'columns': col_objs,
+                'rows': ds_rows,
+                'totalRows': len(ds_rows),
+                'truncated': False,
+                'executionMs': exec_ms,
+            }
+            datasets_meta.append({'name': str(ds_k), 'columns': col_objs, 'rowCount': len(ds_rows)})
+
+        metadata_cache.set(f"pycols:{sid}", datasets_meta)
+        chosen_key = requested_ds if (requested_ds and requested_ds in normalized_datasets) else next(iter(normalized_datasets))
+        chosen = normalized_datasets[chosen_key]
+        rows = chosen['rows']
+        columns = chosen['columns']
+        dataset_name = chosen_key
+
     return jsonify({
         "success": True,
+        "status": "success",
         "data": {
+            "id": sid,
             "rows": rows,
             "columns": columns,
+            "totalRows": len(rows),
+            "datasetName": dataset_name,
+            "datasetNames": list(normalized_datasets.keys()),
+            "datasets": normalized_datasets,
             "source": "python",
-            "name": row.get('name') or dataset_name or 'Python Script'
+            "name": row.get('name') or dataset_name or 'Python Script',
+            "description": row.get('description') or '',
+            "executionMs": exec_ms,
         }
     })
+
+
+@app.route('/api/python/scripts/<sid>/columns', methods=['GET'])
+def get_script_columns(sid):
+    """Python script'inin ürettiği sütun listesini döndürür (Widget kolon eşleme & Template Builder için)."""
+    row = _load_script_row(sid)
+    if not row:
+        return _err("Script not found.", 404)
+    if not _can_access_query(row):
+        return _err("Yetkiniz yok.", 403)
+    requested_ds = (request.args.get('dataset') or '').strip()
+    cached = metadata_cache.get(f"pycols:{sid}")
+    if not cached:
+        sql_data = _collect_sql_data(json.loads(row.get('sql_query_ids') or '[]'), {}, bypass_query_acl=True)
+        ok, result = _run_python_raw(row['code'], sql_data, {})
+        if ok and isinstance(result, dict):
+            cached = []
+            for ds_k, ds_v in result.items():
+                ds_rows = (ds_v or {}).get('rows') or []
+                raw_cols = (ds_v or {}).get('columns') or (list(ds_rows[0].keys()) if ds_rows else [])
+                col_objs = [c if isinstance(c, dict) else {'name': str(c), 'dataType': 'string'} for c in raw_cols]
+                cached.append({'name': str(ds_k), 'columns': col_objs, 'rowCount': len(ds_rows)})
+            metadata_cache.set(f"pycols:{sid}", cached)
+    if cached:
+        target = next((d for d in cached if d['name'] == requested_ds), cached[0])
+        col_names = [c['name'] if isinstance(c, dict) else str(c) for c in (target.get('columns') or [])]
+        return jsonify({"success": True, "data": col_names, "datasets": cached})
+    return jsonify({"success": True, "data": [], "datasets": []})
 
 
 # ---------------------------------------------------------------------------
@@ -1764,10 +1957,11 @@ def create_template():
     body = request.get_json(silent=True) or {}
     name = (body.get('name') or '').strip() or "Untitled Template"
     tid = (body.get('id') or '').strip() or _new_id('tpl_')
-    model = body.get('model') or {}
+    model = body.get('model') if body.get('model') is not None else (body.get('design') or {})
     if isinstance(model, str):
         model = json.loads(model)
-    allowed_roles = body.get('allowedRoles') or body.get('allowed_roles') or []
+    default_roles = ['admin', 'superuser', 'engineer', 'operator', 'viewer']
+    allowed_roles = body.get('allowedRoles') if body.get('allowedRoles') is not None else (body.get('allowed_roles') if body.get('allowed_roles') is not None else default_roles)
     allowed_users = body.get('allowedUsers') or body.get('allowed_users') or []
     db = get_db()
     with db._conn() as conn:
@@ -1839,34 +2033,162 @@ def delete_template(tid):
 
 
 def _resolve_python_dataset(ref: str, params_by_query: dict) -> dict:
-    """'py:<scriptId>:<datasetName>' başvurusunu sandbox'ta çalıştırıp dataseti döndürür.
+    """'py:<scriptId>:<datasetName>' veya 'py:<scriptId>' başvurusunu sandbox'ta çalıştırıp dataseti döndürür.
 
-    Güvenlik: script görünürlüğü (_can_access_query) + execute rolü
-    (admin/superuser/engineer). Erişim yoksa/hata verirse sessizce boş dataset
-    döner → render asla patlamaz, sadece o hücre boş kalır.
+    Güvenlik: script görünürlüğü (_can_access_query). Erişim yoksa/hata verirse
+    sessizce boş dataset döner → render asla patlamaz, sadece o hücre boş kalır.
     """
-    try:
-        _, script_id, ds_name = ref.split(':', 2)
-    except ValueError:
+    parts = ref.split(':', 2)
+    if len(parts) < 2:
         return {"columns": [], "rows": []}
-    if getattr(g, 'role', None) not in ('admin', 'superuser', 'engineer'):
-        return {"columns": [], "rows": []}
+    script_id = parts[1].strip()
+    ds_name = parts[2].strip() if len(parts) > 2 else ''
     row = _load_script_row(script_id)
     if not row or not _can_access_query(row):
         return {"columns": [], "rows": []}
     sql_data = _collect_sql_data(
         json.loads(row.get('sql_query_ids') or '[]'),
-        params_by_query.get(ref, {}))
+        params_by_query.get(ref, {}),
+        bypass_query_acl=True,
+    )
     ok, datasets = _run_python_raw(row['code'], sql_data, {})
-    if not ok:
+    if not ok or not isinstance(datasets, dict) or not datasets:
         logger.warning("Template Python script error (%s): %s", ref, datasets)
         return {"columns": [], "rows": []}
-    return datasets.get(ds_name) or {"columns": [], "rows": []}
+    if ds_name and ds_name in datasets:
+        chosen = datasets[ds_name] or {}
+    else:
+        chosen = datasets[next(iter(datasets))] or {}
+    rows = chosen.get('rows') or []
+    raw_cols = chosen.get('columns') or (list(rows[0].keys()) if rows else [])
+    cols = [c if isinstance(c, dict) else {'name': str(c), 'dataType': 'string'} for c in raw_cols]
+    return {"columns": cols, "rows": rows, "name": row.get('name') or script_id}
+
+
+def _execute_template_queries(model: dict, params_by_query: dict):
+    """Şablon modelinde başvurulan tüm SQL sorgularını ve Python scriptlerini CANLI çalıştırır."""
+    query_ids = set()
+    for sheet in model.get('sheets', []):
+        for cell in (sheet.get('cells') or {}).values():
+            b = cell.get('binding') or {}
+            if b.get('queryId'):
+                query_ids.add(b['queryId'])
+        for band in (sheet.get('bands') or []):
+            if band.get('queryId'):
+                query_ids.add(band['queryId'])
+        for chart in (sheet.get('charts') or []):
+            if chart.get('queryId'):
+                query_ids.add(chart['queryId'])
+
+    sql_ids = {qid for qid in query_ids if not qid.startswith('py:')}
+    py_refs = {qid for qid in query_ids if qid.startswith('py:')}
+
+    query_results = {}
+    query_stats = []
+
+    for qid in sorted(sql_ids):
+        t0 = datetime.now()
+        q = _load_query_row(qid)
+        if not q or not _can_access_query(q):
+            query_results[qid] = {"columns": [], "rows": []}
+            query_stats.append({"queryId": qid, "name": qid, "kind": "sql", "rowCount": 0, "executionMs": 0, "error": "Query not found or inaccessible"})
+            continue
+        ds = _full_data_source(q['data_source_id'])
+        try:
+            res = execute_query(ds, q['sql_text'], params_by_query.get(qid, {}), 5000)
+            ms = int((datetime.now() - t0).total_seconds() * 1000)
+            query_results[qid] = res
+            query_stats.append({
+                "queryId": qid,
+                "name": q.get('name') or qid,
+                "description": q.get('description') or '',
+                "kind": "sql",
+                "rowCount": len(res.get('rows') or []),
+                "executionMs": ms,
+            })
+        except Exception as exc:
+            logger.warning("Query error (%s): %s", qid, exc)
+            query_results[qid] = {"columns": [], "rows": []}
+            query_stats.append({
+                "queryId": qid,
+                "name": q.get('name') or qid,
+                "kind": "sql",
+                "rowCount": 0,
+                "executionMs": 0,
+                "error": str(exc),
+            })
+
+    for ref in sorted(py_refs):
+        t0 = datetime.now()
+        res = _resolve_python_dataset(ref, params_by_query)
+        ms = int((datetime.now() - t0).total_seconds() * 1000)
+        query_results[ref] = res
+        query_stats.append({
+            "queryId": ref,
+            "name": res.get('name') or ref,
+            "kind": "python",
+            "rowCount": len(res.get('rows') or []),
+            "executionMs": ms,
+        })
+
+    return query_results, query_stats
+
+
+@app.route('/api/templates/evaluate', methods=['POST'])
+def evaluate_template_adhoc():
+    """Şablon modelini (veya templateId'yi) veritabanı ve Python sandbox üzerinde CANLI çalıştırıp
+    tarayıcıda anlık önizleme için genişletilmiş hücre/satır/özet verisini döndürür.
+    """
+    body = request.get_json(silent=True) or {}
+    model = body.get('model')
+    tid = (body.get('templateId') or '').strip()
+    if not model and tid:
+        db = get_db()
+        with db._conn() as conn:
+            row = conn.execute('SELECT * FROM report_templates WHERE id=?', (tid,)).fetchone()
+        if not row:
+            return _err("Template not found.", 404)
+        if not _can_access_query(dict(row)):
+            return _err("Erişim yetkiniz yok.", 403)
+        model = json.loads(dict(row).get('model') or '{}')
+    if isinstance(model, str):
+        model = json.loads(model)
+    if not isinstance(model, dict) or not model.get('sheets'):
+        return _err("Geçerli bir şablon modeli gerekli.", 400)
+
+    params_by_query = body.get('params') or {}
+    max_band_rows = min(max(int(body.get('maxBandRows') or 100), 1), 500)
+
+    query_results, query_stats = _execute_template_queries(model, params_by_query)
+    evaluated = _engine.evaluate_model_preview(model, query_results, max_band_rows=max_band_rows)
+    evaluated['queryStats'] = query_stats
+    return jsonify({"success": True, "data": evaluated})
+
+
+@app.route('/api/templates/<tid>/evaluate', methods=['POST'])
+def evaluate_saved_template(tid):
+    """Kayıtlı bir şablonu canlı çalıştırıp JSON önizlemesini döndürür."""
+    db = get_db()
+    with db._conn() as conn:
+        row = conn.execute('SELECT * FROM report_templates WHERE id=?', (tid,)).fetchone()
+    if not row:
+        return _err("Template not found.", 404)
+    if not _can_access_query(dict(row)):
+        return _err("Erişim yetkiniz yok.", 403)
+    model = json.loads(dict(row).get('model') or '{}')
+    body = request.get_json(silent=True) or {}
+    params_by_query = body.get('params') or {}
+    max_band_rows = min(max(int(body.get('maxBandRows') or 100), 1), 500)
+
+    query_results, query_stats = _execute_template_queries(model, params_by_query)
+    evaluated = _engine.evaluate_model_preview(model, query_results, max_band_rows=max_band_rows)
+    evaluated['queryStats'] = query_stats
+    return jsonify({"success": True, "data": evaluated})
 
 
 @app.route('/api/templates/<tid>/render', methods=['POST'])
 def render_template(tid):
-    """Şablonu çalıştır: bağlı query'leri koş, modeli doldur, .xlsx döndür."""
+    """Şablonu çalıştır: bağlı query ve Python script'leri CANLI koş, modeli doldur, .xlsx veya .pdf döndür."""
     fmt = (request.args.get('format') or 'xlsx').lower()
     if fmt not in ('xlsx', 'pdf', 'excel'):
         return _err("Only xlsx and pdf formats are supported for now.", 400)
@@ -1883,40 +2205,7 @@ def render_template(tid):
     body = request.get_json(silent=True) or {}
     params_by_query = body.get('params') or {}
 
-    # Modelde başvurulan tüm query'leri topla ve çalıştır.
-    query_ids = set()
-    for sheet in model.get('sheets', []):
-        for cell in (sheet.get('cells') or {}).values():
-            b = cell.get('binding') or {}
-            if b.get('queryId'):
-                query_ids.add(b['queryId'])
-        for band in (sheet.get('bands') or []):
-            if band.get('queryId'):
-                query_ids.add(band['queryId'])
-        for chart in (sheet.get('charts') or []):
-            if chart.get('queryId'):
-                query_ids.add(chart['queryId'])
-
-    # SQL sorgu id'leri ile Python dataset başvurularını (py:<sid>:<ds>) ayır.
-    sql_ids = {qid for qid in query_ids if not qid.startswith('py:')}
-    py_refs = {qid for qid in query_ids if qid.startswith('py:')}
-
-    query_results = {}
-    for qid in sql_ids:
-        q = _load_query_row(qid)
-        if not q:
-            query_results[qid] = {"columns": [], "rows": []}
-            continue
-        ds = _full_data_source(q['data_source_id'])
-        try:
-            query_results[qid] = execute_query(ds, q['sql_text'], params_by_query.get(qid, {}), 5000)
-        except QueryExecutionError as exc:
-            logger.warning("Query error (%s): %s", qid, exc)
-            query_results[qid] = {"columns": [], "rows": []}
-
-    # Python script çıktıları: py:<scriptId>:<dataset> → sandbox'ta çalıştır.
-    for ref in py_refs:
-        query_results[ref] = _resolve_python_dataset(ref, params_by_query)
+    query_results, _stats = _execute_template_queries(model, params_by_query)
 
     try:
         out = _engine.render_from_model(model, query_results)
@@ -1954,7 +2243,7 @@ def render_template(tid):
 # Path Defs (Path Definer — hiyerarşik navigasyon tanımları)
 # ---------------------------------------------------------------------------
 
-_VALID_STRUCTURES = ('tree', 'binary_tree', 'sequence', 'grouped', 'dag')
+_VALID_STRUCTURES = ('tree', 'binary_tree', 'sequence', 'grouped', 'dag', 'multi_level')
 
 
 def _load_path_row(pid: str):
@@ -1986,7 +2275,21 @@ def _path_to_dict(row: dict) -> dict:
 
 
 def _run_path_query(query_id: str, params: dict = None, limit: int = 5000):
-    """Bir path'i besleyen sorguyu koş → (rows, columns, error). Erişim dahil."""
+    """Bir path'i besleyen sorguyu veya Python scriptini koş → (rows, columns, error). Erişim dahil."""
+    if not query_id:
+        return [], [], "Query ID is required."
+    if str(query_id).startswith('py:'):
+        try:
+            ds_out = _resolve_python_dataset(str(query_id), {str(query_id): params or {}})
+            rows = (ds_out.get('rows') or [])[:limit]
+            cols = [c.get('name') for c in (ds_out.get('columns') or []) if isinstance(c, dict)]
+            if not cols and rows:
+                cols = list(rows[0].keys())
+            return rows, cols, None
+        except Exception as exc:
+            logger.warning("Path python script error (%s): %s", query_id, exc)
+            return [], [], f"Python script error: {exc}"
+
     q = _load_query_row(query_id)
     if not q:
         return [], [], "Query not found."
@@ -2554,6 +2857,8 @@ def admin_update_user(uid):
         cur = conn.execute(f"UPDATE users SET {', '.join(sets)} WHERE id=?", params)
         if cur.rowcount == 0:
             return _err('User not found.', 404)
+        if ia is not None and not ia:
+            conn.execute('UPDATE refresh_tokens SET revoked=1 WHERE user_id=?', (uid,))
     return jsonify({'success': True})
 
 
@@ -2566,7 +2871,11 @@ def admin_delete_user(uid):
         return _err('Bu kullanıcıyı silme yetkiniz yok.', 403)
     db = get_db()
     with db._conn() as conn:
+        conn.execute('DELETE FROM refresh_tokens WHERE user_id=?', (uid,))
+        conn.execute('DELETE FROM user_permissions WHERE user_id=?', (uid,))
         cur = conn.execute('DELETE FROM users WHERE id=?', (uid,))
+    if cur.rowcount > 0:
+        _revoked_user_ids.add(uid)
     _audit('user.delete', target=uid)
     return jsonify({'success': True, 'deleted': cur.rowcount > 0})
 
@@ -2891,9 +3200,113 @@ def download_schedule_run_file(run_id):
         return _err("Generated report file not found on disk.", 404)
 
     fmt = run_dict.get('output_format', 'xlsx').lower()
+    real_base = os.path.realpath(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    real_target = os.path.realpath(file_path)
+    if not (real_target.startswith(real_base + os.sep) or real_target.startswith('/tmp' + os.sep) or real_target.startswith('/private/tmp' + os.sep) or real_target.startswith('/var/folders' + os.sep) or real_target.startswith('/private/var/folders' + os.sep)):
+        return _err("Invalid report file path.", 403)
     mimetype = 'application/pdf' if fmt == 'pdf' else 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    filename = os.path.basename(file_path)
-    return send_file(file_path, mimetype=mimetype, as_attachment=True, download_name=filename)
+    filename = os.path.basename(real_target)
+    return send_file(real_target, mimetype=mimetype, as_attachment=True, download_name=filename)
+
+
+# ---------------------------------------------------------------------------
+# Endüstriyel Alarmlar (SQLite kalıcı + canlı telemetri uyumlu)
+# ---------------------------------------------------------------------------
+
+def _ensure_alarms_table(conn):
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS system_alarms (
+            id TEXT PRIMARY KEY,
+            severity TEXT NOT NULL DEFAULT 'warning',
+            source TEXT NOT NULL,
+            message TEXT NOT NULL,
+            timestamp TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'active',
+            location TEXT NOT NULL DEFAULT '',
+            value TEXT DEFAULT '',
+            threshold TEXT DEFAULT '',
+            acknowledged_by TEXT DEFAULT '',
+            resolved_by TEXT DEFAULT ''
+        )
+    ''')
+    cnt = conn.execute('SELECT COUNT(*) AS c FROM system_alarms').fetchone()['c']
+    if cnt == 0:
+        now_dt = datetime.now(timezone.utc)
+        seeds = [
+            ('alm_1', 'critical', 'CNC İşleme Merkezi E1', 'Ana iş mili (spindle) sıcaklığı kritik eşiği aştı: 95.4°C (Limit: 85°C)', (now_dt - timedelta(minutes=8)).isoformat(), 'active', 'Tesis Alpha - Motor Montaj Hattı', '95.4 °C', '85.0 °C', '', ''),
+            ('alm_2', 'critical', 'KUKA Robot KR-210 (Pano 03)', 'Aks 4 redüktör tork sapması (+%28). Aşırı mekanik sürtünme veya yük algılandı', (now_dt - timedelta(minutes=22)).isoformat(), 'active', 'Tesis Alpha - Gövde Kaynak İstasyonu', '128 %', '100 %', '', ''),
+            ('alm_3', 'critical', 'Enjeksiyon Pres Makinesi B2', 'Kalıp hidrolik yağ basıncı 135 bar seviyesine düştü (Gereken minimum: 180 bar)', (now_dt - timedelta(minutes=45)).isoformat(), 'active', 'Tesis Beta - Plastik Enjeksiyon Hattı', '135 bar', '180 bar', '', ''),
+            ('alm_4', 'warning', 'Apex AX-1500 Master PLC', 'Endüstriyel Ethernet I/O istasyon 08 yanıt süresi gecikmesi (45ms). Paket kaybı riski', (now_dt - timedelta(minutes=65)).isoformat(), 'active', 'Tesis Alpha - Hat Otomasyonu', '45 ms', '20 ms', '', ''),
+            ('alm_5', 'warning', 'SMD Reflow Fırın Tüneli', 'Bölge 3 ön ısıtma profili sapması: +5.8°C termal dalgalanma', (now_dt - timedelta(minutes=95)).isoformat(), 'acknowledged', 'Tesis Gamma - Elektronik Kart Montajı', '245.8 °C', '240.0 °C', 'engineer', ''),
+            ('alm_6', 'warning', 'Konveyör Bandı C-Main', 'Bant tahrik motorunda titreşim artışı: 2.1 mm/s (Eşik: 1.5 mm/s)', (now_dt - timedelta(minutes=130)).isoformat(), 'active', 'Tesis Alpha - Şasi Taşıma Hattı', '2.1 mm/s', '1.5 mm/s', '', ''),
+            ('alm_7', 'info', 'Enerji Dağıtım Panosu ADP-01', 'Vardiya reaktif güç kompanzasyonu devrede (Güç Faktörü cos φ = 0.98)', (now_dt - timedelta(minutes=210)).isoformat(), 'resolved', 'Tesis Alpha - Trafo Merkezi', '0.98 cos φ', '0.90 cos φ', 'operator', 'Sistem Otomasyonu'),
+        ]
+        conn.executemany(
+            '''INSERT INTO system_alarms
+               (id, severity, source, message, timestamp, status, location, value, threshold, acknowledged_by, resolved_by)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+            seeds
+        )
+
+
+def _alarm_row_to_dict(r) -> dict:
+    d = {
+        'id': r['id'],
+        'severity': r['severity'],
+        'source': r['source'],
+        'message': r['message'],
+        'timestamp': r['timestamp'],
+        'status': r['status'],
+        'location': r['location'] or '',
+    }
+    if r['value']:
+        d['value'] = r['value']
+    if r['threshold']:
+        d['threshold'] = r['threshold']
+    if r['acknowledged_by']:
+        d['acknowledgedBy'] = r['acknowledged_by']
+    if r['resolved_by']:
+        d['resolvedBy'] = r['resolved_by']
+    return d
+
+
+@app.route('/api/alarms', methods=['GET'])
+def list_alarms():
+    db = get_db()
+    with db._conn() as conn:
+        _ensure_alarms_table(conn)
+        rows = conn.execute('SELECT * FROM system_alarms ORDER BY timestamp DESC').fetchall()
+    return jsonify({'success': True, 'data': [_alarm_row_to_dict(r) for r in rows]})
+
+
+@app.route('/api/alarms/<aid>/acknowledge', methods=['POST'])
+def acknowledge_alarm(aid):
+    actor = getattr(g, 'username', None) or 'operator'
+    db = get_db()
+    with db._conn() as conn:
+        _ensure_alarms_table(conn)
+        cur = conn.execute(
+            "UPDATE system_alarms SET status='acknowledged', acknowledged_by=? WHERE id=?",
+            (actor, aid)
+        )
+        if cur.rowcount == 0:
+            return _err('Alarm not found.', 404)
+    return jsonify({'success': True})
+
+
+@app.route('/api/alarms/<aid>/resolve', methods=['POST'])
+def resolve_alarm(aid):
+    actor = getattr(g, 'username', None) or 'engineer'
+    db = get_db()
+    with db._conn() as conn:
+        _ensure_alarms_table(conn)
+        cur = conn.execute(
+            "UPDATE system_alarms SET status='resolved', resolved_by=? WHERE id=?",
+            (actor, aid)
+        )
+        if cur.rowcount == 0:
+            return _err('Alarm not found.', 404)
+    return jsonify({'success': True})
 
 
 # ---------------------------------------------------------------------------
@@ -2928,6 +3341,12 @@ def _handle_429(e):
     body, status = _err("Çok fazla istek. Lütfen daha sonra tekrar deneyin.", 429)
     body.headers['Retry-After'] = '60'
     return body, status
+
+
+try:
+    register_ai(app, config, get_db, _can_access_query, _has_perm, _query_columns, metadata_cache, limiter)
+except Exception:
+    logger.warning("Opsiyonel AI servisi devre dışı; çekirdek SuperNova tam kapasite çalışmaya devam ediyor.", exc_info=True)
 
 
 if __name__ == '__main__':

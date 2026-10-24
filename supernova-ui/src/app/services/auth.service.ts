@@ -506,13 +506,13 @@ export class AuthService {
 
     // Demo credentials (both secure and easy passwords accepted)
     const credentials: { [username: string]: string[] } = {
-      'developer': ['Sp7_Super#4302', 'dev123'],
-      'admin': ['Sp7_Admin#9841', 'admin123'],
-      'engineer': ['Sp7_Engineer#5544', 'engineer123'],
-      'utku': ['utku123', 'Sp7_Super#4302'],
-      'operator': ['Sp7_Operator#1520', 'operator123', 'user123'],
-      'user': ['Sp7_Operator#1520', 'user123', 'operator123'],
-      'viewer': ['Sp7_Viewer#7611', 'viewer123']
+      'developer': ['Nova_Super#4302', 'dev123'],
+      'admin': ['Nova_Admin#9841', 'admin123'],
+      'engineer': ['Nova_Engineer#5544', 'engineer123'],
+      'utku': ['utku123', 'Nova_Super#4302'],
+      'operator': ['Nova_Operator#1520', 'operator123', 'user123'],
+      'user': ['Nova_Operator#1520', 'user123', 'operator123'],
+      'viewer': ['Nova_Viewer#7611', 'viewer123']
     };
 
     // Credential kontrolü

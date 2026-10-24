@@ -1,0 +1,10 @@
+{
+  "completed": true,
+  "iters": 600,
+  "duration_seconds": 13505.004963584011,
+  "peak_memory_bytes": 7585737110,
+  "training_records": 2400,
+  "approx_epochs": 0.25,
+  "num_layers": 1,
+  "rank": 4
+}

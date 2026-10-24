@@ -37,7 +37,11 @@ def build_structure(structure: str, rows: List[Dict[str, Any]],
     if structure == "sequence":
         return _build_sequence(rows, config)
     if structure == "grouped":
+        if config.get("level_cols") or config.get("subgroup_col") or config.get("level2_col"):
+            return _build_multi_level(rows, config)
         return _build_grouped(rows, config)
+    if structure in ("multi_level", "multilevel", "levels", "hierarchy"):
+        return _build_multi_level(rows, config)
     if structure in ("dag", "graph", "network"):
         return _build_dag(rows, config)
     # Bilinmeyen tip — boş sonuç + uyarı (exception yok).
@@ -165,6 +169,24 @@ def _extract_decorations(r: Dict[str, Any], config: Dict[str, Any]) -> Dict[str,
     elif status:
         badge = status
 
+    # 5. Icon & Semantic Type fallback
+    icon_col = config.get("icon_col")
+    icon = None
+    if icon_col and icon_col in r and r[icon_col]:
+        icon = str(r[icon_col]).strip()
+    elif "icon" in r and r["icon"]:
+        icon = str(r["icon"]).strip()
+
+    type_col = config.get("type_col")
+    sem_type = None
+    if type_col and type_col in r and r[type_col] is not None:
+        sem_type = str(r[type_col]).strip()
+    else:
+        for candidate in ("asset_type", "node_type", "equipment_type", "type", "PATH_LEVEL", "category", "role"):
+            if candidate in r and r[candidate] is not None:
+                sem_type = str(r[candidate]).strip()
+                break
+
     decorations = {}
     if health_score is not None:
         decorations["healthScore"] = health_score
@@ -174,6 +196,10 @@ def _extract_decorations(r: Dict[str, Any], config: Dict[str, Any]) -> Dict[str,
         decorations["statusColor"] = status_color
     if badge is not None:
         decorations["badge"] = badge
+    if icon:
+        decorations["icon"] = icon
+    if sem_type:
+        decorations["type"] = sem_type
     return decorations
 
 
@@ -364,7 +390,7 @@ def _finalize_chain(chain: List[str], by_id: Dict[str, Dict[str, Any]],
 
 
 # ---------------------------------------------------------------------------
-# Grouped
+# Grouped & Multi-Level Column Hierarchy
 # ---------------------------------------------------------------------------
 
 def _build_grouped(rows, config) -> Dict[str, Any]:
@@ -386,32 +412,95 @@ def _build_grouped(rows, config) -> Dict[str, Any]:
         for gkey in groups:
             groups[gkey] = _sort_numeric_then_str(groups[gkey], key=lambda r: _cell(r, order_col))
 
-    nodes: List[Dict[str, Any]] = []
+    # Eğer her grupta sadece 1 satır varsa ve group_col == label_col ise,
+    # tüm grupları ortak bir Tesis/Sistem Kökü altında topla ki anlamlı bir ağaç oluşsun.
+    all_single_same = (
+        len(groups) > 1
+        and all(len(rs) == 1 for rs in groups.values())
+        and (not label_col or label_col == group_col)
+    )
+    if all_single_same:
+        root_id = "root::overview"
+        root_label = config.get("root_label") or "Tesis Genel Görünümü"
+        nodes: List[Dict[str, Any]] = []
+        member_ids: List[str] = []
+        paths: List[List[str]] = []
+        scores: List[float] = []
+        for gkey, rs in groups.items():
+            r = rs[0]
+            mid = f"node::{gkey}"
+            decos = _extract_decorations(r, config)
+            if "healthScore" in decos:
+                scores.append(float(decos["healthScore"]))
+            mnode = {
+                "id": mid, "label": gkey, "parent": root_id, "depth": 1,
+                "path": [root_id, mid], "type": decos.get("type") or "area",
+                "children": [], "row": r,
+            }
+            mnode.update(decos)
+            nodes.append(mnode)
+            member_ids.append(mid)
+            paths.append([root_id, mid])
+
+        avg_health = round(sum(scores) / len(scores), 1) if scores else None
+        root_node: Dict[str, Any] = {
+            "id": root_id, "label": root_label, "parent": "", "depth": 0,
+            "path": [root_id], "type": "enterprise", "children": member_ids,
+            "row": {"Toplam Küme": len(member_ids), "Ortalama Sağlık": avg_health or "—"},
+        }
+        if avg_health is not None:
+            root_node["healthScore"] = avg_health
+            root_node["badge"] = f"{avg_health}%"
+        nodes.insert(0, root_node)
+        return {
+            "nodes": nodes, "roots": [root_id], "paths": paths,
+            "stats": {
+                "node_count": len(nodes), "path_count": len(paths),
+                "max_depth": 1, "warnings": warnings,
+            },
+        }
+
+    nodes = []
     roots: List[str] = []
-    paths: List[List[str]] = []
+    paths = []
     seq = 0
     for gkey, rs in groups.items():
         gid = f"group::{gkey}"
-        member_ids: List[str] = []
+        member_ids = []
+        group_scores: List[float] = []
         for r in rs:
             raw_id = r.get(id_col) if id_col else None
             mid = _norm_id(raw_id) if raw_id is not None else f"m_{gkey}_{seq}"
+            if mid == gid or any(n["id"] == mid for n in nodes):
+                mid = f"{mid}_{seq}"
             seq += 1
             label_val = _cell(r, label_col) if label_col else None
             if label_val is None:
                 label_val = raw_id if raw_id is not None else mid
+            decos = _extract_decorations(r, config)
+            if "healthScore" in decos:
+                group_scores.append(float(decos["healthScore"]))
             member_node = {
                 "id": mid, "label": str(label_val), "parent": gid, "depth": 1,
-                "path": [gid, mid], "type": gkey, "children": [], "row": r,
+                "path": [gid, mid], "type": decos.get("type") or gkey, "children": [], "row": r,
             }
-            member_node.update(_extract_decorations(r, config))
+            member_node.update(decos)
             nodes.append(member_node)
             member_ids.append(mid)
             paths.append([gid, mid])  # grup → üye (her üye bir yol)
-        nodes.append({
+
+        avg_h = round(sum(group_scores) / len(group_scores), 1) if group_scores else None
+        group_node: Dict[str, Any] = {
             "id": gid, "label": gkey, "parent": "", "depth": 0,
-            "path": [gid], "type": "group", "children": member_ids, "row": {},
-        })
+            "path": [gid], "type": "group", "children": member_ids,
+            "row": {"Grup": gkey, "Eleman Sayısı": len(member_ids), **({"Ortalama Skor": avg_h} if avg_h is not None else {})},
+        }
+        if avg_h is not None:
+            group_node["healthScore"] = avg_h
+            group_node["badge"] = f"{avg_h}%"
+            group_node["status"] = "HEALTHY" if avg_h >= 85 else ("WARNING" if avg_h >= 65 else "CRITICAL")
+            group_node["statusColor"] = "#10b981" if avg_h >= 85 else ("#f59e0b" if avg_h >= 65 else "#ef4444")
+        nodes.append(group_node)
         roots.append(gid)
 
     return {
@@ -419,6 +508,119 @@ def _build_grouped(rows, config) -> Dict[str, Any]:
         "stats": {
             "node_count": len(nodes), "path_count": len(paths),
             "max_depth": 1 if nodes else 0, "warnings": warnings,
+        },
+    }
+
+
+def _build_multi_level(rows: List[Dict[str, Any]], config: Dict[str, Any]) -> Dict[str, Any]:
+    """Herhangi bir düz tablo/sorgudan çok katmanlı kolon hiyerarşisi (L1 → L2 → L3 → Yaprak) kurar."""
+    raw_levels = config.get("level_cols")
+    if isinstance(raw_levels, str):
+        level_cols = [c.strip() for c in raw_levels.split(",") if c.strip()]
+    elif isinstance(raw_levels, list):
+        level_cols = [str(c).strip() for c in raw_levels if c and str(c).strip()]
+    else:
+        level_cols = []
+
+    if not level_cols:
+        for k in ("group_col", "level1_col", "subgroup_col", "level2_col", "level3_col"):
+            v = config.get(k)
+            if v and str(v).strip() and str(v).strip() not in level_cols:
+                level_cols.append(str(v).strip())
+
+    label_col = config.get("label_col") or config.get("id_col")
+    if label_col and label_col not in level_cols:
+        level_cols.append(label_col)
+
+    if not level_cols:
+        return _empty_result(["Çok katmanlı hiyerarşi için en az 1 kolon (Seviye 1 / Grup) seçilmelidir."])
+
+    nodes_by_id: Dict[str, Dict[str, Any]] = {}
+    children_map: Dict[str, List[str]] = {}
+    node_scores: Dict[str, List[float]] = {}
+    node_counts: Dict[str, int] = {}
+    roots: List[str] = []
+    leaf_paths: List[List[str]] = []
+    warnings: List[str] = []
+
+    for row_idx, r in enumerate(rows):
+        chain_ids: List[str] = []
+        decos = _extract_decorations(r, config)
+        row_score = decos.get("healthScore")
+
+        for depth, col in enumerate(level_cols):
+            val = _cell(r, col)
+            val_str = str(val).strip() if val is not None and str(val).strip() != "" else f"(Tanımsız {col})"
+            parent_id = chain_ids[-1] if chain_ids else ""
+            is_last = (depth == len(level_cols) - 1)
+
+            nid = f"L{depth}::{parent_id}::{val_str}" if parent_id else f"L0::{val_str}"
+            # Son katmanda aynı isimli birden fazla satır varsa ve id_col farklıysa ayır
+            if is_last and config.get("id_col") and config.get("id_col") != col:
+                raw_uid = _cell(r, config.get("id_col"))
+                if raw_uid is not None:
+                    nid = f"{nid}::{raw_uid}"
+
+            chain_ids.append(nid)
+            node_counts[nid] = node_counts.get(nid, 0) + 1
+            if row_score is not None:
+                node_scores.setdefault(nid, []).append(float(row_score))
+
+            if nid not in nodes_by_id:
+                node_obj: Dict[str, Any] = {
+                    "id": nid,
+                    "label": val_str,
+                    "parent": parent_id,
+                    "depth": depth,
+                    "path": list(chain_ids),
+                    "type": col,
+                    "children": [],
+                    "row": r if is_last else {"Seviye": col, "Değer": val_str},
+                }
+                if is_last:
+                    node_obj.update(decos)
+                nodes_by_id[nid] = node_obj
+                if not parent_id:
+                    if nid not in roots:
+                        roots.append(nid)
+                else:
+                    kids = children_map.setdefault(parent_id, [])
+                    if nid not in kids:
+                        kids.append(nid)
+
+        if chain_ids:
+            leaf_paths.append(chain_ids)
+
+    # Ara düğümlere çocuk listesini ve ortalama sağlık skorlarını işle
+    for nid, nobj in nodes_by_id.items():
+        kids = children_map.get(nid, [])
+        nobj["children"] = kids
+        if kids:
+            nobj["row"] = {
+                "Seviye": nobj["type"],
+                "Değer": nobj["label"],
+                "Alt Düğüm Sayısı": len(kids),
+                "Toplam Kayıt": node_counts.get(nid, len(kids)),
+            }
+            scores = node_scores.get(nid, [])
+            if scores:
+                avg_s = round(sum(scores) / len(scores), 1)
+                nobj["healthScore"] = avg_s
+                nobj["badge"] = f"{avg_s}%"
+                nobj["status"] = "HEALTHY" if avg_s >= 85 else ("WARNING" if avg_s >= 65 else "CRITICAL")
+                nobj["statusColor"] = "#10b981" if avg_s >= 85 else ("#f59e0b" if avg_s >= 65 else "#ef4444")
+                nobj["row"]["Ortalama Skor"] = f"{avg_s}%"
+
+    max_depth = max((n["depth"] for n in nodes_by_id.values()), default=0)
+    return {
+        "nodes": list(nodes_by_id.values()),
+        "roots": roots,
+        "paths": leaf_paths[:500],
+        "stats": {
+            "node_count": len(nodes_by_id),
+            "path_count": len(leaf_paths),
+            "max_depth": max_depth,
+            "warnings": warnings,
         },
     }
 

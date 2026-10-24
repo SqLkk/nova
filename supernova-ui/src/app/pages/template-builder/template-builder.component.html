@@ -1,57 +1,133 @@
-<div class="tb flex flex-col h-screen bg-surface text-ink">
+<div class="tb flex flex-col h-screen min-w-0 bg-surface text-ink overflow-hidden">
 
   <!-- ============================================================= -->
-  <!-- GALERİ — şablon kütüphanesi                                    -->
+  <!-- GALERİ — şablon kütüphanesi & hazır taslaklar                 -->
   <!-- ============================================================= -->
-  <div *ngIf="mode === 'gallery'" class="tb-gallery flex-1 flex flex-col min-h-0 overflow-y-auto">
+  <div *ngIf="mode === 'gallery'" class="tb-gallery flex-1 flex flex-col min-h-0 overflow-y-auto animate-fade-up">
 
-    <header class="tb-g-head flex items-center gap-3 px-6 py-5 bg-surface-card border-b border-edge shrink-0">
-      <div class="tb-logo tb-logo-lg"><i class="fas fa-file-spreadsheet"></i></div>
-      <div>
-        <h1 class="tb-g-title">Template Builder</h1>
-        <p class="tb-g-sub">Choose your template, edit like Excel, generate with one click.</p>
+    <header class="tb-g-head flex items-center justify-between gap-4 px-8 py-6 border-b border-edge shrink-0">
+      <div class="flex items-center gap-4">
+        <div class="tb-logo tb-logo-lg">
+          <i class="fas fa-table-cells-large"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2.5">
+            <h1 class="tb-g-title">Template Studio</h1>
+            <span class="tb-pill-gold">Excel Engine</span>
+          </div>
+          <p class="tb-g-sub">Design data-bound spreadsheet templates, bind SQL or Python outputs, and export with one click.</p>
+        </div>
       </div>
-      <div class="flex items-center gap-2 ml-auto">
-        <button class="tb-btn" (click)="backToApp()" title="Return to panel"><i class="fas fa-arrow-left"></i><span>Return to Panel</span></button>
-        <button class="tb-btn tb-btn-accent" (click)="newTemplate()"><i class="fas fa-plus"></i><span>New Template</span></button>
+      <div class="flex items-center gap-2.5">
+        <button type="button" class="tb-btn tb-btn-accent" (click)="newTemplate()">
+          <i class="fas fa-plus"></i>
+          <span>New Blank Template</span>
+        </button>
       </div>
     </header>
 
-    <div class="tb-g-toolbar flex items-center gap-3 px-6 py-3 border-b border-edge shrink-0">
-      <div class="tb-g-search flex items-center gap-2">
-        <i class="fas fa-search text-ink-muted"></i>
-        <input [(ngModel)]="searchTemplates" placeholder="Search template..." />
-      </div>
-      <span class="ml-auto text-xs text-ink-muted">{{ filteredTemplates.length }} template(s)</span>
-    </div>
+    <div class="tb-g-body px-8 py-6 flex flex-col gap-8 max-w-[1440px] w-full mx-auto">
 
-    <div class="tb-g-grid p-6 grid gap-4">
-      <button class="tb-card tb-card-new" (click)="newTemplate()">
-        <i class="fas fa-plus"></i><span>Blank Template</span>
-      </button>
-
-      <div *ngFor="let t of filteredTemplates" class="tb-card" (click)="open(t)">
-        <div class="tb-card-top">
-          <div class="tb-card-icon"><i class="fas fa-file-circle-check"></i></div>
-          <span class="tb-card-ver">v{{ t.version || 1 }}</span>
-        </div>
-        <h3 class="tb-card-name truncate">{{ t.name }}</h3>
-        <p class="tb-card-desc">{{ t.description || 'No description' }}</p>
-        <div class="tb-card-foot">
-          <span class="tb-card-date"><i class="far fa-clock"></i> {{ relTime(t.updated_at) }}</span>
-          <div class="tb-card-actions" (click)="$event.stopPropagation()">
-            <button class="tb-card-act" (click)="open(t)" title="Open"><i class="fas fa-pen"></i></button>
-            <button class="tb-card-act" (click)="duplicateTemplate(t, $event)" title="Duplicate"><i class="fas fa-copy"></i></button>
-            <button class="tb-card-act tb-card-del" (click)="deleteTemplate(t, $event)" title="Delete"><i class="fas fa-trash"></i></button>
+      <!-- Hazır Taslaklar (Starter Blueprints) -->
+      <section class="flex flex-col gap-3">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="tb-section-dot"></span>
+            <h2 class="tb-section-title">Starter Blueprints</h2>
+            <span class="tb-section-hint">Pre-styled Nov4 report layouts ready to customize</span>
           </div>
         </div>
-      </div>
-    </div>
 
-    <div *ngIf="!templates.length" class="tb-g-empty mx-auto my-auto text-center">
-      <i class="fas fa-folder-open"></i>
-      <p>No templates yet.</p>
-      <button class="tb-btn tb-btn-accent mt-3" (click)="newTemplate()"><i class="fas fa-plus"></i><span>Create first template</span></button>
+        <div class="tb-blueprint-grid grid gap-4">
+          <button *ngFor="let p of starterPresets" type="button"
+                  class="tb-blueprint-card"
+                  [attr.data-accent]="p.accent"
+                  (click)="openStarterPreset(p.id)">
+            <!-- Mini spreadsheet illustration -->
+            <div class="tb-mini-sheet" [attr.data-accent]="p.accent">
+              <div class="tb-mini-banner"></div>
+              <div class="tb-mini-kpis">
+                <span></span><span></span><span></span>
+              </div>
+              <div class="tb-mini-table">
+                <div class="tb-mini-th"></div>
+                <div class="tb-mini-tr"></div>
+                <div class="tb-mini-tr"></div>
+              </div>
+            </div>
+            <div class="tb-blueprint-info">
+              <div class="flex items-center justify-between gap-2 mb-1">
+                <span class="tb-blueprint-badge" [attr.data-accent]="p.accent">
+                  <i class="fas" [ngClass]="p.icon"></i> {{ p.badge }}
+                </span>
+                <span class="tb-blueprint-cta">Use Blueprint <i class="fas fa-arrow-right ml-1"></i></span>
+              </div>
+              <h3 class="tb-blueprint-name">{{ p.name }}</h3>
+              <p class="tb-blueprint-desc">{{ p.desc }}</p>
+            </div>
+          </button>
+        </div>
+      </section>
+
+      <!-- Kayıtlı Şablonlar (Saved Library) -->
+      <section class="flex flex-col gap-4">
+        <div class="flex items-center justify-between gap-4 flex-wrap">
+          <div class="flex items-center gap-2">
+            <span class="tb-section-dot"></span>
+            <h2 class="tb-section-title">Saved Templates</h2>
+            <span class="tb-count-pill">{{ filteredTemplates.length }}</span>
+          </div>
+
+          <div class="tb-g-search flex items-center gap-2">
+            <i class="fas fa-search text-ink-muted text-xs"></i>
+            <input [(ngModel)]="searchTemplates" placeholder="Filter saved templates..." />
+            <button *ngIf="searchTemplates" type="button" class="text-ink-muted hover:text-ink text-xs"
+                    (click)="searchTemplates = ''">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="tb-g-grid grid gap-4">
+          <button type="button" class="tb-card tb-card-new" (click)="newTemplate()">
+            <div class="tb-card-new-icon">
+              <i class="fas fa-plus"></i>
+            </div>
+            <span class="font-semibold text-sm text-ink">Blank Grid Template</span>
+            <span class="text-xs text-ink-muted">Start from a clean A1..Z40 sheet</span>
+          </button>
+
+          <div *ngFor="let t of filteredTemplates" class="tb-card" (click)="open(t)">
+            <!-- Mini visual preview header -->
+            <div class="tb-card-preview">
+              <div class="tb-preview-bar"></div>
+              <div class="tb-preview-rows">
+                <span></span><span></span><span></span>
+              </div>
+              <span class="tb-card-ver">v{{ t.version || 1 }}</span>
+            </div>
+
+            <div class="tb-card-top mt-1">
+              <div class="tb-card-icon"><i class="fas fa-file-excel"></i></div>
+              <div class="flex-1 min-w-0">
+                <h3 class="tb-card-name truncate">{{ t.name }}</h3>
+                <span class="tb-card-date"><i class="far fa-clock"></i> {{ relTime(t.updated_at) || 'Saved' }}</span>
+              </div>
+            </div>
+
+            <p class="tb-card-desc">{{ t.description || 'Custom data-bound spreadsheet report template.' }}</p>
+
+            <div class="tb-card-foot">
+              <span class="tb-card-open-hint">Open in Editor <i class="fas fa-chevron-right text-[10px]"></i></span>
+              <div class="tb-card-actions" (click)="$event.stopPropagation()">
+                <button type="button" class="tb-card-act" (click)="open(t)" title="Edit"><i class="fas fa-pen"></i></button>
+                <button type="button" class="tb-card-act" (click)="duplicateTemplate(t, $event)" title="Duplicate"><i class="fas fa-copy"></i></button>
+                <button type="button" class="tb-card-act tb-card-del" (click)="deleteTemplate(t, $event)" title="Delete"><i class="fas fa-trash"></i></button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
   </div>
 
@@ -62,173 +138,376 @@
 
     <!-- ===== Üst bar ===== -->
     <header class="tb-header flex items-center gap-3 px-4 py-2.5 bg-surface-card border-b border-edge shrink-0">
-      <button class="tb-btn" (click)="openGallery()" title="Return to gallery"><i class="fas fa-arrow-left"></i></button>
-      <div class="flex items-center gap-2">
-        <div class="tb-logo"><i class="fas fa-file-spreadsheet"></i></div>
+      <button type="button" class="tb-btn" (click)="openGallery()" title="Back to Template Studio">
+        <i class="fas fa-arrow-left"></i>
+        <span>Gallery</span>
+      </button>
+      <span class="tb-sep"></span>
+      <div class="flex items-center gap-2.5 min-w-0">
+        <div class="tb-logo"><i class="fas fa-table-cells"></i></div>
         <input class="tb-name" [(ngModel)]="doc.name" placeholder="Template name" />
+        <input class="tb-desc-input hidden md:block" [(ngModel)]="doc.description" placeholder="Add short description..." />
       </div>
 
-      <div class="flex items-center gap-1.5 ml-auto">
-        <button class="tb-btn" (click)="newDoc()" title="New"><i class="fas fa-file"></i><span>New</span></button>
-        <button class="tb-btn tb-btn-primary" (click)="save()" [disabled]="busy">
-          <i class="fas" [ngClass]="busy ? 'fa-spinner fa-spin' : 'fa-save'"></i><span>Save</span>
+      <div class="flex items-center gap-2 ml-auto">
+        <button type="button" class="tb-btn" data-coworker="tb-live-preview"
+          [ngClass]="livePreviewMode ? 'tb-btn-accent' : ''"
+          (click)="toggleLivePreview()" [disabled]="livePreviewLoading || busy"
+          title="Şablondaki tüm SQL sorgularını ve Python scriptlerini canlı çalıştırıp güncel sonuçları tabloda göster">
+          <i class="fas" [ngClass]="livePreviewLoading ? 'fa-spinner fa-spin' : (livePreviewMode ? 'fa-pen-to-square' : 'fa-bolt')"></i>
+          <span>{{ livePreviewMode ? 'Tasarım Moduna Dön' : 'Canlı Çalıştır & Önizle' }}</span>
         </button>
-        <button class="tb-btn tb-btn-accent" (click)="render()" [disabled]="busy">
-          <i class="fas fa-file-excel"></i><span>Generate Excel</span>
+        <button type="button" class="tb-btn" (click)="newDoc()" title="Reset to blank sheet">
+          <i class="fas fa-file-circle-plus"></i><span>Clear</span>
+        </button>
+        <button type="button" class="tb-btn tb-btn-primary" (click)="save()" [disabled]="busy">
+          <i class="fas" [ngClass]="busy ? 'fa-spinner fa-spin' : 'fa-floppy-disk'"></i><span>Save</span>
+        </button>
+        <button type="button" class="tb-btn tb-btn-accent" (click)="render('xlsx')" [disabled]="busy" title="Canlı sorguları çalıştırıp Excel (.XLSX) indir">
+          <i class="fas fa-file-excel"></i><span>Export .XLSX</span>
+        </button>
+        <button type="button" class="tb-btn" (click)="render('pdf')" [disabled]="busy" title="Canlı sorguları çalıştırıp PDF indir">
+          <i class="fas fa-file-pdf text-rose-400"></i><span>Export .PDF</span>
         </button>
       </div>
     </header>
 
+    <!-- ===== Canlı Çalıştırma (Live Execution) Bilgi Barı ===== -->
+    <div *ngIf="livePreviewMode && evaluatedResult"
+         class="flex items-center justify-between gap-3 px-4 py-2 bg-emerald-500/10 border-b border-emerald-500/30 text-xs shrink-0">
+      <div class="flex items-center gap-2 flex-wrap">
+        <span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold uppercase tracking-wider text-[10px]">
+          <i class="fas fa-bolt mr-1"></i>Canlı Rapor Görünümü (Dinamik Veri)
+        </span>
+        <span class="text-ink-muted">
+          Çalıştırma Zamanı: <strong class="text-ink">{{ evaluatedResult.evaluatedAt | date:'HH:mm:ss' }}</strong>
+        </span>
+        <span *ngFor="let qs of evaluatedResult.queryStats"
+              class="px-2 py-0.5 rounded bg-surface-card border border-edge text-[10px] text-ink">
+          <i class="fas mr-1" [ngClass]="qs.kind === 'python' ? 'fa-code text-amber-400' : 'fa-database text-cyan-400'"></i>
+          <strong>{{ qs.name }}</strong>: {{ qs.rowCount }} satır ({{ qs.executionMs }} ms)
+        </span>
+      </div>
+      <div class="flex items-center gap-2 shrink-0">
+        <button type="button" class="tb-mini" (click)="executeLivePreview()" [disabled]="livePreviewLoading">
+          <i class="fas fa-rotate mr-1" [class.fa-spin]="livePreviewLoading"></i>Yeniden Çalıştır
+        </button>
+        <button type="button" class="tb-mini" (click)="exitLivePreview()">
+          <i class="fas fa-pen mr-1"></i>Şablonu Düzenle
+        </button>
+      </div>
+    </div>
+
     <!-- ===== Formula bar ===== -->
     <div class="tb-formula flex items-center gap-2 px-4 py-1.5 bg-surface-card border-b border-edge shrink-0">
       <span class="tb-addr">{{ selectedAddress }}</span>
+      <span *ngIf="selectedBindingBadge" class="tb-binding-pill">{{ selectedBindingBadge }}</span>
       <span class="tb-fx">fx</span>
-      <input class="tb-formula-input" [(ngModel)]="formulaValue" [placeholder]="'Enter value or {{field_name}}'" />
+      <input class="tb-formula-input" [(ngModel)]="formulaValue"
+             [placeholder]="'Type text, =FORMULA, or click a query field on the left to bind {{field}}'" />
     </div>
 
     <!-- ===== Toolbar ===== -->
     <div class="tb-toolbar flex items-center gap-1 px-4 py-1.5 bg-surface-card border-b border-edge shrink-0 flex-wrap">
-      <button class="tb-tool" (click)="toggleBold()" title="Bold"><i class="fas fa-bold"></i></button>
-      <span class="tb-sep"></span>
-      <input type="color" class="tb-color" (change)="setFill($any($event.target).value)" title="Fill color" />
+      <!-- Text style -->
+      <button type="button" class="tb-tool" [class.active]="selectedStyle.bold" (click)="toggleBold()" title="Bold">
+        <i class="fas fa-bold"></i>
+      </button>
+      <button type="button" class="tb-tool" [class.active]="selectedStyle.italic" (click)="toggleItalic()" title="Italic">
+        <i class="fas fa-italic"></i>
+      </button>
+      <button type="button" class="tb-tool" [class.active]="selectedStyle.underline" (click)="toggleUnderline()" title="Underline">
+        <i class="fas fa-underline"></i>
+      </button>
+
       <span class="tb-sep"></span>
 
-      <button class="tb-tool" (click)="mergeRange()" [disabled]="!hasRange" title="Merge selected range">
+      <!-- Alignment -->
+      <button type="button" class="tb-tool" [class.active]="!selectedStyle.align || selectedStyle.align === 'left'"
+              (click)="setAlign('left')" title="Align Left">
+        <i class="fas fa-align-left"></i>
+      </button>
+      <button type="button" class="tb-tool" [class.active]="selectedStyle.align === 'center'"
+              (click)="setAlign('center')" title="Align Center">
+        <i class="fas fa-align-center"></i>
+      </button>
+      <button type="button" class="tb-tool" [class.active]="selectedStyle.align === 'right'"
+              (click)="setAlign('right')" title="Align Right">
+        <i class="fas fa-align-right"></i>
+      </button>
+
+      <span class="tb-sep"></span>
+
+      <!-- Colors & Theme Presets -->
+      <label class="tb-color-wrap" title="Background fill color">
+        <i class="fas fa-fill-drip"></i>
+        <input type="color" class="tb-color-native" [value]="selectedStyle.bg || '#F5B301'"
+               (change)="setFill($any($event.target).value)" />
+        <span class="tb-color-bar" [style.background]="selectedStyle.bg || '#F5B301'"></span>
+      </label>
+
+      <label class="tb-color-wrap" title="Text color">
+        <i class="fas fa-font"></i>
+        <input type="color" class="tb-color-native" [value]="selectedStyle.color || '#F4F1EA'"
+               (change)="setTextColor($any($event.target).value)" />
+        <span class="tb-color-bar" [style.background]="selectedStyle.color || '#F4F1EA'"></span>
+      </label>
+
+      <div class="flex items-center gap-1 ml-0.5">
+        <button type="button" class="tb-preset-chip tb-preset-gold" (click)="applyThemePreset('gold-header')" title="Apply Nov4 Gold Header style">
+          Gold Header
+        </button>
+        <button type="button" class="tb-preset-chip tb-preset-onyx" (click)="applyThemePreset('onyx-header')" title="Apply Dark Onyx Header style">
+          Onyx Banner
+        </button>
+        <button type="button" class="tb-preset-chip tb-preset-lunar" (click)="applyThemePreset('lunar-sub')" title="Apply Subheader style">
+          Subheader
+        </button>
+      </div>
+
+      <span class="tb-sep"></span>
+
+      <!-- Merge -->
+      <button type="button" class="tb-tool" (click)="mergeRange()" [disabled]="!hasRange" title="Merge selected range (Shift+Click)">
         <i class="fas fa-object-group"></i><span class="tb-tool-text">Merge</span>
       </button>
-      <button class="tb-tool" (click)="unmergeAt()" [disabled]="!selectedMerge" title="Unmerge">
+      <button type="button" class="tb-tool" (click)="unmergeAt()" [disabled]="!selectedMerge" title="Unmerge cells">
         <i class="fas fa-object-ungroup"></i>
       </button>
+
       <span class="tb-sep"></span>
 
+      <!-- Dynamic Bindings -->
       <select class="tb-select" (change)="insertBuiltin($any($event.target).value); $any($event.target).value = ''">
-        <option value="">Built-in...</option>
-        <option value="report_date">Date</option>
-        <option value="report_datetime">Date & Time</option>
-        <option value="report_name">Report Name</option>
+        <option value="">+ Auto Token...</option>
+        <option value="report_date">Report Date</option>
+        <option value="report_datetime">Date &amp; Time</option>
+        <option value="report_name">Report Title</option>
       </select>
 
       <select class="tb-select" (change)="bindSummary($any($event.target).value); $any($event.target).value = ''"
         [disabled]="!activeSource">
-        <option value="">Summary...</option>
+        <option value="">+ Summary Σ...</option>
         <option *ngFor="let op of summaryOps" [value]="op">{{ op }}</option>
       </select>
 
-      <button class="tb-tool" (click)="makeBand()" [disabled]="!hasRange || !activeSource"
-        title="Make selected range detail band">
-        <i class="fas fa-table"></i><span class="tb-tool-text">Band</span>
+      <button type="button" class="tb-tool tb-tool-highlight" (click)="makeBand()" [disabled]="!hasRange || !activeSource"
+        title="Convert selected range into a repeating Detail Band">
+        <i class="fas fa-Repeat"></i><i class="fas fa-table-list"></i><span class="tb-tool-text">Detail Band</span>
       </button>
 
       <div class="relative">
-        <button class="tb-tool" (click)="chartMenuOpen = !chartMenuOpen" [disabled]="!activeSource" title="Add chart">
+        <button type="button" class="tb-tool" (click)="chartMenuOpen = !chartMenuOpen" [disabled]="!activeSource" title="Insert embedded chart">
           <i class="fas fa-chart-column"></i><span class="tb-tool-text">Chart</span>
         </button>
         <div *ngIf="chartMenuOpen" class="tb-menu tb-menu-right">
-          <button *ngFor="let ct of chartTypes" class="tb-menu-item" (click)="insertChart(ct); chartMenuOpen = false">
+          <button *ngFor="let ct of chartTypes" type="button" class="tb-menu-item" (click)="insertChart(ct); chartMenuOpen = false">
             <i class="fas"
               [ngClass]="{'fa-chart-column': ct==='bar', 'fa-chart-line': ct==='line', 'fa-chart-pie': ct==='pie'}"></i>
-            <span>{{ ct | uppercase }}</span>
+            <span>{{ ct | uppercase }} Chart</span>
           </button>
         </div>
       </div>
 
-      <button class="tb-tool ml-auto" (click)="clearCell()" title="Clear cell"><i class="fas fa-eraser"></i></button>
+      <div class="ml-auto flex items-center gap-1">
+        <button type="button" class="tb-tool" (click)="applyThemePreset('clear')" title="Clear cell formatting">
+          <i class="fas fa-paintbrush"></i>
+        </button>
+        <button type="button" class="tb-tool" (click)="clearCell()" title="Clear cell content &amp; binding">
+          <i class="fas fa-eraser"></i>
+        </button>
+      </div>
     </div>
 
     <!-- ===== Gövde ===== -->
     <div class="flex flex-1 min-h-0">
 
       <!-- Sol: sekme paneli -->
-      <aside class="tb-side flex flex-col w-72 bg-surface-card border-r border-edge shrink-0">
+      <aside class="tb-side flex flex-col w-80 bg-surface-card border-r border-edge shrink-0">
 
         <!-- Sekmeler -->
         <div class="tb-side-tabs flex shrink-0">
-          <button class="tb-side-tab" [class.active]="sideTab === 'queries'" (click)="sideTab = 'queries'">
-            <i class="fas fa-database"></i><span>Queries</span>
+          <button type="button" class="tb-side-tab" [class.active]="sideTab === 'queries'" (click)="sideTab = 'queries'">
+            <i class="fas fa-database"></i><span>SQL Sorguları ({{ queries.length }})</span>
           </button>
-          <button class="tb-side-tab" [class.active]="sideTab === 'python'" (click)="sideTab = 'python'">
-            <i class="fas fa-file-code"></i><span>Python</span>
+          <button type="button" class="tb-side-tab" [class.active]="sideTab === 'python'" (click)="sideTab = 'python'">
+            <i class="fas fa-code"></i><span>Python ({{ pythonScripts.length }})</span>
           </button>
+        </div>
+
+        <!-- Ortak arama kutusu -->
+        <div class="px-3 py-2 border-b border-edge bg-surface/40">
+          <div class="relative">
+            <i class="fas fa-search absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] text-ink-muted"></i>
+            <input [(ngModel)]="sourceSearchTerm"
+                   placeholder="Sorgu veya Python scripti ara..."
+                   class="tb-input w-full pl-7 pr-6 py-1 text-xs" />
+            <button *ngIf="sourceSearchTerm" type="button"
+                    (click)="sourceSearchTerm = ''"
+                    class="absolute right-2 top-1/2 -translate-y-1/2 text-ink-muted hover:text-ink text-[10px]">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
         </div>
 
         <!-- Sorgular sekmesi -->
         <ng-container *ngIf="sideTab === 'queries'">
-          <div class="tb-side-head flex items-center justify-between px-3 py-2 border-b border-edge">
-            <span class="tb-side-title">Saved Queries</span>
-            <button class="tb-icon-btn" (click)="toggleQueryForm()" [title]="showQueryForm ? 'Close' : 'New query'">
+          <div class="tb-side-head flex items-center justify-between px-3.5 py-2 border-b border-edge">
+            <span class="tb-side-title">SQL Sorguları</span>
+            <button type="button" class="tb-icon-btn" (click)="toggleQueryForm()" [title]="showQueryForm ? 'Kapat' : 'Hızlı SQL sorgusu ekle'">
               <i class="fas" [ngClass]="showQueryForm ? 'fa-minus' : 'fa-plus'"></i>
             </button>
           </div>
 
           <div *ngIf="showQueryForm" class="tb-qform p-3 border-b border-edge bg-surface-raised/40 flex flex-col gap-2">
-            <input class="tb-input" [(ngModel)]="newQuery.name" placeholder="Query name" />
+            <input class="tb-input" [(ngModel)]="newQuery.name" placeholder="Sorgu adı" />
+            <input class="tb-input" [(ngModel)]="newQuery.description" placeholder="Açıklama (isteğe bağlı)" />
             <select class="tb-input" [(ngModel)]="newQuery.dataSourceId">
               <option *ngFor="let ds of dataSources" [value]="ds.id">{{ ds.name }} ({{ ds.dbType }})</option>
             </select>
-            <textarea class="tb-input tb-sql" [(ngModel)]="newQuery.sql" placeholder="SELECT … FROM …" rows="4"></textarea>
-            <button class="tb-btn tb-btn-accent tb-btn-sm" (click)="saveQuery()">Save</button>
+            <textarea class="tb-input tb-sql" [(ngModel)]="newQuery.sql" placeholder="SELECT … FROM …" rows="3"></textarea>
+            <button type="button" class="tb-btn tb-btn-accent tb-btn-sm justify-center" (click)="saveQuery()">Sorguyu Kaydet</button>
           </div>
 
-          <div class="flex-1 overflow-y-auto p-2 flex flex-col gap-1">
-            <button *ngFor="let q of queries" class="tb-query"
+          <div class="flex-1 overflow-y-auto p-2 flex flex-col gap-1.5 min-h-[140px]">
+            <button *ngFor="let q of filteredQueries" type="button" class="tb-query flex-col !items-stretch gap-1 py-2"
               [class.active]="activeSource?.id === q.id" (click)="selectQuery(q)">
-              <i class="fas fa-circle text-[7px]"
-                [style.color]="activeSource?.id === q.id ? 'rgb(var(--accent-primary))' : 'rgb(var(--text-muted))'"></i>
-              <span class="flex-1 text-left truncate">{{ q.name }}</span>
-              <span class="tb-query-meta">{{ q.dataSourceId }}</span>
+              <div class="flex items-center gap-2 w-full">
+                <span class="tb-query-dot shrink-0" [class.active]="activeSource?.id === q.id"></span>
+                <span class="flex-1 text-left font-semibold truncate text-xs">{{ q.name }}</span>
+                <span class="tb-query-meta shrink-0">{{ q.dataSourceId }}</span>
+              </div>
+              <p *ngIf="q.description" class="text-[10px] text-ink-muted text-left line-clamp-2 pl-3.5 leading-snug">
+                {{ q.description }}
+              </p>
             </button>
-            <p *ngIf="!queries.length" class="tb-empty">No queries yet.</p>
+            <p *ngIf="!filteredQueries.length" class="tb-empty">Eşleşen SQL sorgusu bulunamadı.</p>
           </div>
         </ng-container>
 
         <!-- Python sekmesi -->
         <ng-container *ngIf="sideTab === 'python'">
-          <div class="tb-side-head flex items-center justify-between px-3 py-2 border-b border-edge">
-            <span class="tb-side-title">Python Scripts</span>
-            <span class="tb-side-hint">click → run</span>
+          <div class="tb-side-head flex items-center justify-between px-3.5 py-2 border-b border-edge">
+            <span class="tb-side-title">Python Scriptleri</span>
+            <span class="tb-side-hint">tıkla &amp; çalıştır</span>
           </div>
 
-          <div class="flex-1 overflow-y-auto p-2 flex flex-col gap-1">
-            <button *ngFor="let s of pythonScripts" class="tb-query"
+          <div class="flex-1 overflow-y-auto p-2 flex flex-col gap-1.5 min-h-[140px]">
+            <button *ngFor="let s of filteredPythonScripts" type="button" class="tb-query flex-col !items-stretch gap-1 py-2"
               [class.active]="s.id === activePythonId" (click)="selectPythonScript(s)">
-              <i class="fas fa-file-code text-brand"></i>
-              <span class="flex-1 text-left truncate">{{ s.name }}</span>
+              <div class="flex items-center gap-2 w-full">
+                <i class="fas fa-file-code text-brand shrink-0"></i>
+                <span class="flex-1 text-left font-semibold truncate text-xs">{{ s.name }}</span>
+                <span *ngIf="s.datasetNames?.length" class="tb-query-meta shrink-0">{{ s.datasetNames?.length }} tablo</span>
+              </div>
+              <p *ngIf="s.description" class="text-[10px] text-ink-muted text-left line-clamp-2 pl-4 leading-snug">
+                {{ s.description }}
+              </p>
             </button>
-            <p *ngIf="!pythonScripts.length" class="tb-empty">No scripts yet.</p>
-            <span *ngIf="pyLoading" class="tb-empty"><i class="fas fa-spinner fa-spin"></i> Running...</span>
+            <p *ngIf="!filteredPythonScripts.length" class="tb-empty">Eşleşen Python scripti bulunamadı.</p>
+            <span *ngIf="pyLoading" class="tb-empty"><i class="fas fa-spinner fa-spin mr-1"></i> Python sandbox çalıştırılıyor...</span>
             <span *ngIf="pyError" class="tb-empty tb-error-text">{{ pyError }}</span>
           </div>
 
           <!-- Çıktı datasetleri -->
-          <div *ngIf="pyDatasetNames.length" class="tb-py-datasets border-t border-edge">
-            <div class="tb-side-head px-3 py-2 border-b border-edge">
-              <span class="tb-side-title">Outputs</span>
+          <div *ngIf="pyDatasetNames.length" class="tb-py-datasets border-t border-edge shrink-0">
+            <div class="tb-side-head px-3.5 py-1.5 border-b border-edge flex items-center justify-between">
+              <span class="tb-side-title">Python Çıktı Veri Setleri</span>
+              <span class="tb-side-hint">{{ pyDatasetNames.length }} adet</span>
             </div>
-            <div class="p-2 flex flex-col gap-1">
-              <button *ngFor="let ds of pyDatasetNames" class="tb-query tb-query-sub"
+            <div class="p-2 flex flex-col gap-1 max-h-28 overflow-y-auto">
+              <button *ngFor="let ds of pyDatasetNames" type="button" class="tb-query tb-query-sub"
                 [class.active]="activeSource?.id === ('py:' + activePythonId + ':' + ds)"
                 (click)="selectPythonDataset(ds)">
                 <i class="fas fa-table text-brand"></i>
-                <span class="flex-1 text-left truncate">{{ ds }}</span>
-                 <span class="tb-query-meta">{{ pyPreview[ds].rows?.length || 0 }} row(s)</span>
+                <span class="flex-1 text-left truncate font-medium">{{ ds }}</span>
+                <span class="tb-query-meta">{{ pyPreview[ds]?.totalRows ?? pyPreview[ds]?.rows?.length ?? 0 }} satır</span>
               </button>
             </div>
           </div>
         </ng-container>
 
-        <!-- Aktif kaynak alanları (her iki sekme için ortak) -->
-        <div *ngIf="activeSource" class="tb-fields border-t border-edge">
-          <div class="tb-side-head px-3 py-2 border-b border-edge">
-            <span class="tb-side-title"><i class="fas fa-columns text-brand"></i> Fields</span>
-            <span class="tb-side-hint truncate ml-1">{{ activeSource.label }}</span>
+        <!-- Seçili Veri Kaynağı Detayı & Bağlama Araçları (SQL ve Python için ortak) -->
+        <div *ngIf="activeSource" class="tb-fields border-t border-edge bg-surface/50 flex flex-col max-h-[52%] overflow-y-auto shrink-0">
+          <!-- Başlık + Açıklama + Canlı Önizleme -->
+          <div class="px-3.5 py-2.5 border-b border-edge flex flex-col gap-1.5">
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center gap-1.5 min-w-0">
+                <span class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase shrink-0"
+                      [ngClass]="activeSource.kind === 'python' ? 'bg-amber-500/20 text-amber-300' : 'bg-cyan-500/20 text-cyan-300'">
+                  {{ activeSource.kind === 'python' ? 'PYTHON' : 'SQL' }}
+                </span>
+                <span class="font-bold text-xs text-ink truncate" [title]="activeSource.label">{{ activeSource.label }}</span>
+              </div>
+              <span *ngIf="!sourceLoading && activeSource.totalRows !== undefined"
+                    class="text-[10px] text-emerald-400 font-mono shrink-0">
+                {{ activeSource.totalRows }} satır
+              </span>
+            </div>
+
+            <p *ngIf="activeSource.description" class="text-[11px] text-ink-muted leading-snug">
+              {{ activeSource.description }}
+            </p>
+
+            <!-- Hızlı Aksiyonlar: Tablo Olarak Ekle & Sonuçları Gör -->
+            <div class="flex items-center gap-1.5 pt-1">
+              <button type="button"
+                      (click)="autoInsertTableFromActiveSource()"
+                      [disabled]="sourceLoading || !activeSource.columns?.length"
+                      class="flex-1 px-2 py-1.5 rounded bg-brand/15 hover:bg-brand/25 border border-brand/40 text-brand text-[11px] font-semibold flex items-center justify-center gap-1.5 transition"
+                      [title]="'Seçili hücreye (' + selectedAddress + ') kolon başlıklarını ve dinamik veri bandını yerleştir'">
+                <i class="fas fa-table-list"></i>
+                <span>Tablo Olarak Ekle ({{ selectedAddress }})</span>
+              </button>
+              <button type="button"
+                      (click)="showSourcePreviewModal = true"
+                      [disabled]="sourceLoading"
+                      class="px-2.5 py-1.5 rounded bg-surface-card hover:bg-surface-raised border border-edge text-ink text-[11px] font-medium flex items-center gap-1 transition"
+                      title="Sorgu / Python sonuçlarını canlı tabloda incele">
+                <i class="fas fa-eye text-cyan-400"></i>
+                <span>Sonuçlar</span>
+              </button>
+            </div>
           </div>
-          <div class="p-2 flex flex-wrap gap-1.5">
-            <button *ngFor="let col of activeSource.columns" class="tb-chip"
-              (click)="bindField(col.name)" [title]="'Bind to selected cell: ' + col.name">
-              {{ col.name }}
-            </button>
-            <span *ngIf="sourceLoading" class="tb-empty">Loading...</span>
-            <span *ngIf="!sourceLoading && !activeSource.columns?.length" class="tb-empty">No columns.</span>
+
+          <!-- Kolonlar (Tek Hücreye Bağla) -->
+          <div class="px-3.5 py-2 border-b border-edge">
+            <div class="flex items-center justify-between mb-1.5">
+              <span class="text-[10px] font-bold uppercase tracking-wider text-ink-muted">
+                <i class="fas fa-link text-brand mr-1"></i>Kolonlar ({{ selectedAddress }} hücresine bağla)
+              </span>
+              <span class="text-[10px] text-ink-muted">{{ activeSource.columns?.length || 0 }} alan</span>
+            </div>
+            <div class="flex flex-wrap gap-1">
+              <button *ngFor="let col of activeSource.columns" type="button" class="tb-chip"
+                (click)="bindField(col.name)" [title]="col.name + ' alanını ' + selectedAddress + ' hücresine bağla'">
+                <i class="fas fa-link text-[9px] opacity-70 mr-1"></i>{{ col.name }}
+              </button>
+              <span *ngIf="sourceLoading" class="tb-empty"><i class="fas fa-spinner fa-spin mr-1"></i> Şema ve sonuçlar yükleniyor...</span>
+              <span *ngIf="!sourceLoading && !activeSource.columns?.length" class="tb-empty">Kolon bulunamadı.</span>
+            </div>
+          </div>
+
+          <!-- Özet (Summary Σ) Hesaplama Bağla -->
+          <div *ngIf="activeSource.columns?.length" class="px-3.5 py-2">
+            <div class="flex items-center justify-between gap-2 mb-1.5">
+              <span class="text-[10px] font-bold uppercase tracking-wider text-ink-muted">
+                <i class="fas fa-calculator text-amber-400 mr-1"></i>Özet Hesaplama (Σ → {{ selectedAddress }})
+              </span>
+            </div>
+            <div class="flex items-center gap-1.5 mb-1.5">
+              <select [(ngModel)]="summaryField" class="tb-input flex-1 py-1 text-xs" title="Özetlenecek kolonu seçin">
+                <option *ngFor="let col of activeSource.columns" [value]="col.name">{{ col.name }}</option>
+              </select>
+            </div>
+            <div class="flex items-center gap-1 flex-wrap">
+              <button *ngFor="let op of summaryOps" type="button"
+                      (click)="bindSummary(op)"
+                      class="px-2 py-1 rounded bg-surface-card hover:bg-brand/20 border border-edge hover:border-brand/40 text-[10px] font-mono font-semibold text-ink transition"
+                      [title]="selectedAddress + ' hücresine ' + op + '(' + summaryField + ') bağla'">
+                Σ {{ op }}
+              </button>
+            </div>
           </div>
         </div>
       </aside>
@@ -239,8 +518,9 @@
           <table class="tb-grid">
             <thead>
               <tr>
-                <th class="tb-corner"></th>
+                <th class="tb-corner"><i class="fas fa-caret-right text-[9px] opacity-40"></i></th>
                 <th *ngFor="let c of colsArray()" class="tb-colhead"
+                  [class.active-axis]="selected.col === c"
                   [style.min-width.px]="colWidthPx(c)" [style.width.px]="colWidthPx(c)">
                   {{ colLetter(c) }}
                   <span class="tb-resize tb-resize-col" (mousedown)="startColResize(c, $event)"></span>
@@ -249,14 +529,18 @@
             </thead>
             <tbody>
               <tr *ngFor="let r of rowsArray()">
-                <td class="tb-rowhead" [style.height.px]="rowHeightPx(r)">
+                <td class="tb-rowhead"
+                    [class.active-axis]="selected.row === r"
+                    [style.height.px]="rowHeightPx(r)">
                   {{ r }}
                   <span class="tb-resize tb-resize-row" (mousedown)="startRowResize(r, $event)"></span>
                 </td>
                 <ng-container *ngFor="let c of colsArray()">
                   <td *ngIf="!isMergeCovered(r, c)" class="tb-cell"
+                    [attr.data-cell]="r + ',' + c"
                     [class.selected]="isSelected(r, c)"
                     [class.in-range]="inRange(r, c)"
+                    [class.in-band]="isInBand(r, c)"
                     [class.has-binding]="!!cellAt(r, c)?.binding"
                     [style.width.px]="colWidthPx(c)"
                     [style.height.px]="rowHeightPx(r)"
@@ -269,6 +553,10 @@
                       id="tb-edit-input" class="tb-edit-input" [(ngModel)]="editValue"
                       (keydown.enter)="commitEdit()" (keydown.escape)="cancelEdit()" (blur)="commitEdit()" />
                     <ng-container *ngIf="!(editing && editing.row === r && editing.col === c)">
+                      <span *ngIf="chartAnchorAt(r, c) as ch" class="tb-chart-pill">
+                        <i class="fas fa-chart-Simple mr-1"></i>📊 {{ ch.title || (ch.type | uppercase) }} ({{ ch.anchor.widthCols }}×{{ ch.anchor.heightRows }})
+                        <button type="button" class="tb-chart-del" (click)="removeChart(ch.id, $event)" title="Remove chart">×</button>
+                      </span>
                       {{ displayValue(cellAt(r, c)) }}
                     </ng-container>
                   </td>
@@ -279,29 +567,103 @@
         </div>
 
         <!-- Bant rozetleri + boyut kontrolleri -->
-        <div class="tb-statusbar flex items-center gap-2 px-3 py-1.5 border-t border-edge bg-surface-card text-xs text-ink-muted shrink-0">
-          <span *ngIf="hasRange" class="tb-badge"><i class="fas fa-vector-square"></i> Range selected — Band / Merge</span>
-          <span *ngIf="!hasRange" class="text-ink-muted">Select cell • shift+click range • double click to edit • use arrow keys to navigate</span>
-          <span class="ml-auto flex items-center gap-2">
-            <button class="tb-mini" (click)="addRows()"><i class="fas fa-plus"></i> 10 rows</button>
-            <button class="tb-mini" (click)="addCols()"><i class="fas fa-plus"></i> 4 columns</button>
-            <span class="text-brand"><i class="fas fa-table"></i> {{ sheet.bands?.length || 0 }} band(s)</span>
-            <span class="text-brand"><i class="fas fa-chart-column"></i> {{ sheet.charts?.length || 0 }} chart(s)</span>
+        <div class="tb-statusbar flex items-center gap-3 px-4 py-1.5 border-t border-edge bg-surface-card text-xs text-ink-muted shrink-0">
+          <span *ngIf="hasRange" class="tb-badge"><i class="fas fa-vector-square"></i> Range active — Click Merge or Detail Band</span>
+          <span *ngIf="!hasRange" class="text-ink-muted truncate">
+            <strong class="text-ink">{{ selectedAddress }}</strong> • Shift+Click to select range • Double-click or type to edit
+          </span>
+          <span class="ml-auto flex items-center gap-2 shrink-0">
+            <button type="button" class="tb-mini" (click)="addRows()"><i class="fas fa-plus"></i> 10 Rows</button>
+            <button type="button" class="tb-mini" (click)="addCols()"><i class="fas fa-plus"></i> 4 Cols</button>
+            <span class="tb-stat-pill"><i class="fas fa-table-list text-brand"></i> {{ sheet.bands?.length || 0 }} Band(s)</span>
+            <span class="tb-stat-pill"><i class="fas fa-chart-column text-brand"></i> {{ sheet.charts?.length || 0 }} Chart(s)</span>
           </span>
         </div>
 
         <!-- Sheet sekmeleri -->
-        <div class="tb-sheets flex items-center gap-1 px-2 py-1.5 border-t border-edge bg-surface-card shrink-0">
-          <button *ngFor="let s of doc.sheets; let i = index" class="tb-sheet" [class.active]="i === sheetIndex"
+        <div class="tb-sheets flex items-center gap-1.5 px-3 py-1.5 border-t border-edge bg-surface-card shrink-0">
+          <button *ngFor="let s of doc.sheets; let i = index" type="button" class="tb-sheet" [class.active]="i === sheetIndex"
             (click)="selectSheet(i)">
-            {{ s.name }}
+            <i class="fas fa-table-cells text-[10px] mr-1 opacity-70"></i>{{ s.name }}
           </button>
-          <button class="tb-sheet-add" (click)="addSheet()"><i class="fas fa-plus"></i></button>
+          <button type="button" class="tb-sheet-add" (click)="addSheet()" title="Add worksheet"><i class="fas fa-plus"></i></button>
         </div>
       </section>
     </div>
   </ng-container>
 
+  <!-- Seçili Veri Kaynağı (SQL / Python) Canlı Sonuç Önizleme Modalı -->
+  <div *ngIf="showSourcePreviewModal && activeSource"
+       class="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-6"
+       (click)="showSourcePreviewModal = false">
+    <div class="bg-surface-card border border-edge rounded-xl w-full max-w-5xl max-h-[82vh] flex flex-col shadow-2xl overflow-hidden"
+         (click)="$event.stopPropagation()">
+      <div class="px-5 py-3.5 border-b border-edge flex items-center justify-between gap-4 bg-surface">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase"
+                [ngClass]="activeSource.kind === 'python' ? 'bg-amber-500/20 text-amber-300' : 'bg-cyan-500/20 text-cyan-300'">
+            {{ activeSource.kind === 'python' ? 'Python Script Çıktısı' : 'SQL Sorgu Sonucu' }}
+          </span>
+          <h3 class="font-bold text-sm text-ink truncate">{{ activeSource.label }}</h3>
+          <span class="text-xs text-emerald-400 font-mono shrink-0">
+            {{ activeSource.totalRows || activeSource.rows?.length || 0 }} satır
+            <ng-container *ngIf="activeSource.executionMs"> • {{ activeSource.executionMs }} ms</ng-container>
+          </span>
+        </div>
+        <div class="flex items-center gap-2">
+          <button type="button"
+                  (click)="autoInsertTableFromActiveSource(); showSourcePreviewModal = false"
+                  class="tb-btn tb-btn-accent tb-btn-sm">
+            <i class="fas fa-table-list mr-1"></i>Şablona Dinamik Tablo Olarak Ekle ({{ selectedAddress }})
+          </button>
+          <button type="button" (click)="showSourcePreviewModal = false" class="tb-btn tb-btn-sm">
+            <i class="fas fa-times"></i> Kapat
+          </button>
+        </div>
+      </div>
+
+      <div *ngIf="activeSource.description" class="px-5 py-2.5 bg-surface/60 border-b border-edge text-xs text-ink-muted">
+        <i class="fas fa-circle-info text-brand mr-1.5"></i>{{ activeSource.description }}
+      </div>
+
+      <div class="flex-1 overflow-auto p-4">
+        <table *ngIf="activeSource.rows?.length" class="w-full text-xs border-collapse">
+          <thead>
+            <tr class="bg-surface border-b border-edge text-left">
+              <th class="px-3 py-2 font-mono text-[10px] text-ink-muted w-10">#</th>
+              <th *ngFor="let col of activeSource.columns"
+                  class="px-3 py-2 font-semibold text-brand whitespace-nowrap">
+                <div class="flex items-center justify-between gap-2">
+                  <span>{{ col.name }}</span>
+                  <button type="button"
+                          (click)="bindField(col.name); showSourcePreviewModal = false"
+                          class="text-[10px] px-1.5 py-0.5 rounded bg-brand/15 hover:bg-brand/30 text-brand font-normal"
+                          [title]="col.name + ' kolonunu ' + selectedAddress + ' hücresine bağla'">
+                    + Bağla
+                  </button>
+                </div>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let row of activeSource.rows; let idx = index"
+                class="border-b border-edge/50 hover:bg-surface/60">
+              <td class="px-3 py-1.5 font-mono text-[10px] text-ink-muted">{{ idx + 1 }}</td>
+              <td *ngFor="let col of activeSource.columns" class="px-3 py-1.5 whitespace-nowrap text-ink">
+                {{ row[col.name] }}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <div *ngIf="!activeSource.rows?.length && !sourceLoading" class="py-12 text-center text-ink-muted text-sm">
+          Bu veri kaynağından henüz satır dönmedi.
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Geri bildirim toast -->
-  <div *ngIf="feedback" class="tb-toast">{{ feedback }}</div>
+  <div *ngIf="feedback" class="tb-toast">
+    <i class="fas fa-circle-check text-brand mr-2"></i>{{ feedback }}
+  </div>
 </div>

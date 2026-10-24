@@ -79,7 +79,7 @@
   },
   {
     "id": "mach_4",
-    "label": "Siemens S7 PLC C1",
+    "label": "Apex AX-7 PLC C1",
     "depth": 2,
     "parent": "line_1"
   },
@@ -109,7 +109,7 @@
   },
   {
     "id": "mach_9",
-    "label": "Siemens S7 PLC E1",
+    "label": "Apex AX-7 PLC E1",
     "depth": 2,
     "parent": "line_2"
   },

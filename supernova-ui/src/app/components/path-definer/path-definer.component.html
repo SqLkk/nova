@@ -4,83 +4,232 @@
   <header class="pd-head flex items-center gap-3 px-5 py-3 bg-surface-card border-b border-edge shrink-0">
     <div class="pd-logo"><i class="fas fa-route"></i></div>
     <div *ngIf="view==='library'">
-      <h1 class="pd-title">Path Definer</h1>
-      <p class="pd-sub">Define hierarchical paths from query data — SCADA / factory / tree.</p>
+      <h1 class="pd-title">Path Definer &amp; Space Map Studio</h1>
+      <p class="pd-sub">DB Tablo, Package/Procedure, SQL Sorgusu veya Python Script çıktılarından dinamik uzay haritası ve rapor hiyerarşileri üretin.</p>
     </div>
     <div *ngIf="view==='build'">
-      <h1 class="pd-title">Define Path</h1>
-      <p class="pd-sub">Query + structure type + column mapping → preview → save.</p>
+      <h1 class="pd-title">{{ form.id ? 'Harita / Path Tanımını Düzenle' : 'Yeni Space Map / Path Tanımla' }}</h1>
+      <p class="pd-sub">Veri kaynağı seçin (Query Viewer, Python, Tablo, Package) → Yapı &amp; İkonları belirleyin → Önizleyin ve Kaydedin.</p>
     </div>
     <div *ngIf="view==='search'">
-      <h1 class="pd-title">Search Path</h1>
-      <p class="pd-sub">Search for a value — see which path it belongs to.</p>
+      <h1 class="pd-title">Hiyerarşi İçinde Ara</h1>
+      <p class="pd-sub">Bir düğüm, makine, sensör veya metrik arayın — hangi hiyerarşi yolunda olduğunu görün.</p>
     </div>
 
-    <div class="flex items-center gap-1.5 ml-auto">
-      <button *ngIf="view!=='library'" class="pd-btn" (click)="view='library'; loadPaths()"><i class="fas fa-arrow-left"></i><span>Library</span></button>
-      <button *ngIf="view==='library' && canDefine" class="pd-btn pd-btn-accent" (click)="newBuild()"><i class="fas fa-plus"></i><span>New Path</span></button>
+    <div class="flex items-center gap-2 ml-auto">
+      <button *ngIf="view!=='library'" class="pd-btn" (click)="view='library'; loadPaths()">
+        <i class="fas fa-arrow-left"></i><span>Kütüphane ({{ paths.length }})</span>
+      </button>
+      <button *ngIf="view==='library' && canDefine" class="pd-btn pd-btn-accent" (click)="newBuild()">
+        <i class="fas fa-plus"></i><span>Yeni Path / Space Map</span>
+      </button>
     </div>
   </header>
 
   <!-- ============ KÜTÜPHANE ============ -->
   <div *ngIf="view==='library'" class="pd-body flex-1 overflow-y-auto p-5">
-    <div class="pd-search flex items-center gap-2 mb-4">
-      <i class="fas fa-search text-ink-muted"></i>
-      <input [(ngModel)]="searchLib" placeholder="Search path..." />
-      <span class="ml-auto text-xs text-ink-muted">{{ filteredPaths.length }} path(s)</span>
+    <div class="flex flex-wrap items-center gap-3 mb-4">
+      <div class="pd-search flex-1 flex items-center gap-2 !mb-0 min-w-[240px]">
+        <i class="fas fa-search text-ink-muted"></i>
+        <input [(ngModel)]="searchLib" placeholder="Harita adı, açıklama veya yapı tipi ara..." />
+        <span class="ml-auto text-xs text-ink-muted">{{ filteredPaths.length }} harita</span>
+      </div>
+      <label class="flex items-center gap-2 text-xs text-ink-muted cursor-pointer select-none px-3 py-2 rounded-lg bg-surface-card border border-edge">
+        <input type="checkbox" [(ngModel)]="showAllDbPaths" class="accent-amber-400" />
+        <span>Tüm Veritabanlarındaki Haritaları Göster</span>
+      </label>
     </div>
 
     <div class="pd-grid">
-      <div *ngFor="let p of filteredPaths" class="pd-card">
-        <div class="pd-card-top">
-          <div class="pd-card-ic"><i class="fas" [ngClass]="structureMeta(p.structure).icon"></i></div>
-          <span class="pd-card-tag">{{ structureMeta(p.structure).label }}</span>
+      <div *ngFor="let p of filteredPaths" class="pd-card flex flex-col justify-between">
+        <div>
+          <div class="pd-card-top">
+            <div class="pd-card-ic">
+              <i class="fas" [ngClass]="p.config?.spaceMapConfig?.level1Icon || structureMeta(p.structure).icon"></i>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span *ngIf="p.config?.spaceMapConfig?.theme" class="px-2 py-0.5 rounded text-[10px] font-mono uppercase bg-brand/15 text-brand border border-brand/30">
+                {{ p.config.spaceMapConfig?.theme }}
+              </span>
+              <span class="pd-card-tag">{{ structureMeta(p.structure).label }}</span>
+            </div>
+          </div>
+          <h3 class="pd-card-name truncate" [title]="p.name">{{ p.name }}</h3>
+          <p class="pd-card-desc line-clamp-2">{{ p.description || 'Dinamik hiyerarşik veri haritası.' }}</p>
         </div>
-        <h3 class="pd-card-name truncate">{{ p.name }}</h3>
-        <p class="pd-card-desc">{{ p.description || 'No description' }}</p>
-        <div class="pd-card-foot">
-          <span class="pd-card-q"><i class="fas fa-database"></i> {{ queries.find(q=>q.id===p.queryId)?.name || p.queryId }}</span>
+
+        <div class="pd-card-foot mt-3 pt-2.5 border-t border-edge/60">
+          <span class="pd-card-q truncate max-w-[170px]" [title]="sourceLabelForPath(p)">
+            <i class="fas" [ngClass]="p.queryId.startsWith('py:') ? 'fa-code text-amber-400' : 'fa-database text-cyan-400'"></i>
+            {{ sourceLabelForPath(p) }}
+          </span>
           <div class="pd-card-actions">
-            <button class="pd-act pd-act-map" (click)="openInMap(p)" title="Space Map'te Aç"><i class="fas fa-satellite"></i></button>
-            <button class="pd-act" (click)="openSearch(p)" title="Search"><i class="fas fa-search"></i></button>
-            <button *ngIf="canDefine" class="pd-act" (click)="editBuild(p)" title="Edit"><i class="fas fa-pen"></i></button>
-            <button *ngIf="canDefine" class="pd-act pd-act-del" (click)="deletePath(p,$event)" title="Delete"><i class="fas fa-trash"></i></button>
+            <button class="pd-act pd-act-map" (click)="openInMap(p)" title="Space Map'te Canlı Aç">
+              <i class="fas fa-satellite"></i>
+            </button>
+            <button class="pd-act text-emerald-400 hover:bg-emerald-500/15" (click)="createReportFromPath(p, $event)" title="Bu Haritadan Hızlı Rapor Oluştur (Template Builder)">
+              <i class="fas fa-file-excel"></i>
+            </button>
+            <button class="pd-act" (click)="openSearch(p)" title="Hiyerarşi İçinde Ara">
+              <i class="fas fa-search"></i>
+            </button>
+            <button *ngIf="canDefine" class="pd-act" (click)="editBuild(p)" title="Düzenle &amp; İkonları Değiştir">
+              <i class="fas fa-pen"></i>
+            </button>
+            <button *ngIf="canDefine" class="pd-act pd-act-del" (click)="deletePath(p,$event)" title="Sil">
+              <i class="fas fa-trash"></i>
+            </button>
           </div>
         </div>
       </div>
     </div>
 
-    <div *ngIf="!paths.length" class="pd-empty">
+    <div *ngIf="!filteredPaths.length" class="pd-empty">
       <i class="fas fa-route"></i>
-      <p>No paths yet.</p>
-      <button *ngIf="canDefine" class="pd-btn pd-btn-accent mt-3" (click)="newBuild()"><i class="fas fa-plus"></i><span>Create first path</span></button>
+      <p>Henüz eşleşen bir harita / path tanımı yok.</p>
+      <button *ngIf="canDefine" class="pd-btn pd-btn-accent mt-3" (click)="newBuild()">
+        <i class="fas fa-plus"></i><span>İlk Haritayı Oluştur</span>
+      </button>
     </div>
   </div>
 
-  <!-- ============ TANIMLA ============ -->
+  <!-- ============ TANIMLA / İNŞA ET ============ -->
   <div *ngIf="view==='build'" class="pd-build flex-1 flex min-h-0">
 
     <!-- Sol: form -->
-    <aside class="pd-form flex flex-col gap-3 w-[380px] shrink-0 overflow-y-auto p-5 border-r border-edge bg-surface-card">
+    <aside class="pd-form flex flex-col gap-3.5 w-[440px] shrink-0 overflow-y-auto p-5 border-r border-edge bg-surface-card">
+      <!-- 1. Ad & Açıklama -->
       <div class="flex flex-col gap-1.5">
-        <label class="pd-label">Path Name</label>
-        <input class="pd-input" [(ngModel)]="form.name" placeholder="e.g., Area → Bay → Element" />
-      </div>
-      <div class="flex flex-col gap-1.5">
-        <label class="pd-label">Description</label>
-        <input class="pd-input" [(ngModel)]="form.description" placeholder="optional" />
+        <label class="pd-label">1. Harita / Path Adı &amp; Açıklaması</label>
+        <input class="pd-input" [(ngModel)]="form.name" placeholder="Örn: Fabrika Üretim &amp; OEE Topolojisi" />
+        <input class="pd-input text-xs" [(ngModel)]="form.description" placeholder="Kısa açıklama (sunum ve rapor alt başlığında görünür)" />
       </div>
 
-      <div class="flex flex-col gap-1.5">
-        <label class="pd-label">Query (Data Source)</label>
-        <select class="pd-input" [(ngModel)]="form.queryId" (ngModelChange)="onQueryChange()">
-          <option value="">— select query —</option>
-          <option *ngFor="let q of scopedQueries" [value]="q.id">{{ q.name }}</option>
-        </select>
+      <!-- 2. Veri Kaynağı Türü Seçimi (Generic: Query Viewer, Python, DB Tablo, DB Package/Procedure) -->
+      <div class="flex flex-col gap-2 p-3 rounded-xl bg-surface border border-edge">
+        <div class="flex items-center justify-between">
+          <label class="pd-label !mb-0">2. Veri Kaynağı Seçimi</label>
+          <button type="button"
+                  (click)="showQueryViewerModal = true"
+                  class="px-2.5 py-1 rounded-lg bg-brand/15 hover:bg-brand/25 border border-brand/40 text-brand text-[11px] font-bold flex items-center gap-1.5 transition">
+            <i class="fas fa-magnifying-glass-chart"></i>
+            <span>Query Viewer'dan Seç</span>
+          </button>
+        </div>
+
+        <!-- 4 Kaynak Sekmesi -->
+        <div class="grid grid-cols-4 gap-1 bg-surface-card p-1 rounded-lg border border-edge text-[11px]">
+          <button type="button" (click)="sourceMode='query'"
+                  [class.bg-brand]="sourceMode==='query'" [class.text-black]="sourceMode==='query'" [class.font-bold]="sourceMode==='query'"
+                  class="py-1.5 px-1.5 rounded text-center truncate transition">
+            <i class="fas fa-database mr-1"></i>SQL Sorgu
+          </button>
+          <button type="button" (click)="sourceMode='python'"
+                  [class.bg-brand]="sourceMode==='python'" [class.text-black]="sourceMode==='python'" [class.font-bold]="sourceMode==='python'"
+                  class="py-1.5 px-1.5 rounded text-center truncate transition">
+            <i class="fab fa-python mr-1"></i>Python
+          </button>
+          <button type="button" (click)="sourceMode='table'"
+                  [class.bg-brand]="sourceMode==='table'" [class.text-black]="sourceMode==='table'" [class.font-bold]="sourceMode==='table'"
+                  class="py-1.5 px-1.5 rounded text-center truncate transition">
+            <i class="fas fa-table mr-1"></i>Tablo
+          </button>
+          <button type="button" (click)="sourceMode='package'"
+                  [class.bg-brand]="sourceMode==='package'" [class.text-black]="sourceMode==='package'" [class.font-bold]="sourceMode==='package'"
+                  class="py-1.5 px-1.5 rounded text-center truncate transition">
+            <i class="fas fa-cubes mr-1"></i>Package
+          </button>
+        </div>
+
+        <!-- A) SQL Sorgusu Seçimi -->
+        <div *ngIf="sourceMode==='query'" class="flex flex-col gap-1.5 pt-1">
+          <select class="pd-input text-xs" [(ngModel)]="form.queryId" (ngModelChange)="onQueryChange()">
+            <option value="">— Kayıtlı SQL Sorgusu Seçin —</option>
+            <option *ngFor="let q of scopedQueries" [value]="q.id">{{ q.name }} ({{ q.dataSourceId }})</option>
+          </select>
+          <p *ngIf="selectedQueryObj?.description" class="text-[11px] text-ink-muted bg-surface-card/70 px-2.5 py-1.5 rounded border border-edge/60 leading-snug">
+            <i class="fas fa-circle-info text-brand mr-1"></i>{{ selectedQueryObj?.description }}
+          </p>
+        </div>
+
+        <!-- B) Python Script Seçimi -->
+        <div *ngIf="sourceMode==='python'" class="flex flex-col gap-1.5 pt-1">
+          <select class="pd-input text-xs" [(ngModel)]="selectedPyScriptId" (ngModelChange)="onSelectPythonScript()">
+            <option value="">— Python Analitik Scripti Seçin —</option>
+            <option *ngFor="let s of pythonScripts" [value]="s.id">{{ s.name }}</option>
+          </select>
+          <div *ngIf="pyDatasets.length" class="flex items-center gap-2">
+            <span class="text-[11px] text-ink-muted shrink-0">Çıktı Veri Seti:</span>
+            <select class="pd-input text-xs flex-1" [(ngModel)]="selectedPyDataset" (ngModelChange)="onSelectPythonDataset()">
+              <option *ngFor="let ds of pyDatasets" [value]="ds">{{ ds }}</option>
+            </select>
+          </div>
+          <p *ngIf="selectedPythonObj?.description" class="text-[11px] text-ink-muted bg-surface-card/70 px-2.5 py-1.5 rounded border border-edge/60 leading-snug">
+            <i class="fas fa-code text-amber-400 mr-1"></i>{{ selectedPythonObj?.description }}
+          </p>
+        </div>
+
+        <!-- C) DB Tablo / View Seçimi -->
+        <div *ngIf="sourceMode==='table'" class="flex flex-col gap-1.5 pt-1">
+          <div class="flex items-center gap-1.5">
+            <span class="text-[11px] text-ink-muted shrink-0">Veritabanı:</span>
+            <select class="pd-input text-xs flex-1" [(ngModel)]="activeDbId" (ngModelChange)="onActiveDbChange()">
+              <option *ngFor="let ds of dataSources" [value]="ds.id">{{ ds.name }}</option>
+            </select>
+          </div>
+          <div class="max-h-36 overflow-y-auto flex flex-col gap-1 p-1.5 rounded bg-surface-card border border-edge">
+            <button *ngFor="let t of dbTables" type="button"
+                    (click)="handleTableNameChange(t, activeDbId)"
+                    [class.bg-brand/20]="selectedTableName===t"
+                    [class.border-brand/50]="selectedTableName===t"
+                    class="px-2.5 py-1.5 rounded text-left text-xs flex items-center justify-between border border-transparent hover:bg-surface-raised transition">
+              <span><i class="fas fa-table text-brand mr-2"></i>{{ t }}</span>
+              <span class="text-[10px] text-ink-muted">Seç &amp; Bağla →</span>
+            </button>
+            <p *ngIf="!dbTables.length" class="text-xs text-ink-muted py-2 text-center">Bu veritabanında tablo bulunamadı.</p>
+          </div>
+        </div>
+
+        <!-- D) DB Package / Stored Procedure / Function Seçimi -->
+        <div *ngIf="sourceMode==='package'" class="flex flex-col gap-1.5 pt-1">
+          <div class="flex items-center gap-1.5">
+            <span class="text-[11px] text-ink-muted shrink-0">Veritabanı:</span>
+            <select class="pd-input text-xs flex-1" [(ngModel)]="activeDbId" (ngModelChange)="onActiveDbChange()">
+              <option *ngFor="let ds of dataSources" [value]="ds.id">{{ ds.name }}</option>
+            </select>
+          </div>
+          <div class="max-h-48 overflow-y-auto flex flex-col gap-2 p-2 rounded bg-surface-card border border-edge">
+            <div *ngFor="let grp of groupedPackages" class="flex flex-col gap-1">
+              <div class="text-[10px] font-mono font-bold uppercase tracking-wider text-amber-400 px-1 flex items-center gap-1.5">
+                <i class="fas fa-box-open"></i><span>{{ grp.pkg }}</span>
+              </div>
+              <button *ngFor="let fn of grp.items" type="button"
+                      (click)="onSelectDbFunction(fn)"
+                      [class.bg-brand/20]="selectedFunctionName===fn.name"
+                      [class.border-brand/50]="selectedFunctionName===fn.name"
+                      class="px-2.5 py-1.5 rounded text-left border border-edge/50 hover:border-brand/40 hover:bg-surface-raised transition flex flex-col gap-0.5">
+                <div class="flex items-center justify-between gap-2">
+                  <span class="text-xs font-semibold text-ink truncate">{{ fn.name }}</span>
+                  <span class="px-1.5 py-0.2 rounded text-[9px] font-mono bg-cyan-500/15 text-cyan-300 shrink-0">{{ fn.type }}</span>
+                </div>
+                <span class="text-[10px] text-ink-muted line-clamp-2 leading-tight">{{ fn.description }}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Aktif Bağlı Kaynak Özeti -->
+        <div *ngIf="form.queryId" class="flex items-center justify-between px-2.5 py-1.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-[11px]">
+          <span class="truncate text-emerald-300 font-medium">
+            <i class="fas fa-check-circle mr-1"></i>Bağlı: <strong>{{ sourceLabelForPath(form) }}</strong>
+          </span>
+          <span class="text-ink-muted font-mono shrink-0 ml-2">{{ queryColumns.length }} kolon</span>
+        </div>
       </div>
 
+      <!-- 3. Hiyerarşi Yapı Tipi -->
       <div class="flex flex-col gap-1.5">
-        <label class="pd-label">Structure Type</label>
+        <label class="pd-label">3. Hiyerarşi Yapı Tipi (Structure)</label>
         <div class="pd-struct-grid">
           <button *ngFor="let s of structures" type="button" class="pd-struct"
             [class.active]="form.structure === s.value"
@@ -92,104 +241,183 @@
         </div>
       </div>
 
-      <!-- Kolon eşleme -->
+      <!-- 4. Kolon Eşleme -->
       <div *ngIf="queryColumns.length" class="pd-mapping flex flex-col gap-2">
-        <label class="pd-label">Column Mapping <span class="pd-hint">(auto-suggested)</span></label>
+        <label class="pd-label">4. Kolon Eşlemesi <span class="pd-hint">(otomatik önerildi)</span></label>
 
         <ng-container *ngIf="form.structure==='tree' || form.structure==='binary_tree'">
-          <div class="pd-map-row"><span>Identity (id)</span>
+          <div class="pd-map-row"><span>Düğüm ID (id)</span>
             <select class="pd-sel" [(ngModel)]="form.config.id_col"><option value="">—</option><option *ngFor="let c of queryColumns" [value]="c">{{ c }}</option></select></div>
-          <div class="pd-map-row"><span>Parent</span>
+          <div class="pd-map-row"><span>Üst Düğüm (parent)</span>
             <select class="pd-sel" [(ngModel)]="form.config.parent_col"><option value="">—</option><option *ngFor="let c of queryColumns" [value]="c">{{ c }}</option></select></div>
-          <div class="pd-map-row"><span>Label</span>
+          <div class="pd-map-row"><span>Görünen Ad (label)</span>
             <select class="pd-sel" [(ngModel)]="form.config.label_col"><option value="">—</option><option *ngFor="let c of queryColumns" [value]="c">{{ c }}</option></select></div>
-          <div class="pd-map-row"><span>Type (optional)</span>
+          <div class="pd-map-row"><span>Düğüm Tipi (type)</span>
             <select class="pd-sel" [(ngModel)]="form.config.type_col"><option value="">—</option><option *ngFor="let c of queryColumns" [value]="c">{{ c }}</option></select></div>
-          <div class="pd-map-row"><span>Root Value (optional)</span>
-            <input class="pd-sel !px-2" [(ngModel)]="form.config.root_value" placeholder="e.g. 0, ROOT (blank=NULL)" /></div>
+          <div class="pd-map-row"><span>Kök Değeri (root)</span>
+            <input class="pd-sel !px-2" [(ngModel)]="form.config.root_value" placeholder="Örn: 0, ROOT (boş=NULL)" /></div>
+        </ng-container>
+
+        <ng-container *ngIf="form.structure==='multi_level'">
+          <div class="pd-map-row"><span>Seviye 1 (Ana Grup)</span>
+            <select class="pd-sel" [(ngModel)]="form.config.level1_col"><option value="">—</option><option *ngFor="let c of queryColumns" [value]="c">{{ c }}</option></select></div>
+          <div class="pd-map-row"><span>Seviye 2 (Alt Grup)</span>
+            <select class="pd-sel" [(ngModel)]="form.config.level2_col"><option value="">— (Opsiyonel) —</option><option *ngFor="let c of queryColumns" [value]="c">{{ c }}</option></select></div>
+          <div class="pd-map-row"><span>Seviye 3 (Alt Katman)</span>
+            <select class="pd-sel" [(ngModel)]="form.config.level3_col"><option value="">— (Opsiyonel) —</option><option *ngFor="let c of queryColumns" [value]="c">{{ c }}</option></select></div>
+          <div class="pd-map-row"><span>Uç Düğüm Etiketi</span>
+            <select class="pd-sel" [(ngModel)]="form.config.label_col"><option value="">—</option><option *ngFor="let c of queryColumns" [value]="c">{{ c }}</option></select></div>
         </ng-container>
 
         <ng-container *ngIf="form.structure==='sequence'">
-          <div class="pd-map-row"><span>Identity (id)</span>
+          <div class="pd-map-row"><span>Düğüm ID (id)</span>
             <select class="pd-sel" [(ngModel)]="form.config.id_col"><option value="">—</option><option *ngFor="let c of queryColumns" [value]="c">{{ c }}</option></select></div>
-          <div class="pd-map-row"><span>Next</span>
+          <div class="pd-map-row"><span>Sonraki Adım (next)</span>
             <select class="pd-sel" [(ngModel)]="form.config.next_col"><option value="">—</option><option *ngFor="let c of queryColumns" [value]="c">{{ c }}</option></select></div>
-          <div class="pd-map-row"><span>Or order</span>
+          <div class="pd-map-row"><span>Veya Sıralama (order)</span>
             <select class="pd-sel" [(ngModel)]="form.config.order_col"><option value="">—</option><option *ngFor="let c of queryColumns" [value]="c">{{ c }}</option></select></div>
-          <div class="pd-map-row"><span>Label</span>
+          <div class="pd-map-row"><span>Görünen Ad (label)</span>
             <select class="pd-sel" [(ngModel)]="form.config.label_col"><option value="">—</option><option *ngFor="let c of queryColumns" [value]="c">{{ c }}</option></select></div>
         </ng-container>
 
         <ng-container *ngIf="form.structure==='grouped'">
-          <div class="pd-map-row"><span>Group column</span>
+          <div class="pd-map-row"><span>Grup Kolonu</span>
             <select class="pd-sel" [(ngModel)]="form.config.group_col"><option value="">—</option><option *ngFor="let c of queryColumns" [value]="c">{{ c }}</option></select></div>
-          <div class="pd-map-row"><span>Label</span>
+          <div class="pd-map-row"><span>Alt Grup (Opsiyonel)</span>
+            <select class="pd-sel" [(ngModel)]="form.config.subgroup_col"><option value="">—</option><option *ngFor="let c of queryColumns" [value]="c">{{ c }}</option></select></div>
+          <div class="pd-map-row"><span>Eleman Etiketi</span>
             <select class="pd-sel" [(ngModel)]="form.config.label_col"><option value="">—</option><option *ngFor="let c of queryColumns" [value]="c">{{ c }}</option></select></div>
-          <div class="pd-map-row"><span>Order (optional)</span>
+          <div class="pd-map-row"><span>Sıralama (Opsiyonel)</span>
             <select class="pd-sel" [(ngModel)]="form.config.order_col"><option value="">—</option><option *ngFor="let c of queryColumns" [value]="c">{{ c }}</option></select></div>
         </ng-container>
 
         <ng-container *ngIf="form.structure==='dag'">
-          <div class="pd-map-row"><span>Identity (id)</span>
+          <div class="pd-map-row"><span>Düğüm ID (id)</span>
             <select class="pd-sel" [(ngModel)]="form.config.id_col"><option value="">—</option><option *ngFor="let c of queryColumns" [value]="c">{{ c }}</option></select></div>
-          <div class="pd-map-row"><span>Parents (comma/list)</span>
+          <div class="pd-map-row"><span>Öncül Adımlar (parents)</span>
             <select class="pd-sel" [(ngModel)]="form.config.parent_col"><option value="">—</option><option *ngFor="let c of queryColumns" [value]="c">{{ c }}</option></select></div>
-          <div class="pd-map-row"><span>Label</span>
+          <div class="pd-map-row"><span>Görünen Ad (label)</span>
             <select class="pd-sel" [(ngModel)]="form.config.label_col"><option value="">—</option><option *ngFor="let c of queryColumns" [value]="c">{{ c }}</option></select></div>
-          <div class="pd-map-row"><span>Type (optional)</span>
+          <div class="pd-map-row"><span>Düğüm Tipi (type)</span>
             <select class="pd-sel" [(ngModel)]="form.config.type_col"><option value="">—</option><option *ngFor="let c of queryColumns" [value]="c">{{ c }}</option></select></div>
         </ng-container>
 
-        <!-- Live Health & Status Badges (Optional) -->
+        <!-- Canlı Sağlık Skoru & Durum Rozeti -->
         <div class="pd-map-row mt-1">
-          <span>Health Score</span>
+          <span>Sağlık / OEE Skoru</span>
           <select class="pd-sel" [(ngModel)]="form.config.health_col">
-            <option value="">— (Auto detect) —</option>
+            <option value="">— (Otomatik algıla) —</option>
             <option *ngFor="let c of queryColumns" [value]="c">{{ c }}</option>
           </select>
         </div>
         <div class="pd-map-row">
-          <span>Status / State</span>
+          <span>Durum (Status)</span>
           <select class="pd-sel" [(ngModel)]="form.config.status_col">
-            <option value="">— (Auto detect) —</option>
-            <option *ngFor="let c of queryColumns" [value]="c">{{ c }}</option>
-          </select>
-        </div>
-
-        <!-- Hedef Kolon (Ortak) -->
-        <div class="pd-map-row mt-2 pt-2 border-t border-[rgb(58,52,64)]/50">
-          <span class="text-indigo-300 font-semibold">Target Column</span>
-          <select class="pd-sel !border-indigo-500/30 focus:!border-indigo-400" [(ngModel)]="form.config.target_col">
-            <option value="">—</option>
+            <option value="">— (Otomatik algıla) —</option>
             <option *ngFor="let c of queryColumns" [value]="c">{{ c }}</option>
           </select>
         </div>
       </div>
-      <p *ngIf="!queryColumns.length && form.queryId" class="pd-hint">Columns could not be loaded — you can still try Preview.</p>
 
-      <div class="pd-form-actions flex flex-col gap-2 mt-auto pt-3">
-        <button class="pd-btn" (click)="doPreview()" [disabled]="previewLoading || !form.queryId">
-          <i class="fas" [ngClass]="previewLoading ? 'fa-spinner fa-spin' : 'fa-eye'"></i><span>Preview</span>
+      <!-- 5. Space Map Görsel Tema, Yerleşim & İkon Seçimi -->
+      <div *ngIf="form.config.spaceMapConfig as smc" class="flex flex-col gap-2.5 p-3 rounded-xl bg-surface border border-edge">
+        <label class="pd-label !mb-0"><i class="fas fa-palette text-brand mr-1.5"></i>5. Space Map Görünümü, Yerleşim &amp; İkonlar</label>
+
+        <!-- Tema Seçici -->
+        <div class="grid grid-cols-5 gap-1">
+          <button *ngFor="let t of mapThemes" type="button"
+                  (click)="applyMapThemePreset(t.id)"
+                  [class.bg-brand]="smc.theme === t.id"
+                  [class.text-black]="smc.theme === t.id"
+                  [class.font-bold]="smc.theme === t.id"
+                  class="flex flex-col items-center gap-1 py-1.5 px-1 rounded-lg border border-edge text-[10px] hover:border-brand/50 transition">
+            <i class="fas text-xs" [ngClass]="t.icon"></i>
+            <span class="truncate w-full text-center">{{ t.label.split(' ')[0] }}</span>
+          </button>
+        </div>
+
+        <!-- Yerleşim (Layout) Seçici -->
+        <div class="pd-map-row">
+          <span>Harita Düzeni (Layout)</span>
+          <select class="pd-sel" [(ngModel)]="smc.layout">
+            <option *ngFor="let l of mapLayouts" [value]="l.id">{{ l.label }}</option>
+          </select>
+        </div>
+
+        <!-- Seviye İkonları (Görsel Butonlu Seçici) -->
+        <div class="grid grid-cols-2 gap-2 pt-1">
+          <div class="flex flex-col gap-1">
+            <span class="text-[10px] text-ink-muted flex items-center gap-1">
+              <i class="fas text-brand" [ngClass]="smc.level1Icon || 'fa-industry'"></i>Seviye 1 (Kök/Tesis)
+            </span>
+            <select class="pd-sel text-xs" [(ngModel)]="smc.level1Icon">
+              <option *ngFor="let ic of availableIcons" [value]="ic.id">{{ ic.label }} ({{ ic.id }})</option>
+            </select>
+          </div>
+          <div class="flex flex-col gap-1">
+            <span class="text-[10px] text-ink-muted flex items-center gap-1">
+              <i class="fas text-emerald-400" [ngClass]="smc.level2Icon || 'fa-cogs'"></i>Seviye 2 (Bölüm/Hat)
+            </span>
+            <select class="pd-sel text-xs" [(ngModel)]="smc.level2Icon">
+              <option *ngFor="let ic of availableIcons" [value]="ic.id">{{ ic.label }} ({{ ic.id }})</option>
+            </select>
+          </div>
+          <div class="flex flex-col gap-1">
+            <span class="text-[10px] text-ink-muted flex items-center gap-1">
+              <i class="fas text-cyan-400" [ngClass]="smc.level3Icon || 'fa-robot'"></i>Seviye 3 (Makine/Hücre)
+            </span>
+            <select class="pd-sel text-xs" [(ngModel)]="smc.level3Icon">
+              <option *ngFor="let ic of availableIcons" [value]="ic.id">{{ ic.label }} ({{ ic.id }})</option>
+            </select>
+          </div>
+          <div class="flex flex-col gap-1">
+            <span class="text-[10px] text-ink-muted flex items-center gap-1">
+              <i class="fas text-amber-400" [ngClass]="smc.level4Icon || 'fa-gauge-high'"></i>Seviye 4+ (Sensör/Uç)
+            </span>
+            <select class="pd-sel text-xs" [(ngModel)]="smc.level4Icon">
+              <option *ngFor="let ic of availableIcons" [value]="ic.id">{{ ic.label }} ({{ ic.id }})</option>
+            </select>
+          </div>
+        </div>
+
+        <label class="flex items-center gap-2 text-[11px] text-ink-muted cursor-pointer pt-1">
+          <input type="checkbox" [(ngModel)]="smc.autoTypeIcons" class="accent-amber-400" />
+          <span>Düğüm tipine (`type`) göre akıllı fabrika/sensör ikonlarını otomatik eşleştir</span>
+        </label>
+      </div>
+
+      <!-- Aksiyon Butonları -->
+      <div class="pd-form-actions flex flex-col gap-2 mt-auto pt-2">
+        <button type="button" class="pd-btn justify-center" (click)="doPreview()" [disabled]="previewLoading || !form.queryId">
+          <i class="fas" [ngClass]="previewLoading ? 'fa-spinner fa-spin' : 'fa-eye'"></i>
+          <span>Hiyerarşiyi Önizle (Preview)</span>
         </button>
-        <button class="pd-btn pd-btn-accent" (click)="save()" [disabled]="saving">
-          <i class="fas" [ngClass]="saving ? 'fa-spinner fa-spin' : 'fa-save'"></i><span>{{ form.id ? 'Update' : 'Save' }}</span>
-        </button>
+        <div class="grid grid-cols-2 gap-2">
+          <button type="button" class="pd-btn justify-center" (click)="save(false)" [disabled]="saving">
+            <i class="fas" [ngClass]="saving ? 'fa-spinner fa-spin' : 'fa-save'"></i>
+            <span>{{ form.id ? 'Güncelle' : 'Kaydet' }}</span>
+          </button>
+          <button type="button" class="pd-btn pd-btn-accent justify-center" (click)="save(true)" [disabled]="saving">
+            <i class="fas fa-satellite"></i>
+            <span>Kaydet &amp; Haritada Aç</span>
+          </button>
+        </div>
       </div>
     </aside>
 
     <!-- Sağ: önizleme -->
     <section class="flex-1 flex flex-col min-w-0 overflow-hidden">
       <div class="pd-prev-head flex items-center gap-3 px-5 py-3 border-b border-edge bg-surface-card shrink-0">
-        <span class="pd-label">Preview</span>
+        <span class="pd-label !mb-0">Canlı Hiyerarşi Önizlemesi</span>
         <span *ngIf="preview" class="pd-stats">
-          <b>{{ preview.structure.stats.node_count }}</b> node(s) ·
-          <b>{{ preview.structure.stats.path_count }}</b> path(s) ·
-          depth <b>{{ preview.structure.stats.max_depth }}</b>
+          <b>{{ preview.structure.stats.node_count }}</b> düğüm ·
+          <b>{{ preview.structure.stats.path_count }}</b> uç yol ·
+          derinlik <b>{{ preview.structure.stats.max_depth + 1 }}</b> katman
         </span>
       </div>
 
       <div class="flex-1 overflow-y-auto p-5">
-        <div class="pd-empty" *ngIf="previewLoading"><i class="fas fa-spinner fa-spin"></i><p>Calculating...</p></div>
+        <div class="pd-empty" *ngIf="previewLoading"><i class="fas fa-spinner fa-spin"></i><p>Hiyerarşi hesaplanıyor...</p></div>
         <div class="pd-error" *ngIf="previewError">{{ previewError }}</div>
 
         <ng-container *ngIf="preview && !previewLoading">
@@ -207,17 +435,17 @@
 
           <!-- Yol listesi -->
           <div class="pd-paths">
-            <div class="pd-label mb-2">Paths (root › leaf)</div>
+            <div class="pd-label mb-2">Örnek Hiyerarşi Yolları (Kök › Yaprak)</div>
             <div *ngFor="let path of preview.structure.paths.slice(0, 50)" class="pd-path">
               {{ breadcrumbFromIds(path) }}
             </div>
-            <p *ngIf="preview.structure.paths.length > 50" class="pd-hint">… and {{ preview.structure.paths.length - 50 }} more path(s).</p>
+            <p *ngIf="preview.structure.paths.length > 50" class="pd-hint">… ve {{ preview.structure.paths.length - 50 }} yol daha.</p>
           </div>
         </ng-container>
 
         <div *ngIf="!preview && !previewLoading && !previewError" class="pd-empty">
           <i class="fas fa-sitemap"></i>
-          <p>Select query + structure, then press Preview.</p>
+          <p>Sol panelden bir SQL Sorgusu, Python Scripti, DB Tablosu veya Package seçip <b>Hiyerarşiyi Önizle</b> butonuna basın.</p>
         </div>
       </div>
     </section>
@@ -226,20 +454,20 @@
   <!-- ============ ARA ============ -->
   <div *ngIf="view==='search'" class="pd-search-view flex-1 flex flex-col min-h-0 overflow-hidden">
     <div class="px-5 py-4 border-b border-edge bg-surface-card flex items-center gap-3 shrink-0">
-      <span class="pd-label">Path:</span>
+      <span class="pd-label !mb-0">Harita:</span>
       <span class="pd-curpath">{{ searchPath?.name }}</span>
       <div class="pd-search-box ml-auto flex items-center gap-2">
         <i class="fas fa-search text-ink-muted"></i>
-        <input [(ngModel)]="term" (keydown.enter)="doSearch()" placeholder="Search value (id, name, column)..." />
+        <input [(ngModel)]="term" (keydown.enter)="doSearch()" placeholder="Değer ara (id, ad, kolon içeriği)..." />
         <button class="pd-btn pd-btn-sm pd-btn-accent" (click)="doSearch()" [disabled]="searchLoading"><i class="fas fa-search"></i></button>
       </div>
     </div>
 
     <div class="flex-1 overflow-y-auto p-5">
-      <div *ngIf="searchLoading" class="pd-empty"><i class="fas fa-spinner fa-spin"></i><p>Searching...</p></div>
+      <div *ngIf="searchLoading" class="pd-empty"><i class="fas fa-spinner fa-spin"></i><p>Aranıyor...</p></div>
 
       <ng-container *ngIf="searchResult && !searchLoading">
-        <p class="pd-result-count">{{ searchResult.hits.length }} match(es)</p>
+        <p class="pd-result-count">{{ searchResult.hits.length }} eşleşme bulundu</p>
         <div *ngFor="let h of searchResult.hits" class="pd-hit">
           <div class="pd-hit-label">{{ h.label }} <span *ngIf="h.type" class="pd-hit-type">{{ h.type }}</span></div>
           <div class="pd-hit-crumb">
@@ -248,14 +476,21 @@
             </span>
           </div>
         </div>
-        <div *ngIf="!searchResult.hits.length" class="pd-empty"><i class="fas fa-magnifying-glass"></i><p>"{{ term }}" not found.</p></div>
+        <div *ngIf="!searchResult.hits.length" class="pd-empty"><i class="fas fa-magnifying-glass"></i><p>"{{ term }}" bulunamadı.</p></div>
       </ng-container>
 
       <div *ngIf="!searchResult && !searchLoading" class="pd-empty">
-        <i class="fas fa-search"></i><p>Enter a value and search — we will show you which path it belongs to.</p>
+        <i class="fas fa-search"></i><p>Bir değer yazıp arayın — hangi hiyerarşi dalına ait olduğunu anında görün.</p>
       </div>
     </div>
   </div>
+
+  <!-- Query Viewer Dialog (Kayıtlı SQL Sorgularını ve Python Scriptlerini açıklamalarıyla ve canlı verileriyle seçmek için) -->
+  <app-query-viewer-dialog
+    [visible]="showQueryViewerModal"
+    (visibleChange)="showQueryViewerModal = $event"
+    (explorationSelected)="onQueryViewerSelected($event)">
+  </app-query-viewer-dialog>
 
   <!-- Toast -->
   <div *ngIf="toast" class="pd-toast">{{ toast }}</div>
