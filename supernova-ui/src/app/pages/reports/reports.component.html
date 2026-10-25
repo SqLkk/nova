@@ -8,7 +8,7 @@
   <!-- Başlık -->
   <header class="page-head">
     <div class="title-block">
-      <div class="title-icon"><i class="fas fa-file-spreadsheet"></i></div>
+      <div class="title-icon"><i class="fas fa-file-excel"></i></div>
       <div>
         <h1>{{ 'REPORTS.TITLE' | translate }}</h1>
         <p>{{ 'REPORTS.SUBTITLE' | translate }}</p>
@@ -267,7 +267,7 @@
         <i class="fas fa-table-list"></i>
         <div>
           <h3>{{ outputTemplate?.name }}</h3>
-          <p *ngIf="outputResult">{{ 'Canlı Çalıştırma Çıktısı · ' + (outputResult.evaluatedAt || '') }}</p>
+          <p *ngIf="outputResult">Canlı Çalıştırma Çıktısı · {{ outputResult.evaluatedAt | date:'dd.MM.yyyy HH:mm:ss' }}</p>
           <p *ngIf="!outputResult && outputTemplate?.description">{{ outputTemplate?.description }}</p>
         </div>
       </div>

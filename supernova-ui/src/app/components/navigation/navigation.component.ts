@@ -95,7 +95,7 @@ export class NavigationComponent implements OnInit, OnDestroy {
   private static readonly BASE_NAV: NavItem[] = [
     { key: 'NAV.DASHBOARD', title: 'Dashboard', icon: 'fas fa-chart-line', route: '/dashboard', pageKey: 'dashboard' },
     { key: 'NAV.NETWORK_MAP', title: 'Network Map', icon: 'fas fa-space-shuttle', route: '/network-map', pageKey: 'network-map' },
-    { key: 'NAV.TEMPLATE_BUILDER', title: 'Template Builder', icon: 'fas fa-file-spreadsheet', route: '/template-builder', pageKey: 'template-builder' },
+    { key: 'NAV.TEMPLATE_BUILDER', title: 'Template Builder', icon: 'fas fa-table-cells-large', route: '/template-builder', pageKey: 'template-builder' },
     { key: 'NAV.REPORTS', title: 'Reports', icon: 'fas fa-file-lines', route: '/reports', pageKey: 'reports' },
     { key: 'NAV.ALARMS', title: 'Alarms', icon: 'fas fa-bell', route: '/alarms', pageKey: 'alarms' }
   ];

@@ -125,10 +125,10 @@
   <section *ngIf="activeTab==='sharing' && showSharingTab" class="tab-panel">
     <div class="toolbar">
       <div class="share-tabs">
-        <button [class.active]="sharingType==='templates'" *ngIf="canShareType('templates')" (click)="switchSharingType('templates')"><i class="fas fa-file-spreadsheet"></i> Template'ler</button>
+        <button [class.active]="sharingType==='templates'" *ngIf="canShareType('templates')" (click)="switchSharingType('templates')"><i class="fas fa-table-cells-large"></i> Template'ler</button>
         <button [class.active]="sharingType==='paths'" *ngIf="canShareType('paths')" (click)="switchSharingType('paths')"><i class="fas fa-diagram-project"></i> Network Map'ler</button>
         <button [class.active]="sharingType==='queries'" *ngIf="canShareType('queries')" (click)="switchSharingType('queries')"><i class="fas fa-code"></i> Sorgular</button>
-        <button [class.active]="sharingType==='scripts'" *ngIf="canShareType('scripts')" (click)="switchSharingType('scripts')"><i class="fas fa-python"></i> Script'ler</button>
+        <button [class.active]="sharingType==='scripts'" *ngIf="canShareType('scripts')" (click)="switchSharingType('scripts')"><i class="fab fa-python"></i> Script'ler</button>
         <button [class.active]="sharingType==='dashboards'" *ngIf="canShareType('dashboards')" (click)="switchSharingType('dashboards')"><i class="fas fa-meteor"></i> Dashboard'lar</button>
       </div>
       <div class="search-wrap small">
@@ -305,10 +305,10 @@
         <div *ngIf="detailTab==='activity'" class="detail-section">
           <h4 class="sec-title">Sahip Olduğu Nesneler</h4>
           <div class="owned-grid">
-            <div class="owned-box"><i class="fas fa-file-spreadsheet"></i><div class="n">{{ selectedUser.ownedCounts?.templates || 0 }}</div><div class="l">Template</div></div>
+            <div class="owned-box"><i class="fas fa-table-cells-large"></i><div class="n">{{ selectedUser.ownedCounts?.templates || 0 }}</div><div class="l">Template</div></div>
             <div class="owned-box"><i class="fas fa-diagram-project"></i><div class="n">{{ selectedUser.ownedCounts?.paths || 0 }}</div><div class="l">Network Map</div></div>
             <div class="owned-box"><i class="fas fa-code"></i><div class="n">{{ selectedUser.ownedCounts?.queries || 0 }}</div><div class="l">Sorgu</div></div>
-            <div class="owned-box"><i class="fas fa-python"></i><div class="n">{{ selectedUser.ownedCounts?.scripts || 0 }}</div><div class="l">Script</div></div>
+            <div class="owned-box"><i class="fab fa-python"></i><div class="n">{{ selectedUser.ownedCounts?.scripts || 0 }}</div><div class="l">Script</div></div>
           </div>
           <div class="kv mt"><span>Son Güncelleme</span><b>{{ selectedUser.updatedAt || '—' }}</b></div>
         </div>

@@ -551,7 +551,8 @@ export function evaluateDemoTemplate(model: TemplateDocument, maxBandRows = 60):
     });
   });
 
-  const nowStr = new Date().toLocaleString('tr-TR');
+  const nowIso = new Date().toISOString();
+  const nowDisplay = new Date().toLocaleString('tr-TR');
   const sheets = (model.sheets || []).map((sheet) => {
     const colCount = Number(sheet.columnCount || 10);
     const rowCount = Number(sheet.rowCount || 30);
@@ -595,7 +596,7 @@ export function evaluateDemoTemplate(model: TemplateDocument, maxBandRows = 60):
           let val: any = cell.value ?? '';
           if (cell.binding) {
             if (cell.binding.kind === 'builtin') {
-              val = cell.binding.builtin === 'report_name' ? model.name : nowStr;
+              val = cell.binding.builtin === 'report_name' ? model.name : nowDisplay;
             } else if (cell.binding.kind === 'summary' && cell.binding.queryId) {
               val = computeSummary(qMap[cell.binding.queryId] || [], cell.binding.operation || 'SUM', cell.binding.field || '');
             } else if (cell.binding.kind === 'query_field' && cell.binding.queryId && cell.binding.field) {
@@ -647,7 +648,7 @@ export function evaluateDemoTemplate(model: TemplateDocument, maxBandRows = 60):
     id: model.id,
     name: model.name,
     description: model.description,
-    evaluatedAt: nowStr,
+    evaluatedAt: nowIso,
     sheets,
     queryStats,
   };

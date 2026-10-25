@@ -149,7 +149,7 @@ export class DashboardEditService {
         icon: 'fas fa-industry',
         widgets: [
           { id: 'oee-monitor', type: 'oee', title: 'OEE Monitor', icon: 'fas fa-tachometer-alt', w: 2, h: 2, category: 'Production', description: 'Overall Equipment Effectiveness', config: { visualType: 'Gauge Chart', refreshInterval: 10000 } },
-          { id: 'production-line', type: 'line-status', title: 'Production Line Status', icon: 'fas fa-conveyor-belt', w: 2, h: 1, category: 'Production', description: 'SCADA renkli tesis hücre matrisi', config: { visualType: 'Status Board', refreshInterval: 5000 } },
+          { id: 'production-line', type: 'line-status', title: 'Production Line Status', icon: 'fas fa-industry', w: 2, h: 1, category: 'Production', description: 'SCADA renkli tesis hücre matrisi', config: { visualType: 'Status Board', refreshInterval: 5000 } },
           { id: 'shift-overview', type: 'shift', title: 'Shift Overview', icon: 'fas fa-clock', w: 1, h: 1, category: 'Production', description: 'Vardiya bazında üretim özeti', config: { visualType: 'KPI Card', refreshInterval: 30000 } },
           { id: 'downtime-tracker', type: 'downtime', title: 'Downtime Tracker', icon: 'fas fa-pause-circle', w: 2, h: 1, category: 'Production', description: 'Zaman çizelgesi ve duruş blokları', config: { visualType: 'Timeline', refreshInterval: 15000 } },
         ]
