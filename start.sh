@@ -3,7 +3,7 @@
 # ==============================================================================
 # 🚀 SuperNova Platform Unified Starter Script
 # Launches:
-#   1. Local AI Copilot Service (MLX Qwen3.5-9B + LoRA Adapter 600 on Port 8085)
+#   1. Local AI Copilot Service (MLX Qwen3.5-9B + LoRA v2.4 Adapter 240 on Port 8085)
 #   2. Backend API Server (Flask on Port 5001)
 #   3. Frontend UI (Angular on Port 4200)
 #
@@ -77,18 +77,18 @@ free_port_if_busy() {
 }
 
 # ------------------------------------------------------------------------------
-# 1. Yerel AI Copilot Sunucusu (MLX Qwen 3.5 9B + Adapter 600)
+# 1. Yerel AI Copilot Sunucusu (MLX Qwen 3.5 9B + v2.4 Adapter 240)
 # ------------------------------------------------------------------------------
 if [ "$START_AI" = "true" ]; then
     free_port_if_busy 8085 "AI Copilot"
-    AI_ADAPTER="training/supernova-v23/adapter600/0000600_adapters.safetensors"
+    AI_ADAPTER="training/supernova-v24/adapter240/0000240_adapters.safetensors"
     AI_PYTHON=".venv-ai/bin/python"
 
     if [ -f "$AI_ADAPTER" ] && [ -x "$AI_PYTHON" ]; then
         echo "--> [1/3] Yerel AI Copilot Sunucusu Başlatılıyor (Port 8085)..."
         "$AI_PYTHON" scripts/local_ai.py serve --adapter-path "$AI_ADAPTER" &
         AI_PID=$!
-        echo "    🤖 AI Copilot PID: $AI_PID (Qwen3.5-9B + Adım 600 Adaptörü)"
+        echo "    🤖 AI Copilot PID: $AI_PID (Qwen3.5-9B + v2.4 Adım 240 Adaptörü)"
         echo "    ⏳ Model ağırlıkları yükleniyor (lütfen bekleyin)..."
         for i in {1..35}; do
             if curl -s http://127.0.0.1:8085/health 2>/dev/null | grep -q '"status": *"ok"'; then

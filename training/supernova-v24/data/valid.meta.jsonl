@@ -1,0 +1,240 @@
+{"category": "tool_calling", "subtype": "schema_roundtrip", "scenario": "sc17_cleanroom", "checks": ["structured_call", "schema_roundtrip"]}
+{"category": "py_weighted", "subtype": "availability", "scenario": "sc16_optical_qc", "checks": ["unequal_weights", "null_and_missing", "zero_denominator", "empty", "ratio_after_aggregation"]}
+{"category": "py_weighted", "subtype": "scrap", "scenario": "sc16_optical_qc", "checks": ["unequal_weights", "null_and_missing", "zero_denominator", "empty", "ratio_after_aggregation"]}
+{"category": "tool_calling", "subtype": "schema_call", "scenario": "sc17_cleanroom", "checks": ["structured_call", "schema_call"]}
+{"category": "forbidden", "subtype": "admin_password_dump", "scenario": "sc16_optical_qc", "checks": ["refusal", "admin_password_dump", "no_executable_artifact"]}
+{"category": "admin_rbac", "subtype": "create_role", "scenario": "sc16_optical_qc", "checks": ["rbac_create_role", "level_hierarchy"]}
+{"category": "py_fix", "subtype": "per_row_merge", "scenario": "sc16_optical_qc", "checks": ["duplicates_both_sides", "null_and_missing", "left_empty", "both_empty", "zero_placeholder_rows", "error_correction"]}
+{"category": "template", "subtype": "chart_summary_bar", "scenario": "sc17_cleanroom", "checks": ["schema", "chart_and_summary_only"]}
+{"category": "py_merge", "subtype": "left_balance", "scenario": "sc16_optical_qc", "checks": ["duplicates_both_sides", "null_and_missing", "left_empty", "both_empty", "zero_placeholder_rows"]}
+{"category": "py_weighted", "subtype": "quality", "scenario": "sc16_optical_qc", "checks": ["unequal_weights", "null_and_missing", "zero_denominator", "empty", "ratio_after_aggregation"]}
+{"category": "query_viewer", "subtype": "parameter_live_binding", "scenario": "sc17_cleanroom", "checks": ["query_comprehension", "live_connectivity", "no_executable_artifact"]}
+{"category": "query_viewer", "subtype": "interactive_disambiguation", "scenario": "sc17_cleanroom", "checks": ["interactive_disambiguation", "no_executable_artifact"]}
+{"category": "forbidden", "subtype": "eval_exec", "scenario": "sc17_cleanroom", "checks": ["refusal", "eval_exec", "no_executable_artifact"]}
+{"category": "admin_rbac", "subtype": "create_user", "scenario": "sc17_cleanroom", "checks": ["rbac_create_user", "no_credentials"]}
+{"category": "py_merge", "subtype": "left_difference", "scenario": "sc16_optical_qc", "checks": ["duplicates_both_sides", "null_and_missing", "left_empty", "both_empty", "zero_placeholder_rows"]}
+{"category": "sql", "subtype": "cte_sum", "scenario": "sc16_optical_qc", "checks": ["outside_range", "no_events", "exact_aggregate"]}
+{"category": "py_fix", "subtype": "nested_output", "scenario": "sc16_optical_qc", "checks": ["duplicates_both_sides", "null_and_missing", "left_empty", "both_empty", "zero_placeholder_rows", "error_correction"]}
+{"category": "template", "subtype": "chart_summary_pie_area", "scenario": "sc17_cleanroom", "checks": ["schema", "chart_and_summary_only"]}
+{"category": "missing_info", "subtype": "oee_gap", "scenario": "sc16_optical_qc", "checks": ["anti_hallucination", "oee_gap", "no_executable_artifact"]}
+{"category": "admin_rbac", "subtype": "update_sharing", "scenario": "sc17_cleanroom", "checks": ["rbac_sharing_acl"]}
+{"category": "py_fix", "subtype": "zero_division", "scenario": "sc16_optical_qc", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "missing_info", "subtype": "kpi_gap", "scenario": "sc16_optical_qc", "checks": ["anti_hallucination", "kpi_gap", "no_executable_artifact"]}
+{"category": "py_basic", "subtype": "oee_full", "scenario": "sc16_optical_qc", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "forbidden", "subtype": "sql_dml_ddl", "scenario": "sc16_optical_qc", "checks": ["refusal", "sql_dml_ddl", "no_executable_artifact"]}
+{"category": "template", "subtype": "full_band_report", "scenario": "sc16_optical_qc", "checks": ["schema", "live_bands", "zero_hardcoded_numbers"]}
+{"category": "sql", "subtype": "sum", "scenario": "sc17_cleanroom", "checks": ["outside_range", "no_events", "exact_aggregate"]}
+{"category": "missing_info", "subtype": "ambiguous_tables", "scenario": "sc17_cleanroom", "checks": ["anti_hallucination", "ambiguous_tables", "no_executable_artifact"]}
+{"category": "missing_info", "subtype": "path_missing_col", "scenario": "sc16_optical_qc", "checks": ["anti_hallucination", "path_missing_col", "no_executable_artifact"]}
+{"category": "admin_rbac", "subtype": "refuse_escalation", "scenario": "sc17_cleanroom", "checks": ["rbac_refusal", "no_executable_artifact"]}
+{"category": "sql", "subtype": "sum_with_name", "scenario": "sc17_cleanroom", "checks": ["outside_range", "no_events", "exact_aggregate"]}
+{"category": "py_basic", "subtype": "filter", "scenario": "sc17_cleanroom", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "template", "subtype": "multi_summary_band", "scenario": "sc16_optical_qc", "checks": ["schema", "live_bands", "zero_hardcoded_numbers"]}
+{"category": "path", "subtype": "sequence", "scenario": "sc17_cleanroom", "checks": ["schema", "exact_structure"]}
+{"category": "missing_info", "subtype": "sql_missing_col", "scenario": "sc17_cleanroom", "checks": ["anti_hallucination", "sql_missing_col", "no_executable_artifact"]}
+{"category": "sql", "subtype": "three_table_join", "scenario": "sc16_optical_qc", "checks": ["three_table_join", "outside_range", "zero_preserve"]}
+{"category": "path", "subtype": "grouped", "scenario": "sc16_optical_qc", "checks": ["schema", "exact_structure"]}
+{"category": "sql", "subtype": "count", "scenario": "sc17_cleanroom", "checks": ["outside_range", "no_events", "exact_aggregate"]}
+{"category": "py_basic", "subtype": "sum", "scenario": "sc16_optical_qc", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "query_viewer", "subtype": "explain_and_connect", "scenario": "sc17_cleanroom", "checks": ["query_comprehension", "live_connectivity", "no_executable_artifact"]}
+{"category": "py_weighted", "subtype": "performance", "scenario": "sc17_cleanroom", "checks": ["unequal_weights", "null_and_missing", "zero_denominator", "empty", "ratio_after_aggregation"]}
+{"category": "missing_info", "subtype": "template_missing_col", "scenario": "sc16_optical_qc", "checks": ["anti_hallucination", "template_missing_col", "no_executable_artifact"]}
+{"category": "py_fix", "subtype": "pandas_sandbox_rewrite", "scenario": "sc16_optical_qc", "checks": ["unequal_weights", "null_and_missing", "zero_denominator", "empty", "ratio_after_aggregation", "pandas_rewrite"]}
+{"category": "query_viewer", "subtype": "resolved_selection_sql", "scenario": "sc16_optical_qc", "checks": ["resolved_selection", "sql_execution"]}
+{"category": "py_fix", "subtype": "unsupported_comprehension", "scenario": "sc16_optical_qc", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "forbidden", "subtype": "pandas_numpy", "scenario": "sc16_optical_qc", "checks": ["refusal", "pandas_numpy", "no_executable_artifact"]}
+{"category": "forbidden", "subtype": "file_open", "scenario": "sc17_cleanroom", "checks": ["refusal", "file_open", "no_executable_artifact"]}
+{"category": "tool_calling", "subtype": "rbac_call", "scenario": "sc16_optical_qc", "checks": ["structured_call", "rbac_call"]}
+{"category": "template", "subtype": "chart_summary_line", "scenario": "sc16_optical_qc", "checks": ["schema", "chart_and_summary_only"]}
+{"category": "path", "subtype": "tree", "scenario": "sc17_cleanroom", "checks": ["schema", "exact_structure"]}
+{"category": "path", "subtype": "dag", "scenario": "sc16_optical_qc", "checks": ["schema", "exact_structure"]}
+{"category": "py_basic", "subtype": "range", "scenario": "sc17_cleanroom", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "py_basic", "subtype": "group", "scenario": "sc17_cleanroom", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "py_basic", "subtype": "average", "scenario": "sc16_optical_qc", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "py_fix", "subtype": "null_arithmetic", "scenario": "sc17_cleanroom", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "tool_calling", "subtype": "rbac_roundtrip", "scenario": "sc16_optical_qc", "checks": ["structured_call", "rbac_roundtrip"]}
+{"category": "admin_rbac", "subtype": "set_user_overrides", "scenario": "sc16_optical_qc", "checks": ["rbac_overrides"]}
+{"category": "sql", "subtype": "average", "scenario": "sc16_optical_qc", "checks": ["outside_range", "no_events", "exact_aggregate"]}
+{"category": "template", "subtype": "builtin_formula_sheet", "scenario": "sc17_cleanroom", "checks": ["schema", "builtin_and_formula"]}
+{"category": "forbidden", "subtype": "sandbox_bypass", "scenario": "sc17_cleanroom", "checks": ["refusal", "sandbox_bypass", "no_executable_artifact"]}
+{"category": "forbidden", "subtype": "os_subprocess", "scenario": "sc17_cleanroom", "checks": ["refusal", "os_subprocess", "no_executable_artifact"]}
+{"category": "py_merge", "subtype": "full_difference", "scenario": "sc17_cleanroom", "checks": ["duplicates_both_sides", "null_and_missing", "left_empty", "both_empty", "zero_placeholder_rows"]}
+{"category": "path", "subtype": "multi_level", "scenario": "sc17_cleanroom", "checks": ["schema", "multi_level", "space_map_icons"]}
+{"category": "py_merge", "subtype": "left_net", "scenario": "sc16_optical_qc", "checks": ["duplicates_both_sides", "null_and_missing", "left_empty", "both_empty", "zero_placeholder_rows"]}
+{"category": "forbidden", "subtype": "network_socket", "scenario": "sc17_cleanroom", "checks": ["refusal", "network_socket", "no_executable_artifact"]}
+{"category": "path", "subtype": "binary_tree", "scenario": "sc17_cleanroom", "checks": ["schema", "exact_structure"]}
+{"category": "template", "subtype": "chart_summary_pie_area", "scenario": "sc17_cleanroom", "checks": ["schema", "chart_and_summary_only"]}
+{"category": "admin_rbac", "subtype": "refuse_escalation", "scenario": "sc17_cleanroom", "checks": ["rbac_refusal", "no_executable_artifact"]}
+{"category": "template", "subtype": "chart_summary_bar", "scenario": "sc16_optical_qc", "checks": ["schema", "chart_and_summary_only"]}
+{"category": "path", "subtype": "dag", "scenario": "sc17_cleanroom", "checks": ["schema", "exact_structure"]}
+{"category": "admin_rbac", "subtype": "set_user_overrides", "scenario": "sc17_cleanroom", "checks": ["rbac_overrides"]}
+{"category": "query_viewer", "subtype": "resolved_selection_sql", "scenario": "sc17_cleanroom", "checks": ["resolved_selection", "sql_execution"]}
+{"category": "query_viewer", "subtype": "explain_and_connect", "scenario": "sc16_optical_qc", "checks": ["query_comprehension", "live_connectivity", "no_executable_artifact"]}
+{"category": "query_viewer", "subtype": "parameter_live_binding", "scenario": "sc16_optical_qc", "checks": ["query_comprehension", "live_connectivity", "no_executable_artifact"]}
+{"category": "path", "subtype": "tree", "scenario": "sc17_cleanroom", "checks": ["schema", "exact_structure"]}
+{"category": "missing_info", "subtype": "kpi_gap", "scenario": "sc16_optical_qc", "checks": ["anti_hallucination", "kpi_gap", "no_executable_artifact"]}
+{"category": "py_fix", "subtype": "null_arithmetic", "scenario": "sc16_optical_qc", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "py_weighted", "subtype": "availability", "scenario": "sc17_cleanroom", "checks": ["unequal_weights", "null_and_missing", "zero_denominator", "empty", "ratio_after_aggregation"]}
+{"category": "query_viewer", "subtype": "interactive_disambiguation", "scenario": "sc16_optical_qc", "checks": ["interactive_disambiguation", "no_executable_artifact"]}
+{"category": "forbidden", "subtype": "eval_exec", "scenario": "sc16_optical_qc", "checks": ["refusal", "eval_exec", "no_executable_artifact"]}
+{"category": "path", "subtype": "binary_tree", "scenario": "sc16_optical_qc", "checks": ["schema", "exact_structure"]}
+{"category": "template", "subtype": "chart_summary_line", "scenario": "sc16_optical_qc", "checks": ["schema", "chart_and_summary_only"]}
+{"category": "missing_info", "subtype": "template_missing_col", "scenario": "sc17_cleanroom", "checks": ["anti_hallucination", "template_missing_col", "no_executable_artifact"]}
+{"category": "py_fix", "subtype": "per_row_merge", "scenario": "sc17_cleanroom", "checks": ["duplicates_both_sides", "null_and_missing", "left_empty", "both_empty", "zero_placeholder_rows", "error_correction"]}
+{"category": "forbidden", "subtype": "sandbox_bypass", "scenario": "sc16_optical_qc", "checks": ["refusal", "sandbox_bypass", "no_executable_artifact"]}
+{"category": "py_merge", "subtype": "full_difference", "scenario": "sc16_optical_qc", "checks": ["duplicates_both_sides", "null_and_missing", "left_empty", "both_empty", "zero_placeholder_rows"]}
+{"category": "forbidden", "subtype": "os_subprocess", "scenario": "sc16_optical_qc", "checks": ["refusal", "os_subprocess", "no_executable_artifact"]}
+{"category": "py_basic", "subtype": "average", "scenario": "sc17_cleanroom", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "py_merge", "subtype": "left_net", "scenario": "sc16_optical_qc", "checks": ["duplicates_both_sides", "null_and_missing", "left_empty", "both_empty", "zero_placeholder_rows"]}
+{"category": "forbidden", "subtype": "sql_dml_ddl", "scenario": "sc17_cleanroom", "checks": ["refusal", "sql_dml_ddl", "no_executable_artifact"]}
+{"category": "sql", "subtype": "three_table_join", "scenario": "sc16_optical_qc", "checks": ["three_table_join", "outside_range", "zero_preserve"]}
+{"category": "tool_calling", "subtype": "schema_call", "scenario": "sc16_optical_qc", "checks": ["structured_call", "schema_call"]}
+{"category": "template", "subtype": "full_band_report", "scenario": "sc17_cleanroom", "checks": ["schema", "live_bands", "zero_hardcoded_numbers"]}
+{"category": "sql", "subtype": "cte_sum", "scenario": "sc16_optical_qc", "checks": ["outside_range", "no_events", "exact_aggregate"]}
+{"category": "template", "subtype": "builtin_formula_sheet", "scenario": "sc16_optical_qc", "checks": ["schema", "builtin_and_formula"]}
+{"category": "template", "subtype": "multi_summary_band", "scenario": "sc16_optical_qc", "checks": ["schema", "live_bands", "zero_hardcoded_numbers"]}
+{"category": "forbidden", "subtype": "file_open", "scenario": "sc16_optical_qc", "checks": ["refusal", "file_open", "no_executable_artifact"]}
+{"category": "py_merge", "subtype": "left_balance", "scenario": "sc17_cleanroom", "checks": ["duplicates_both_sides", "null_and_missing", "left_empty", "both_empty", "zero_placeholder_rows"]}
+{"category": "py_basic", "subtype": "oee_full", "scenario": "sc17_cleanroom", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "py_weighted", "subtype": "performance", "scenario": "sc17_cleanroom", "checks": ["unequal_weights", "null_and_missing", "zero_denominator", "empty", "ratio_after_aggregation"]}
+{"category": "admin_rbac", "subtype": "create_user", "scenario": "sc17_cleanroom", "checks": ["rbac_create_user", "no_credentials"]}
+{"category": "py_basic", "subtype": "range", "scenario": "sc17_cleanroom", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "missing_info", "subtype": "ambiguous_tables", "scenario": "sc16_optical_qc", "checks": ["anti_hallucination", "ambiguous_tables", "no_executable_artifact"]}
+{"category": "path", "subtype": "multi_level", "scenario": "sc17_cleanroom", "checks": ["schema", "multi_level", "space_map_icons"]}
+{"category": "missing_info", "subtype": "sql_missing_col", "scenario": "sc17_cleanroom", "checks": ["anti_hallucination", "sql_missing_col", "no_executable_artifact"]}
+{"category": "tool_calling", "subtype": "rbac_call", "scenario": "sc17_cleanroom", "checks": ["structured_call", "rbac_call"]}
+{"category": "py_weighted", "subtype": "quality", "scenario": "sc17_cleanroom", "checks": ["unequal_weights", "null_and_missing", "zero_denominator", "empty", "ratio_after_aggregation"]}
+{"category": "py_merge", "subtype": "left_difference", "scenario": "sc17_cleanroom", "checks": ["duplicates_both_sides", "null_and_missing", "left_empty", "both_empty", "zero_placeholder_rows"]}
+{"category": "missing_info", "subtype": "oee_gap", "scenario": "sc17_cleanroom", "checks": ["anti_hallucination", "oee_gap", "no_executable_artifact"]}
+{"category": "sql", "subtype": "average", "scenario": "sc16_optical_qc", "checks": ["outside_range", "no_events", "exact_aggregate"]}
+{"category": "path", "subtype": "grouped", "scenario": "sc16_optical_qc", "checks": ["schema", "exact_structure"]}
+{"category": "admin_rbac", "subtype": "update_sharing", "scenario": "sc17_cleanroom", "checks": ["rbac_sharing_acl"]}
+{"category": "sql", "subtype": "count", "scenario": "sc16_optical_qc", "checks": ["outside_range", "no_events", "exact_aggregate"]}
+{"category": "path", "subtype": "sequence", "scenario": "sc17_cleanroom", "checks": ["schema", "exact_structure"]}
+{"category": "forbidden", "subtype": "network_socket", "scenario": "sc16_optical_qc", "checks": ["refusal", "network_socket", "no_executable_artifact"]}
+{"category": "py_fix", "subtype": "pandas_sandbox_rewrite", "scenario": "sc17_cleanroom", "checks": ["unequal_weights", "null_and_missing", "zero_denominator", "empty", "ratio_after_aggregation", "pandas_rewrite"]}
+{"category": "forbidden", "subtype": "pandas_numpy", "scenario": "sc17_cleanroom", "checks": ["refusal", "pandas_numpy", "no_executable_artifact"]}
+{"category": "py_fix", "subtype": "nested_output", "scenario": "sc17_cleanroom", "checks": ["duplicates_both_sides", "null_and_missing", "left_empty", "both_empty", "zero_placeholder_rows", "error_correction"]}
+{"category": "py_basic", "subtype": "filter", "scenario": "sc16_optical_qc", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "tool_calling", "subtype": "rbac_roundtrip", "scenario": "sc16_optical_qc", "checks": ["structured_call", "rbac_roundtrip"]}
+{"category": "tool_calling", "subtype": "schema_roundtrip", "scenario": "sc16_optical_qc", "checks": ["structured_call", "schema_roundtrip"]}
+{"category": "py_fix", "subtype": "unsupported_comprehension", "scenario": "sc17_cleanroom", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "py_fix", "subtype": "zero_division", "scenario": "sc17_cleanroom", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "py_basic", "subtype": "sum", "scenario": "sc17_cleanroom", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "missing_info", "subtype": "path_missing_col", "scenario": "sc17_cleanroom", "checks": ["anti_hallucination", "path_missing_col", "no_executable_artifact"]}
+{"category": "py_basic", "subtype": "group", "scenario": "sc16_optical_qc", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "forbidden", "subtype": "admin_password_dump", "scenario": "sc17_cleanroom", "checks": ["refusal", "admin_password_dump", "no_executable_artifact"]}
+{"category": "sql", "subtype": "sum_with_name", "scenario": "sc16_optical_qc", "checks": ["outside_range", "no_events", "exact_aggregate"]}
+{"category": "py_weighted", "subtype": "scrap", "scenario": "sc17_cleanroom", "checks": ["unequal_weights", "null_and_missing", "zero_denominator", "empty", "ratio_after_aggregation"]}
+{"category": "admin_rbac", "subtype": "create_role", "scenario": "sc16_optical_qc", "checks": ["rbac_create_role", "level_hierarchy"]}
+{"category": "sql", "subtype": "sum", "scenario": "sc17_cleanroom", "checks": ["outside_range", "no_events", "null_metric", "exact_aggregate"]}
+{"category": "admin_rbac", "subtype": "update_sharing", "scenario": "sc16_optical_qc", "checks": ["rbac_sharing_acl"]}
+{"category": "py_merge", "subtype": "left_net", "scenario": "sc17_cleanroom", "checks": ["duplicates_both_sides", "null_and_missing", "left_empty", "both_empty", "zero_placeholder_rows"]}
+{"category": "py_weighted", "subtype": "scrap", "scenario": "sc16_optical_qc", "checks": ["unequal_weights", "null_and_missing", "zero_denominator", "empty", "ratio_after_aggregation"]}
+{"category": "missing_info", "subtype": "oee_gap", "scenario": "sc17_cleanroom", "checks": ["anti_hallucination", "oee_gap", "no_executable_artifact"]}
+{"category": "sql", "subtype": "sum", "scenario": "sc16_optical_qc", "checks": ["outside_range", "no_events", "exact_aggregate"]}
+{"category": "py_weighted", "subtype": "quality", "scenario": "sc17_cleanroom", "checks": ["unequal_weights", "null_and_missing", "zero_denominator", "empty", "ratio_after_aggregation"]}
+{"category": "py_weighted", "subtype": "availability", "scenario": "sc16_optical_qc", "checks": ["unequal_weights", "null_and_missing", "zero_denominator", "empty", "ratio_after_aggregation"]}
+{"category": "py_fix", "subtype": "pandas_sandbox_rewrite", "scenario": "sc16_optical_qc", "checks": ["unequal_weights", "null_and_missing", "zero_denominator", "empty", "ratio_after_aggregation", "pandas_rewrite"]}
+{"category": "missing_info", "subtype": "sql_missing_col", "scenario": "sc16_optical_qc", "checks": ["anti_hallucination", "sql_missing_col", "no_executable_artifact"]}
+{"category": "query_viewer", "subtype": "explain_and_connect", "scenario": "sc17_cleanroom", "checks": ["query_comprehension", "live_connectivity", "no_executable_artifact"]}
+{"category": "template", "subtype": "chart_summary_pie_area", "scenario": "sc17_cleanroom", "checks": ["schema", "chart_and_summary_only"]}
+{"category": "py_fix", "subtype": "unsupported_comprehension", "scenario": "sc17_cleanroom", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "path", "subtype": "sequence", "scenario": "sc16_optical_qc", "checks": ["schema", "exact_structure"]}
+{"category": "sql", "subtype": "sum_with_name", "scenario": "sc16_optical_qc", "checks": ["outside_range", "no_events", "exact_aggregate"]}
+{"category": "admin_rbac", "subtype": "create_role", "scenario": "sc17_cleanroom", "checks": ["rbac_create_role", "level_hierarchy"]}
+{"category": "tool_calling", "subtype": "rbac_call", "scenario": "sc16_optical_qc", "checks": ["structured_call", "rbac_call"]}
+{"category": "admin_rbac", "subtype": "refuse_escalation", "scenario": "sc17_cleanroom", "checks": ["rbac_refusal", "no_executable_artifact"]}
+{"category": "admin_rbac", "subtype": "set_user_overrides", "scenario": "sc17_cleanroom", "checks": ["rbac_overrides"]}
+{"category": "sql", "subtype": "three_table_join", "scenario": "sc16_optical_qc", "checks": ["three_table_join", "outside_range", "zero_preserve"]}
+{"category": "template", "subtype": "multi_summary_band", "scenario": "sc17_cleanroom", "checks": ["schema", "live_bands", "zero_hardcoded_numbers"]}
+{"category": "py_merge", "subtype": "left_balance", "scenario": "sc16_optical_qc", "checks": ["duplicates_both_sides", "null_and_missing", "left_empty", "both_empty", "zero_placeholder_rows"]}
+{"category": "query_viewer", "subtype": "parameter_live_binding", "scenario": "sc17_cleanroom", "checks": ["query_comprehension", "live_connectivity", "no_executable_artifact"]}
+{"category": "path", "subtype": "grouped", "scenario": "sc17_cleanroom", "checks": ["schema", "exact_structure"]}
+{"category": "py_fix", "subtype": "null_arithmetic", "scenario": "sc17_cleanroom", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "query_viewer", "subtype": "resolved_selection_sql", "scenario": "sc17_cleanroom", "checks": ["resolved_selection", "sql_execution"]}
+{"category": "py_fix", "subtype": "nested_output", "scenario": "sc17_cleanroom", "checks": ["duplicates_both_sides", "null_and_missing", "left_empty", "both_empty", "zero_placeholder_rows", "error_correction"]}
+{"category": "sql", "subtype": "average", "scenario": "sc17_cleanroom", "checks": ["outside_range", "no_events", "exact_aggregate"]}
+{"category": "path", "subtype": "multi_level", "scenario": "sc16_optical_qc", "checks": ["schema", "multi_level", "space_map_icons"]}
+{"category": "py_merge", "subtype": "full_difference", "scenario": "sc16_optical_qc", "checks": ["duplicates_both_sides", "null_and_missing", "left_empty", "both_empty", "zero_placeholder_rows"]}
+{"category": "tool_calling", "subtype": "rbac_roundtrip", "scenario": "sc17_cleanroom", "checks": ["structured_call", "rbac_roundtrip"]}
+{"category": "path", "subtype": "binary_tree", "scenario": "sc16_optical_qc", "checks": ["schema", "exact_structure"]}
+{"category": "query_viewer", "subtype": "interactive_disambiguation", "scenario": "sc16_optical_qc", "checks": ["interactive_disambiguation", "no_executable_artifact"]}
+{"category": "tool_calling", "subtype": "schema_roundtrip", "scenario": "sc17_cleanroom", "checks": ["structured_call", "schema_roundtrip"]}
+{"category": "py_merge", "subtype": "left_difference", "scenario": "sc17_cleanroom", "checks": ["duplicates_both_sides", "null_and_missing", "left_empty", "both_empty", "zero_placeholder_rows"]}
+{"category": "template", "subtype": "chart_summary_bar", "scenario": "sc16_optical_qc", "checks": ["schema", "chart_and_summary_only"]}
+{"category": "sql", "subtype": "cte_sum", "scenario": "sc17_cleanroom", "checks": ["outside_range", "no_events", "exact_aggregate"]}
+{"category": "admin_rbac", "subtype": "create_user", "scenario": "sc16_optical_qc", "checks": ["rbac_create_user", "no_credentials"]}
+{"category": "py_fix", "subtype": "per_row_merge", "scenario": "sc16_optical_qc", "checks": ["duplicates_both_sides", "null_and_missing", "left_empty", "both_empty", "zero_placeholder_rows", "error_correction"]}
+{"category": "tool_calling", "subtype": "schema_call", "scenario": "sc16_optical_qc", "checks": ["structured_call", "schema_call"]}
+{"category": "path", "subtype": "dag", "scenario": "sc17_cleanroom", "checks": ["schema", "exact_structure"]}
+{"category": "py_basic", "subtype": "filter", "scenario": "sc16_optical_qc", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "template", "subtype": "full_band_report", "scenario": "sc17_cleanroom", "checks": ["schema", "live_bands", "zero_hardcoded_numbers"]}
+{"category": "missing_info", "subtype": "kpi_gap", "scenario": "sc17_cleanroom", "checks": ["anti_hallucination", "kpi_gap", "no_executable_artifact"]}
+{"category": "py_basic", "subtype": "average", "scenario": "sc17_cleanroom", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "template", "subtype": "chart_summary_line", "scenario": "sc17_cleanroom", "checks": ["schema", "chart_and_summary_only"]}
+{"category": "py_weighted", "subtype": "performance", "scenario": "sc16_optical_qc", "checks": ["unequal_weights", "null_and_missing", "zero_denominator", "empty", "ratio_after_aggregation"]}
+{"category": "missing_info", "subtype": "template_missing_col", "scenario": "sc16_optical_qc", "checks": ["anti_hallucination", "template_missing_col", "no_executable_artifact"]}
+{"category": "template", "subtype": "builtin_formula_sheet", "scenario": "sc16_optical_qc", "checks": ["schema", "builtin_and_formula"]}
+{"category": "sql", "subtype": "count", "scenario": "sc17_cleanroom", "checks": ["outside_range", "no_events", "exact_aggregate"]}
+{"category": "py_fix", "subtype": "zero_division", "scenario": "sc16_optical_qc", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "py_basic", "subtype": "sum", "scenario": "sc16_optical_qc", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "py_basic", "subtype": "group", "scenario": "sc16_optical_qc", "checks": ["ast", "exact_rows", "null_missing", "empty"]}
+{"category": "path", "subtype": "tree", "scenario": "sc16_optical_qc", "checks": ["schema", "exact_structure"]}
+{"category": "query_viewer", "subtype": "interactive_disambiguation", "scenario": "sc17_cleanroom", "checks": ["interactive_disambiguation", "no_executable_artifact"]}
+{"category": "admin_rbac", "subtype": "create_role", "scenario": "sc17_cleanroom", "checks": ["rbac_create_role", "level_hierarchy"]}
+{"category": "admin_rbac", "subtype": "refuse_escalation", "scenario": "sc16_optical_qc", "checks": ["rbac_refusal", "no_executable_artifact"]}
+{"category": "template", "subtype": "chart_summary_line", "scenario": "sc17_cleanroom", "checks": ["schema", "chart_and_summary_only"]}
+{"category": "sql", "subtype": "sum_with_name", "scenario": "sc17_cleanroom", "checks": ["outside_range", "no_events", "exact_aggregate"]}
+{"category": "path", "subtype": "binary_tree", "scenario": "sc17_cleanroom", "checks": ["schema", "exact_structure"]}
+{"category": "tool_calling", "subtype": "rbac_call", "scenario": "sc17_cleanroom", "checks": ["structured_call", "rbac_call"]}
+{"category": "sql", "subtype": "sum", "scenario": "sc16_optical_qc", "checks": ["outside_range", "no_events", "exact_aggregate"]}
+{"category": "template", "subtype": "chart_summary_pie_area", "scenario": "sc16_optical_qc", "checks": ["schema", "chart_and_summary_only"]}
+{"category": "sql", "subtype": "average", "scenario": "sc17_cleanroom", "checks": ["outside_range", "no_events", "null_metric", "exact_aggregate"]}
+{"category": "py_merge", "subtype": "left_difference", "scenario": "sc16_optical_qc", "checks": ["duplicates_both_sides", "null_and_missing", "left_empty", "both_empty", "zero_placeholder_rows"]}
+{"category": "query_viewer", "subtype": "resolved_selection_sql", "scenario": "sc16_optical_qc", "checks": ["resolved_selection", "sql_execution"]}
+{"category": "py_merge", "subtype": "full_difference", "scenario": "sc17_cleanroom", "checks": ["duplicates_both_sides", "null_and_missing", "left_empty", "both_empty", "zero_placeholder_rows"]}
+{"category": "sql", "subtype": "cte_sum", "scenario": "sc17_cleanroom", "checks": ["outside_range", "no_events", "exact_aggregate"]}
+{"category": "template", "subtype": "multi_summary_band", "scenario": "sc16_optical_qc", "checks": ["schema", "live_bands", "zero_hardcoded_numbers"]}
+{"category": "query_viewer", "subtype": "parameter_live_binding", "scenario": "sc16_optical_qc", "checks": ["query_comprehension", "live_connectivity", "no_executable_artifact"]}
+{"category": "template", "subtype": "builtin_formula_sheet", "scenario": "sc17_cleanroom", "checks": ["schema", "builtin_and_formula"]}
+{"category": "query_viewer", "subtype": "explain_and_connect", "scenario": "sc16_optical_qc", "checks": ["query_comprehension", "live_connectivity", "no_executable_artifact"]}
+{"category": "path", "subtype": "dag", "scenario": "sc16_optical_qc", "checks": ["schema", "exact_structure"]}
+{"category": "py_merge", "subtype": "left_balance", "scenario": "sc17_cleanroom", "checks": ["duplicates_both_sides", "null_and_missing", "left_empty", "both_empty", "zero_placeholder_rows"]}
+{"category": "py_weighted", "subtype": "quality", "scenario": "sc17_cleanroom", "checks": ["unequal_weights", "null_and_missing", "zero_denominator", "empty", "ratio_after_aggregation"]}
+{"category": "template", "subtype": "full_band_report", "scenario": "sc16_optical_qc", "checks": ["schema", "live_bands", "zero_hardcoded_numbers"]}
+{"category": "path", "subtype": "sequence", "scenario": "sc16_optical_qc", "checks": ["schema", "exact_structure"]}
+{"category": "admin_rbac", "subtype": "create_user", "scenario": "sc16_optical_qc", "checks": ["rbac_create_user", "no_credentials"]}
+{"category": "py_merge", "subtype": "left_net", "scenario": "sc16_optical_qc", "checks": ["duplicates_both_sides", "null_and_missing", "left_empty", "both_empty", "zero_placeholder_rows"]}
+{"category": "tool_calling", "subtype": "schema_call", "scenario": "sc17_cleanroom", "checks": ["structured_call", "schema_call"]}
+{"category": "template", "subtype": "chart_summary_bar", "scenario": "sc17_cleanroom", "checks": ["schema", "chart_and_summary_only"]}
+{"category": "path", "subtype": "multi_level", "scenario": "sc16_optical_qc", "checks": ["schema", "multi_level", "space_map_icons"]}
+{"category": "sql", "subtype": "count", "scenario": "sc17_cleanroom", "checks": ["outside_range", "no_events", "null_metric", "exact_aggregate"]}
+{"category": "py_weighted", "subtype": "availability", "scenario": "sc16_optical_qc", "checks": ["unequal_weights", "null_and_missing", "zero_denominator", "empty", "ratio_after_aggregation"]}
+{"category": "path", "subtype": "tree", "scenario": "sc16_optical_qc", "checks": ["schema", "exact_structure"]}
+{"category": "sql", "subtype": "three_table_join", "scenario": "sc17_cleanroom", "checks": ["three_table_join", "outside_range", "zero_preserve"]}
+{"category": "tool_calling", "subtype": "rbac_roundtrip", "scenario": "sc17_cleanroom", "checks": ["structured_call", "rbac_roundtrip"]}
+{"category": "py_weighted", "subtype": "scrap", "scenario": "sc17_cleanroom", "checks": ["unequal_weights", "null_and_missing", "zero_denominator", "empty", "ratio_after_aggregation"]}
+{"category": "tool_calling", "subtype": "schema_roundtrip", "scenario": "sc16_optical_qc", "checks": ["structured_call", "schema_roundtrip"]}
+{"category": "admin_rbac", "subtype": "update_sharing", "scenario": "sc16_optical_qc", "checks": ["rbac_sharing_acl"]}
+{"category": "py_weighted", "subtype": "performance", "scenario": "sc16_optical_qc", "checks": ["unequal_weights", "null_and_missing", "zero_denominator", "empty", "ratio_after_aggregation"]}
+{"category": "path", "subtype": "grouped", "scenario": "sc17_cleanroom", "checks": ["schema", "exact_structure"]}
+{"category": "admin_rbac", "subtype": "set_user_overrides", "scenario": "sc16_optical_qc", "checks": ["rbac_overrides"]}
+{"category": "py_merge", "subtype": "left_net", "scenario": "sc17_cleanroom", "checks": ["duplicates_both_sides", "null_and_missing", "left_empty", "both_empty", "zero_placeholder_rows"]}
+{"category": "template", "subtype": "chart_summary_pie_area", "scenario": "sc16_optical_qc", "checks": ["schema", "chart_and_summary_only"]}
+{"category": "py_weighted", "subtype": "scrap", "scenario": "sc16_optical_qc", "checks": ["unequal_weights", "null_and_missing", "zero_denominator", "empty", "ratio_after_aggregation"]}
+{"category": "template", "subtype": "chart_summary_line", "scenario": "sc17_cleanroom", "checks": ["schema", "chart_and_summary_only"]}
+{"category": "py_merge", "subtype": "left_balance", "scenario": "sc16_optical_qc", "checks": ["duplicates_both_sides", "null_and_missing", "left_empty", "both_empty", "zero_placeholder_rows"]}
+{"category": "py_merge", "subtype": "full_difference", "scenario": "sc17_cleanroom", "checks": ["duplicates_both_sides", "null_and_missing", "left_empty", "both_empty", "zero_placeholder_rows"]}
+{"category": "py_weighted", "subtype": "performance", "scenario": "sc17_cleanroom", "checks": ["unequal_weights", "null_and_missing", "zero_denominator", "empty", "ratio_after_aggregation"]}
+{"category": "py_weighted", "subtype": "quality", "scenario": "sc16_optical_qc", "checks": ["unequal_weights", "null_and_missing", "zero_denominator", "empty", "ratio_after_aggregation"]}
+{"category": "template", "subtype": "full_band_report", "scenario": "sc17_cleanroom", "checks": ["schema", "live_bands", "zero_hardcoded_numbers"]}
+{"category": "py_merge", "subtype": "left_difference", "scenario": "sc17_cleanroom", "checks": ["duplicates_both_sides", "null_and_missing", "left_empty", "both_empty", "zero_placeholder_rows"]}
+{"category": "admin_rbac", "subtype": "create_role", "scenario": "sc16_optical_qc", "checks": ["rbac_create_role", "level_hierarchy"]}
+{"category": "admin_rbac", "subtype": "create_user", "scenario": "sc16_optical_qc", "checks": ["rbac_create_user", "no_credentials"]}
+{"category": "py_weighted", "subtype": "availability", "scenario": "sc16_optical_qc", "checks": ["unequal_weights", "null_and_missing", "zero_denominator", "empty", "ratio_after_aggregation"]}
+{"category": "template", "subtype": "chart_summary_bar", "scenario": "sc16_optical_qc", "checks": ["schema", "chart_and_summary_only"]}
+{"category": "py_merge", "subtype": "left_difference", "scenario": "sc16_optical_qc", "checks": ["duplicates_both_sides", "null_and_missing", "left_empty", "both_empty", "zero_placeholder_rows"]}
+{"category": "py_weighted", "subtype": "availability", "scenario": "sc17_cleanroom", "checks": ["unequal_weights", "null_and_missing", "zero_denominator", "empty", "ratio_after_aggregation"]}
+{"category": "py_weighted", "subtype": "quality", "scenario": "sc17_cleanroom", "checks": ["unequal_weights", "null_and_missing", "zero_denominator", "empty", "ratio_after_aggregation"]}
+{"category": "py_merge", "subtype": "left_net", "scenario": "sc17_cleanroom", "checks": ["duplicates_both_sides", "null_and_missing", "left_empty", "both_empty", "zero_placeholder_rows"]}

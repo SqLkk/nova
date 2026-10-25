@@ -9,6 +9,7 @@ import { AiContext } from './ai-context.service';
 export interface AiHealth {
   available: boolean;
   reason: string;
+  demo_locked?: boolean;
   model?: string;
   provider?: string;
   timeout_seconds?: number;
@@ -224,7 +225,7 @@ export class AiService {
     }
   }
 
-  validate(kind: 'python' | 'path' | 'template', artifact: unknown): Promise<any> {
+  validate(kind: 'python' | 'path' | 'template' | 'admin', artifact: unknown): Promise<any> {
     return firstValueFrom(this.http.post<{ success: boolean; data: any }>(
       `${this.base}/artifacts/validate`, { kind, artifact }).pipe(timeout(10000))).then(result => result.data);
   }

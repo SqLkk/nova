@@ -287,5 +287,80 @@ class AiApiTests(unittest.TestCase):
             self.assertEqual(self.client.get('/api/paths', headers=self.headers).status_code, 200)
             self.assertEqual(self.client.get('/api/templates', headers=self.headers).status_code, 200)
 
+    def test_template_bands_and_admin_rbac_validation(self):
+        # 1. Template fragment with live summary cell + dynamic repeating band
+        tpl_ok = {
+            'charts': [{
+                'id': 'ch_1',
+                'type': 'bar',
+                'anchor': {'row': 1, 'col': 1, 'widthCols': 6, 'heightRows': 10},
+                'queryId': 'q_ai',
+                'xAxis': 'name',
+                'yAxis': ['value'],
+                'title': 'Live Assets',
+            }],
+            'cells': [{
+                'row': 12,
+                'col': 1,
+                'value': '',
+                'binding': {'kind': 'summary', 'queryId': 'q_ai', 'field': 'value', 'operation': 'SUM'},
+            }],
+            'bands': [{
+                'id': 'bnd_1',
+                'queryId': 'q_ai',
+                'range': {'startRow': 15, 'startCol': 1, 'endRow': 15, 'endCol': 2},
+                'fieldMap': {'1': 'name', '2': 'value'},
+            }],
+        }
+        res_tpl = self.client.post('/api/ai/artifacts/validate', headers=self.headers, json={'kind': 'template', 'artifact': tpl_ok})
+        self.assertEqual(res_tpl.status_code, 200)
+        self.assertEqual(res_tpl.json['data']['bands'][0]['fieldMap'], {'1': 'name', '2': 'value'})
+
+        # Reject invented column in band fieldMap
+        tpl_bad = json.loads(json.dumps(tpl_ok))
+        tpl_bad['bands'][0]['fieldMap']['2'] = 'hallucinated_col'
+        self.assertEqual(
+            self.client.post('/api/ai/artifacts/validate', headers=self.headers, json={'kind': 'template', 'artifact': tpl_bad}).status_code,
+            422,
+        )
+
+        # 2. Admin RBAC drafts: viewer is forbidden (403); admin (80) can create level 50 role, cannot create level 80+ or include passwords
+        admin80_headers = {'Authorization': 'Bearer ' + auth.create_token(self.admin, 'sub-admin', 'admin', 80)}
+        role_ok = {
+            'action': 'create_role',
+            'role': {
+                'key': 'line_auditor',
+                'name': 'Hat Denetçisi',
+                'description': 'Salt okunur rapor denetçisi',
+                'level': 50,
+                'permissions': ['page:dashboard', 'page:reports', 'datasource:view'],
+            },
+        }
+        self.assertEqual(
+            self.client.post('/api/ai/artifacts/validate', headers=self.viewer_headers, json={'kind': 'admin', 'artifact': role_ok}).status_code,
+            403,
+        )
+        res_role = self.client.post('/api/ai/artifacts/validate', headers=admin80_headers, json={'kind': 'admin', 'artifact': role_ok})
+        self.assertEqual(res_role.status_code, 200)
+        self.assertEqual(res_role.json['data']['role']['key'], 'line_auditor')
+
+        # Reject privilege escalation (level 80 >= caller_level 80)
+        role_escalate = json.loads(json.dumps(role_ok))
+        role_escalate['role']['level'] = 80
+        self.assertEqual(
+            self.client.post('/api/ai/artifacts/validate', headers=admin80_headers, json={'kind': 'admin', 'artifact': role_escalate}).status_code,
+            422,
+        )
+
+        # Reject plaintext password inside create_user draft
+        user_with_pw = {
+            'action': 'create_user',
+            'user': {'username': 'op_1', 'displayName': 'Op 1', 'roleKey': 'operator', 'password': 'secret'},
+        }
+        self.assertEqual(
+            self.client.post('/api/ai/artifacts/validate', headers=admin80_headers, json={'kind': 'admin', 'artifact': user_with_pw}).status_code,
+            422,
+        )
+
 
 if __name__ == '__main__': unittest.main()

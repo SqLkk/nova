@@ -45,12 +45,12 @@
 
   <!-- FLOATING LAUNCHER -->
   <button #launcher *ngIf="!open" class="copilot-launcher" type="button"
-    [class.is-offline]="!health.available" [attr.aria-expanded]="offlineNotice"
-    [attr.aria-label]="health.available ? 'SuperNova Copilot aç' : 'Yerel AI çevrimdışı — durumunu göster'"
-    aria-controls="supernova-copilot" [title]="health.available ? 'Copilot · Ctrl/⌘ + Shift + K' : 'Yerel Yapay Zeka Servisi Başlatılmadı (Tak-Çıkar Modu)'"
+    [class.is-offline]="!health.available" [class.is-demo-locked]="isDemoLocked" [attr.aria-expanded]="offlineNotice"
+    [attr.aria-label]="isDemoLocked ? 'Yerel AI Copilot (Web demosunda kilitli)' : (health.available ? 'SuperNova Copilot aç' : 'Yerel AI çevrimdışı — durumunu göster')"
+    aria-controls="supernova-copilot" [title]="isDemoLocked ? 'Yerel AI Copilot · Web Demosunda Kullanıma Kapalı (Tesis İçi Kurulumda Aktif)' : (health.available ? 'Copilot · Ctrl/⌘ + Shift + K' : 'Yerel Yapay Zeka Servisi Başlatılmadı (Tak-Çıkar Modu)')"
     (click)="toggle()">
-    <span class="nova-mark"><i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i></span>
-    <span class="launcher-label">Copilot <span class="launcher-dot" [class.online]="health.available"></span></span>
+    <span class="nova-mark"><i class="fa-solid" [ngClass]="isDemoLocked ? 'fa-lock' : 'fa-wand-magic-sparkles'" aria-hidden="true"></i></span>
+    <span class="launcher-label">Copilot <span *ngIf="!isDemoLocked" class="launcher-dot" [class.online]="health.available"></span><span *ngIf="isDemoLocked" class="demo-lock-chip">KİLİTLİ</span></span>
   </button>
 
   <aside *ngIf="offlineNotice && !open" class="offline-popover" aria-live="polite">
@@ -83,7 +83,7 @@
         <span class="nova-mark"><i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i></span>
         <div class="brand-titles">
           <span class="eyebrow">SUPERNOVA WORKSPACE</span>
-          <h2 id="copilot-title">Copilot<span class="beta-label">LOCAL AI</span></h2>
+          <h2 id="copilot-title">Copilot<span class="beta-label">{{ isDemoLocked ? 'KİLİTLİ · ON-PREM' : 'LOCAL AI' }}</span></h2>
           <small *ngIf="activeChatTitle" class="active-chat-subtitle" [title]="activeChatTitle">
             <i class="fa-regular fa-comment-dots" aria-hidden="true"></i>{{ activeChatTitle }}
           </small>
@@ -129,15 +129,16 @@
         <span>{{ memories.length ? (memories.length + ' hafıza') : 'Hafıza' }}</span>
       </button>
       <button type="button" class="coworker-toggle-pill"
-        [class.active]="autoCoworker"
-        [attr.aria-pressed]="autoCoworker"
+        [class.active]="autoCoworker && !isDemoLocked"
+        [disabled]="isDemoLocked"
+        [attr.aria-pressed]="autoCoworker && !isDemoLocked"
         title="Açık olduğunda Copilot rapor, SQL, Space Map ve Python adımlarını ekranınızda canlı olarak uygular"
         (click)="toggleAutoCoworker()">
         <span class="coworker-dot"></span>
-        <span>{{ autoCoworker ? 'Canlı Ekran' : 'Sadece Sohbet' }}</span>
+        <span>{{ isDemoLocked ? 'Demo Kilitli' : (autoCoworker ? 'Canlı Ekran' : 'Sadece Sohbet') }}</span>
       </button>
       <span class="connection" [class.ready]="health.available" [class.mock]="health.mock" [title]="health.model || statusText">
-        <span class="status-dot"></span>{{ health.mock ? 'Önizleme' : health.available ? 'Hazır' : 'Tak-Çıkar' }}
+        <span class="status-dot"></span>{{ isDemoLocked ? 'Kapalı' : (health.mock ? 'Önizleme' : health.available ? 'Hazır' : 'Tak-Çıkar') }}
       </span>
     </div>
 
@@ -244,7 +245,11 @@
     </div>
 
     <div *ngIf="health.mock" class="mock-banner"><i class="fa-solid fa-flask" aria-hidden="true"></i>Geliştirme önizlemesi · Yanıtlar örnektir.</div>
-    <div *ngIf="!health.available" class="connection-banner" role="status">
+    <div *ngIf="isDemoLocked" class="demo-lock-banner" role="status">
+      <i class="fa-solid fa-lock" aria-hidden="true"></i>
+      <span><strong>Web Demosunda Kullanıma Kapalı</strong> — Yerel AI Copilot (Air-Gapped) yalnızca tesis içi kurulumlarda aktiftir.</span>
+    </div>
+    <div *ngIf="!health.available && !isDemoLocked" class="connection-banner" role="status">
       <i class="fa-solid fa-plug-circle-check" aria-hidden="true"></i>
       <span>Tak-Çıkar Modu: Yerel AI servisi kapalı — geçmiş ve hafıza salt-okunur açık, SuperNova tam kapasite çalışır.</span>
       <button *ngIf="health.reason !== 'disabled'" type="button" (click)="refreshHealth()" [disabled]="checking">Tekrar dene</button>
@@ -277,10 +282,12 @@
         </div>
 
         <div class="suggestions">
-          <button *ngFor="let suggestion of suggestions" type="button" class="suggestion-card" (click)="useSuggestion(suggestion.prompt)">
+          <button *ngFor="let suggestion of suggestions" type="button" class="suggestion-card"
+            [class.is-locked]="isDemoLocked" [disabled]="isDemoLocked"
+            (click)="useSuggestion(suggestion.prompt)">
             <span class="suggestion-icon"><i class="fa-solid" [ngClass]="suggestion.icon" aria-hidden="true"></i></span>
             <span class="suggestion-body"><strong>{{ suggestion.title }}</strong><small>{{ suggestion.detail }}</small></span>
-            <i class="fa-solid fa-arrow-up-right-from-square suggestion-arrow" aria-hidden="true"></i>
+            <i class="fa-solid suggestion-arrow" [ngClass]="isDemoLocked ? 'fa-lock' : 'fa-arrow-up-right-from-square'" aria-hidden="true"></i>
           </button>
         </div>
         <div class="welcome-note">
@@ -667,16 +674,17 @@
     </div>
 
     <footer class="panel-footer">
-      <div class="composer-box" [class.busy]="sending">
+      <div class="composer-box" [class.busy]="sending" [class.is-locked]="isDemoLocked">
         <textarea #composer [(ngModel)]="prompt" (keydown)="composerKey($event)" maxlength="6000" rows="2" aria-label="Copilot mesajı"
-          [placeholder]="health.available ? 'Rapor oluştur, sorgu yaz veya verilerini canlı analiz et…' : 'Tak-çıkar modu: Mesaj göndermek için yerel yapay zeka servisini başlatın…'" [disabled]="!health.available"></textarea>
+          [placeholder]="isDemoLocked ? 'Kullanıma kapalı · Yerel AI yalnızca tesis içi (on-premise) kurulumda aktiftir' : (health.available ? 'Rapor oluştur, sorgu yaz veya verilerini canlı analiz et…' : 'Tak-çıkar modu: Mesaj göndermek için yerel yapay zeka servisini başlatın…')"
+          [disabled]="!health.available || isDemoLocked"></textarea>
         <div class="composer-tools">
           <span class="context-included">
-            <i class="fa-solid fa-bolt" aria-hidden="true"></i>
-            {{ autoCoworker ? 'Canlı ekran hazır' : 'Sayfa bağlamı' }}{{ memories.length ? ' · ' + memories.length + ' hafıza aktif' : '' }}
+            <i class="fa-solid" [ngClass]="isDemoLocked ? 'fa-lock' : 'fa-bolt'" aria-hidden="true"></i>
+            {{ isDemoLocked ? 'Air-Gapped On-Premise Modülü' : ((autoCoworker ? 'Canlı ekran hazır' : 'Sayfa bağlamı') + (memories.length ? ' · ' + memories.length + ' hafıza aktif' : '')) }}
           </span>
           <button *ngIf="sending" type="button" class="send-button stop" aria-label="Yanıtı durdur" title="Yanıtı durdur" (click)="stop()"><i class="fa-solid fa-stop" aria-hidden="true"></i></button>
-          <button *ngIf="!sending" type="button" class="send-button" aria-label="Mesajı gönder" title="Gönder · Enter" [disabled]="!prompt.trim() || !health.available" (click)="send()"><i class="fa-solid fa-arrow-up" aria-hidden="true"></i></button>
+          <button *ngIf="!sending" type="button" class="send-button" aria-label="Mesajı gönder" [title]="isDemoLocked ? 'Web demosunda kullanıma kapalı' : 'Gönder · Enter'" [disabled]="!prompt.trim() || !health.available || isDemoLocked" (click)="send()"><i class="fa-solid" [ngClass]="isDemoLocked ? 'fa-lock' : 'fa-arrow-up'" aria-hidden="true"></i></button>
         </div>
       </div>
       <div class="footer-meta">

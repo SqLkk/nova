@@ -16,6 +16,7 @@ import { AuthService } from '../../services/auth.service';
 import { QueryService } from '../../services/query.service';
 import { PathService } from '../../services/path.service';
 import { TemplateBuilderService } from '../../services/template-builder.service';
+import { environment } from '../../../environments/environment';
 
 export interface RichInlineToken {
   kind: 'text' | 'bold' | 'code' | 'italic';
@@ -132,7 +133,11 @@ export class AiCopilotComponent implements OnInit, OnDestroy {
   get visible(): boolean { return this.loggedIn && this.page !== 'login' && !this.launcherHidden; }
   get queryCount(): number { return this.context.snapshot().active_queries?.length || 0; }
   get totalHistoryBadge(): number { return this.savedSessions.length + this.memories.length; }
+  get isDemoLocked(): boolean {
+    return !!(this.health.demo_locked || this.health.reason === 'demo_locked' || (environment as any).demoMode);
+  }
   get statusText(): string {
+    if (this.isDemoLocked) return 'Web demosunda kullanıma kapalı';
     if (this.checking) return 'Bağlantı kontrol ediliyor';
     if (this.health.mock) return 'Geliştirme önizlemesi';
     if (this.health.available) return 'Yerel model hazır';
@@ -215,7 +220,7 @@ export class AiCopilotComponent implements OnInit, OnDestroy {
       this.cdr.markForCheck();
     }));
     this.healthTimer = setInterval(() => {
-      if (this.visible && !this.sending && this.health.reason !== 'disabled') {
+      if (this.visible && !this.sending && !this.isDemoLocked && this.health.reason !== 'disabled') {
         void this.refreshHealth();
       }
     }, 30000);
@@ -236,6 +241,14 @@ export class AiCopilotComponent implements OnInit, OnDestroy {
 
   toggle(): void {
     if (this.open) { this.close(); return; }
+    if (this.isDemoLocked) {
+      this.open = true;
+      this.offlineNotice = false;
+      this.dockChange.emit(this.docked);
+      this.wideChange.emit(this.wideMode);
+      void this.refreshHistory(false);
+      return;
+    }
     if (!this.health.available) {
       this.offlineNotice = !this.offlineNotice;
       if (this.health.reason !== 'disabled') void this.refreshHealth();
@@ -334,7 +347,14 @@ export class AiCopilotComponent implements OnInit, OnDestroy {
     if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) { event.preventDefault(); void this.send(); }
   }
 
-  useSuggestion(value: string): void { this.prompt = value; this.composer?.nativeElement.focus(); }
+  useSuggestion(value: string): void {
+    if (this.isDemoLocked) {
+      this.notify('Yerel AI Copilot web demosunda kullanıma kapalıdır · Tesis içi kurulumda aktiftir.', true);
+      return;
+    }
+    this.prompt = value;
+    this.composer?.nativeElement.focus();
+  }
 
   newChat(): void {
     this.stop();
@@ -593,6 +613,10 @@ export class AiCopilotComponent implements OnInit, OnDestroy {
   }
 
   async send(extraContext?: Record<string, unknown>): Promise<void> {
+    if (this.isDemoLocked) {
+      this.notify('Yerel AI Copilot web demosunda kullanıma kapalıdır · Tesis içi kurulumda aktiftir.', true);
+      return;
+    }
     const text = this.prompt.trim();
     if (!text || this.sending || !this.health.available) return;
     if (text.length > 6000) { this.notify('Mesaj en fazla 6.000 karakter olabilir.', true); return; }
@@ -1179,7 +1203,10 @@ export class AiCopilotComponent implements OnInit, OnDestroy {
     return (part.language === 'python' && this.page === 'python-workspace') || (part.language === 'sql' && this.page === 'query-creator');
   }
   actionLabel(part: MessagePart): string {
-    return part.language === 'json' ? this.page === 'template-builder' ? 'Şablona ekle' : 'Haritaya aktar' : 'Editöre aktar';
+    if (part.language !== 'json') return 'Editöre aktar';
+    if (this.page === 'template-builder') return 'Şablona ekle';
+    if (this.page === 'admin') return 'Yönetim formuna aktar';
+    return 'Haritaya aktar';
   }
 
   async copy(part: MessagePart): Promise<void> {
@@ -1194,7 +1221,10 @@ export class AiCopilotComponent implements OnInit, OnDestroy {
     const sessionId = this.sessionId;
     try {
       let artifact: any;
-      if (part.language === 'json') artifact = await this.ai.validate(page === 'template-builder' ? 'template' : 'path', JSON.parse(part.text));
+      if (part.language === 'json') {
+        const kind = page === 'template-builder' ? 'template' : page === 'admin' ? 'admin' : 'path';
+        artifact = await this.ai.validate(kind, JSON.parse(part.text));
+      }
       if (part.language === 'python') await this.ai.validate('python', part.text);
       if (this.page !== page || this.sessionId !== sessionId) return;
       this.context.apply(part.language, part.text, artifact);

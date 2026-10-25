@@ -230,6 +230,7 @@ def main():
     parser.add_argument('command', choices=['check', 'configure', 'disable', 'serve'])
     parser.add_argument('--model-path', help='Complete local snapshot directory')
     parser.add_argument('--adapter-path', type=Path, help='Optional fine-tuned LoRA adapter directory or checkpoint .safetensors file')
+    parser.add_argument('--no-adapter', action='store_true', help='Serve the base model without loading the profile default adapter')
     parser.add_argument('--cache-dir', help='Hugging Face hub cache directory')
     parser.add_argument('--env-file', type=Path, default=ROOT / '.env')
     parser.add_argument('--runtime-python', type=Path, default=ROOT / '.venv-ai' / 'bin' / 'python')
@@ -244,9 +245,13 @@ def main():
             print('AI disabled in local config. Restart the backend; standard SuperNova remains available.')
             return
         model_path = resolve_cached_model(profile['model'], args.cache_dir, args.model_path)
+        default_adapter_rel = profile.get('default_adapter')
+        default_adapter_path = (ROOT / default_adapter_rel) if default_adapter_rel else None
         if args.command == 'check':
             version = runtime_version(args.runtime_python)
             print(json.dumps({'model': profile['model'], 'snapshot': str(model_path),
+                'default_adapter': str(default_adapter_path) if default_adapter_path else None,
+                'adapter_ready': bool(default_adapter_path and default_adapter_path.is_file()),
                 'runtime_python': str(args.runtime_python), 'runtime_installed': bool(version), 'runtime_version': version,
                 'supported_platform': platform.system() == 'Darwin' and platform.machine() == 'arm64',
                 'network_used': False, 'model_loaded': False}, indent=2))
@@ -261,8 +266,11 @@ def main():
             raise ValueError('MLX requires Apple Silicon. Use the OpenAI/Ollama Gateway on other platforms.')
         if not args.runtime_python.is_file():
             raise ValueError('Optional runtime missing. Create .venv-ai and install optional-ai/requirements-mlx.txt.')
-        if args.adapter_path is not None:
-            target = args.adapter_path.expanduser().resolve()
+        selected_adapter = args.adapter_path
+        if selected_adapter is None and not args.no_adapter and default_adapter_path and default_adapter_path.is_file():
+            selected_adapter = default_adapter_path
+        if selected_adapter is not None:
+            target = selected_adapter.expanduser().resolve()
             valid_file = target.is_file() and target.suffix == '.safetensors' and (target.parent / 'adapter_config.json').is_file()
             valid_dir = target.is_dir() and (target / 'adapters.safetensors').is_file() and (target / 'adapter_config.json').is_file()
             if not (valid_file or valid_dir):
@@ -270,7 +278,7 @@ def main():
         # Re-exec into the isolated runtime without relying on shell activation.
         if Path(sys.prefix).resolve() != args.runtime_python.parent.parent.resolve():
             os.execv(str(args.runtime_python), [str(args.runtime_python), str(Path(__file__).resolve()), *sys.argv[1:]])
-        serve(model_path, profile['model'], args.port, adapter_path=args.adapter_path)
+        serve(model_path, profile['model'], args.port, adapter_path=selected_adapter)
     except (ValueError, OSError, ImportError) as exc:
         parser.exit(1, f'Optional AI: {exc}\nSuperNova does not require this service.\n')
 

@@ -1,7 +1,8 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { AdminService, Role, AdminUser, AdminUserDetail, SharingItem, SharingType } from '../../services/admin.service';
 import { AuthService } from '../../services/auth.service';
 import { ConfirmService } from '../../services/confirm.service';
+import { AiContextService } from '../../services/ai-context.service';
 import { PERMISSION_CATALOG, levelColor, levelRgba } from '../../services/permission-catalog';
 
 type Tab = 'users' | 'roles' | 'sharing' | 'datasources';
@@ -13,8 +14,9 @@ type OverrideState = 'inherit' | 'grant' | 'deny';
   styleUrls: ['./admin.component.scss'],
   standalone: false
 })
-export class AdminComponent implements OnInit {
+export class AdminComponent implements OnInit, OnDestroy {
   activeTab: Tab = 'users';
+  private releaseAi?: () => void;
   catalog = PERMISSION_CATALOG;
   levelColor = levelColor;
   levelRgba = levelRgba;
@@ -74,10 +76,93 @@ export class AdminComponent implements OnInit {
   constructor(
     public admin: AdminService,
     public auth: AuthService,
-    private confirmSvc: ConfirmService
+    private confirmSvc: ConfirmService,
+    private aiContext: AiContextService,
   ) {}
 
   ngOnInit(): void {
+    this.releaseAi = this.aiContext.register('admin', {
+      context: () => ({
+        active_tab: this.activeTab,
+        sharing_type: this.sharingType,
+        assignable_roles: this.assignableRoles().map(r => ({ key: r.key, name: r.name, level: r.level })),
+      }),
+      accepts: language => language === 'json',
+      apply: (_language, _content, artifact) => {
+        if (!artifact?.action) throw new Error('Yönetim taslağı doğrulanamadı.');
+        if (artifact.action === 'create_user' && artifact.user) {
+          this.activeTab = 'users';
+          const matchedRole = this.assignableRoles().find(r => r.key === artifact.user.roleKey) || this.assignableRoles()[0];
+          this.userModalMode = 'create';
+          this.userForm = {
+            username: artifact.user.username || '',
+            displayName: artifact.user.displayName || '',
+            email: artifact.user.email || '',
+            roleId: matchedRole?.id || '',
+            password: '',
+            isActive: artifact.user.isActive !== false,
+          };
+          this.showUserModal = true;
+          this.notify('info', 'Kullanıcı taslağı yüklendi — parolayı belirleyip kaydedebilirsiniz.');
+          return;
+        }
+        if (artifact.action === 'create_role' && artifact.role) {
+          this.activeTab = 'roles';
+          this.roleModalMode = 'create';
+          this.roleForm = {
+            key: artifact.role.key || '',
+            name: artifact.role.name || '',
+            description: artifact.role.description || '',
+            level: Math.min(artifact.role.level || 40, Math.max(20, this.myLevel - 1)),
+            color: artifact.role.color || '#a78bfa',
+            isSystem: false,
+          };
+          this.rolePerms = new Set(artifact.role.permissions || []);
+          this.showRoleModal = true;
+          this.notify('info', 'Özel rol ve izin taslağı yüklendi — inceleyip kaydedebilirsiniz.');
+          return;
+        }
+        if (artifact.action === 'update_sharing') {
+          this.activeTab = 'sharing';
+          this.sharingType = artifact.resourceType as SharingType;
+          this.admin.listSharing(this.sharingType).subscribe({
+            next: items => {
+              this.sharingItems = items;
+              const target = items.find(i => i.id === artifact.resourceId || i.name === artifact.resourceId);
+              if (target) {
+                this.sharingItem = target;
+                this.shareSelectedRoles = [...(artifact.allowedRoles || [])];
+                this.shareSelectedUsers = [...(artifact.allowedUsers || [])];
+                this.showSharingModal = true;
+                this.notify('info', 'Paylaşım (ACL) taslağı yüklendi — inceleyip kaydedebilirsiniz.');
+              } else {
+                this.notify('info', `Paylaşım sekmesi açıldı (${artifact.resourceId}).`);
+              }
+            },
+          });
+          return;
+        }
+        if (artifact.action === 'set_user_overrides') {
+          this.activeTab = 'users';
+          const target = this.users.find(u => u.username === artifact.username || u.id === artifact.username);
+          if (target) {
+            this.admin.getAdminUser(target.id).subscribe({
+              next: detail => {
+                this.selectedUser = detail;
+                this.initOverrides(detail);
+                for (const ov of artifact.overrides || []) {
+                  this.overrideState[ov.permission_key] = ov.granted ? 'grant' : 'deny';
+                }
+                this.detailTab = 'permissions';
+                this.notify('info', 'Kullanıcı izin istisnaları yüklendi — inceleyip kaydedebilirsiniz.');
+              },
+            });
+          } else {
+            this.notify('error', `Kullanıcı bulunamadı: ${artifact.username}`);
+          }
+        }
+      },
+    });
     this.loadUsers();
     this.loadRoles();
     this.loadDataSources();
@@ -87,6 +172,10 @@ export class AdminComponent implements OnInit {
     else if (!this.showUsersTab && this.showSharingTab) this.activeTab = 'sharing';
     else if (!this.showUsersTab && this.showDatasourcesTab) this.activeTab = 'datasources';
     if (this.showSharingTab) this.loadSharing();
+  }
+
+  ngOnDestroy(): void {
+    this.releaseAi?.();
   }
 
   // ---- yardımcılar ----

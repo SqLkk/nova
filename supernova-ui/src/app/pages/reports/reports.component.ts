@@ -1,10 +1,14 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { TranslateService } from '@ngx-translate/core';
 import { Subscription } from 'rxjs';
 import { AuthService } from '../../services/auth.service';
 import { AdminService, AdminUser } from '../../services/admin.service';
-import { TemplateBuilderService, TemplateSummary } from '../../services/template-builder.service';
+import {
+  TemplateBuilderService,
+  TemplateSummary,
+  EvaluatedTemplateResult,
+} from '../../services/template-builder.service';
 import { ROLE_LEVELS } from '../../services/permission-catalog';
 import { ConfirmService } from '../../services/confirm.service';
 
@@ -59,13 +63,25 @@ export class ReportsComponent implements OnInit, OnDestroy {
   shareUsersList: AdminUser[] = [];
   loadingUsers = false;
 
+  // ---- Canlı Çıktı Önizleme Modalı ----
+  showOutputModal = false;
+  outputLoading = false;
+  outputError: string | null = null;
+  outputTemplate: TemplateSummary | null = null;
+  outputResult: EvaluatedTemplateResult | null = null;
+  activeSheetIndex = 0;
+  outputRowIndices: number[] = [];
+  outputColIndices: number[] = [];
+
   /** Rolle checklist'i için sabit hiyerarşi (backend çağrısı gerekmez). */
   readonly roleKeys = Object.keys(ROLE_LEVELS);
 
   private subs = new Subscription();
+  private pendingPreviewId: string | null = null;
 
   constructor(
     private router: Router,
+    private route: ActivatedRoute,
     private auth: AuthService,
     private admin: AdminService,
     private templateService: TemplateBuilderService,
@@ -76,6 +92,17 @@ export class ReportsComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     const me = this.auth.getCurrentUser();
     this.currentUserId = me?.id || '';
+    this.subs.add(
+      this.route.queryParamMap.subscribe((qp) => {
+        const previewId = qp.get('preview');
+        if (previewId) {
+          this.pendingPreviewId = previewId;
+          if (this.templates.length > 0 && !this.loading) {
+            this.tryOpenPendingPreview();
+          }
+        }
+      })
+    );
     this.loadTemplates();
     // Admin/superuser paylaşım modalı için kullanıcı listesini önceden yükle.
     if (this.canAllManage()) this.loadUsersList();
@@ -96,6 +123,7 @@ export class ReportsComponent implements OnInit, OnDestroy {
         this.templates = res.data || [];
         this.applyFilters();
         this.loading = false;
+        this.tryOpenPendingPreview();
       },
       error: (err) => {
         console.error('Templates load error:', err);
@@ -179,16 +207,21 @@ export class ReportsComponent implements OnInit, OnDestroy {
     this.router.navigate(['/template-builder', t.id]);
   }
 
-  generate(t: TemplateSummary): void {
-    if (this.generating.has(t.id)) return;
+  generate(t: TemplateSummary, format: 'xlsx' | 'pdf' = 'xlsx'): void {
+    const key = `${t.id}:${format}`;
+    if (this.generating.has(key) || this.generating.has(t.id)) return;
+    this.generating.add(key);
     this.generating.add(t.id);
-    const sub = this.templateService.render(t.id).subscribe({
+    const sub = this.templateService.render(t.id, {}, format).subscribe({
       next: (blob) => {
+        this.generating.delete(key);
         this.generating.delete(t.id);
-        this.downloadBlob(blob, `${(t.name || 'template').replace(/\s+/g, '_')}.xlsx`);
+        const ext = format === 'pdf' ? 'pdf' : 'xlsx';
+        this.downloadBlob(blob, `${(t.name || 'template').replace(/\s+/g, '_')}.${ext}`);
         this.notify(this.translate.instant('REPORTS.GENERATED'));
       },
       error: (e) => {
+        this.generating.delete(key);
         this.generating.delete(t.id);
         const detail = e?.error?.error ? `: ${e.error.error}` : '';
         this.notify(this.translate.instant('REPORTS.GENERATE_ERROR') + detail);
@@ -198,6 +231,113 @@ export class ReportsComponent implements OnInit, OnDestroy {
   }
 
   isGenerating(id: string): boolean { return this.generating.has(id); }
+
+  private tryOpenPendingPreview(): void {
+    if (!this.pendingPreviewId || !this.templates.length) return;
+    const targetId = this.pendingPreviewId;
+    this.pendingPreviewId = null;
+    const match =
+      this.templates.find((x) => x.id === targetId) ||
+      (targetId === '1' || targetId === 'first' ? this.templates[0] : null);
+    if (match) {
+      this.openOutputPreview(match);
+    }
+  }
+
+  openOutputPreview(t: TemplateSummary): void {
+    this.outputTemplate = t;
+    this.showOutputModal = true;
+    this.outputLoading = true;
+    this.outputError = null;
+    this.outputResult = null;
+    this.activeSheetIndex = 0;
+
+    const sub = this.templateService.evaluateById(t.id, {}, 60).subscribe({
+      next: (res) => {
+        this.outputLoading = false;
+        this.outputResult = res.data || null;
+        this.rebuildOutputBounds();
+      },
+      error: (err) => {
+        this.outputLoading = false;
+        this.outputError = err?.error?.error || 'Rapor çıktısı değerlendirilemedi.';
+      },
+    });
+    this.subs.add(sub);
+  }
+
+  closeOutputPreview(): void {
+    this.showOutputModal = false;
+    this.outputTemplate = null;
+    this.outputResult = null;
+    this.outputError = null;
+  }
+
+  selectOutputSheet(idx: number): void {
+    this.activeSheetIndex = idx;
+    this.rebuildOutputBounds();
+  }
+
+  get activeOutputSheet(): any {
+    const sheets = this.outputResult?.sheets || [];
+    return sheets[this.activeSheetIndex] || sheets[0] || null;
+  }
+
+  private rebuildOutputBounds(): void {
+    const sheet = this.activeOutputSheet;
+    if (!sheet || !sheet.cells) {
+      this.outputRowIndices = [];
+      this.outputColIndices = [];
+      return;
+    }
+    let maxR = 1;
+    let maxC = 1;
+    for (const k of Object.keys(sheet.cells)) {
+      const cell = sheet.cells[k];
+      if (!cell || (cell.value === '' || cell.value === null || cell.value === undefined)) continue;
+      const r = Number(cell.row || k.split(',')[0] || 1);
+      const c = Number(cell.col || k.split(',')[1] || 1);
+      if (r > maxR) maxR = r;
+      if (c > maxC) maxC = c;
+    }
+    maxR = Math.min(Math.max(maxR, 6), 120);
+    maxC = Math.min(Math.max(maxC, 4), 14);
+    this.outputRowIndices = Array.from({ length: maxR }, (_, i) => i + 1);
+    this.outputColIndices = Array.from({ length: maxC }, (_, i) => i + 1);
+  }
+
+  getOutputCell(r: number, c: number): any {
+    const sheet = this.activeOutputSheet;
+    return sheet?.cells ? sheet.cells[`${r},${c}`] : null;
+  }
+
+  colLetter(c: number): string {
+    let n = c;
+    let out = '';
+    while (n > 0) {
+      const rem = (n - 1) % 26;
+      out = String.fromCharCode(65 + rem) + out;
+      n = Math.floor((n - 1) / 26);
+    }
+    return out || 'A';
+  }
+
+  formatOutputValue(cell: any): string {
+    if (!cell || cell.value === null || cell.value === undefined) return '';
+    const v = cell.value;
+    if (typeof v === 'number') {
+      return Number.isInteger(v)
+        ? v.toLocaleString('tr-TR')
+        : v.toLocaleString('tr-TR', { minimumFractionDigits: 1, maximumFractionDigits: 2 });
+    }
+    return String(v);
+  }
+
+  chartBarPercent(seriesValues: number[], val: number): number {
+    if (!Array.isArray(seriesValues) || !seriesValues.length) return 0;
+    const max = Math.max(...seriesValues.map((x) => Math.abs(Number(x) || 0)), 1);
+    return Math.min(100, Math.max(6, Math.round((Math.abs(Number(val) || 0) / max) * 100)));
+  }
 
   duplicate(t: TemplateSummary): void {
     const sub = this.templateService.duplicate(t.id, `${t.name} (copy)`).subscribe({

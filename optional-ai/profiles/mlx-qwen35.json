@@ -7,6 +7,7 @@
   "python": ">=3.12",
   "requirements": "optional-ai/requirements-mlx.txt",
   "model": "mlx-community/Qwen3.5-9B-MLX-4bit",
+  "default_adapter": "training/supernova-v24/adapter240/0000240_adapters.safetensors",
   "runtime_environment": ".venv-ai",
   "launch_command": ["python3", "scripts/local_ai.py", "serve"],
   "download_at_runtime": false,

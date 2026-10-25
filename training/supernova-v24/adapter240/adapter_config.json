@@ -1,0 +1,49 @@
+{
+    "adapter_path": "/Users/utkukaraca/Library/CloudStorage/OneDrive-SiemensAG/Masau\u0308stu\u0308/Development/super_nov4/training/supernova-v24/adapter240",
+    "batch_size": 1,
+    "clear_cache_threshold": 0,
+    "config": "/Users/utkukaraca/Library/CloudStorage/OneDrive-SiemensAG/Masau\u0308stu\u0308/Development/super_nov4/optional-ai/training/v24.yaml",
+    "data": "/Users/utkukaraca/Library/CloudStorage/OneDrive-SiemensAG/Masau\u0308stu\u0308/Development/super_nov4/training/supernova-v24/data",
+    "fine_tune_type": "lora",
+    "grad_accumulation_steps": 1,
+    "grad_checkpoint": true,
+    "iters": 240,
+    "learning_rate": 1.8e-05,
+    "lora_parameters": {
+        "rank": 16,
+        "dropout": 0.05,
+        "scale": 16.0
+    },
+    "lr_schedule": {
+        "name": "cosine_decay",
+        "arguments": [
+            1.8e-05,
+            220,
+            1.8e-06
+        ],
+        "warmup": 20,
+        "warmup_init": 1e-06
+    },
+    "mask_prompt": true,
+    "max_seq_length": 1024,
+    "model": "/Users/utkukaraca/.cache/huggingface/hub/models--mlx-community--Qwen3.5-9B-MLX-4bit/snapshots/938d8919941c6e7efd3c7150eff7fe9d12afa631",
+    "num_layers": 1,
+    "optimizer": "adamw",
+    "optimizer_config": {
+        "adamw": {
+            "weight_decay": 0.01
+        }
+    },
+    "project_name": null,
+    "report_to": null,
+    "resume_adapter_file": null,
+    "save_every": 80,
+    "seed": 42,
+    "steps_per_eval": 80,
+    "steps_per_report": 20,
+    "test": false,
+    "test_batches": 500,
+    "train": true,
+    "trust_remote_code": false,
+    "val_batches": -1
+}

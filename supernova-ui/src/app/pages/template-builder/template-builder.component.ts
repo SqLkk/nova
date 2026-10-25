@@ -125,10 +125,53 @@ export class TemplateBuilderComponent implements OnInit, OnDestroy {
       apply: (_language, _content, artifact) => {
         if (!artifact) throw new Error('Şablon JSON doğrulanamadı.');
         // Validated fragments extend the current sheet; regenerated IDs avoid collisions.
-        this.sheet.charts = [...(this.sheet.charts || []), ...artifact.charts.map((chart: any) => ({ ...chart, id: `ch_${crypto.randomUUID()}` }))];
-        for (const cell of artifact.cells) this.sheet.cells[cellKey(cell.row, cell.col)] = cell;
-        const rowEnds = [...artifact.cells.map((cell: any) => cell.row), ...artifact.charts.map((chart: any) => chart.anchor.row + chart.anchor.heightRows)];
-        const colEnds = [...artifact.cells.map((cell: any) => cell.col), ...artifact.charts.map((chart: any) => chart.anchor.col + chart.anchor.widthCols)];
+        const incomingCharts = Array.isArray(artifact.charts) ? artifact.charts : [];
+        const incomingCells = Array.isArray(artifact.cells) ? artifact.cells : [];
+        const incomingBands = Array.isArray(artifact.bands) ? artifact.bands : [];
+        this.sheet.charts = [...(this.sheet.charts || []), ...incomingCharts.map((chart: any) => ({ ...chart, id: `ch_${crypto.randomUUID()}` }))];
+        for (const cell of incomingCells) this.sheet.cells[cellKey(cell.row, cell.col)] = cell;
+        if (incomingBands.length) {
+          for (const band of incomingBands) {
+            const startRow = Number(band.range?.startRow || 1);
+            const fmap = band.fieldMap || {};
+            for (const [colStr, fieldName] of Object.entries(fmap)) {
+              const colNum = Number(colStr);
+              if (!colNum || !fieldName) continue;
+              if (startRow > 1 && !this.sheet.cells[cellKey(startRow - 1, colNum)]) {
+                this.sheet.cells[cellKey(startRow - 1, colNum)] = {
+                  row: startRow - 1,
+                  col: colNum,
+                  value: String(fieldName),
+                  style: { bold: true, bg: '#1E293B', color: '#FFFFFF', align: 'center' },
+                };
+              }
+              if (!this.sheet.cells[cellKey(startRow, colNum)]) {
+                this.sheet.cells[cellKey(startRow, colNum)] = {
+                  row: startRow,
+                  col: colNum,
+                  value: `{{${fieldName}}}`,
+                  binding: { kind: 'query_field', queryId: band.queryId, field: String(fieldName) },
+                };
+              }
+            }
+          }
+          this.sheet.bands = [...(this.sheet.bands || []), ...incomingBands.map((band: any) => ({
+            ...band,
+            id: `bnd_${crypto.randomUUID().slice(0, 8)}`,
+          }))];
+        }
+        const rowEnds = [
+          4,
+          ...incomingCells.map((cell: any) => cell.row),
+          ...incomingCharts.map((chart: any) => chart.anchor.row + chart.anchor.heightRows),
+          ...incomingBands.map((band: any) => (band.range?.endRow || 1) + 4),
+        ];
+        const colEnds = [
+          4,
+          ...incomingCells.map((cell: any) => cell.col),
+          ...incomingCharts.map((chart: any) => chart.anchor.col + chart.anchor.widthCols),
+          ...incomingBands.map((band: any) => band.range?.endCol || 1),
+        ];
         this.sheet.rowCount = Math.max(this.sheet.rowCount, ...rowEnds);
         this.sheet.columnCount = Math.max(this.sheet.columnCount, ...colEnds);
         this.touch(); this.notify('Copilot içeriği şablona eklendi.'); this.cdr.markForCheck();

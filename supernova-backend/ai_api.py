@@ -10,7 +10,15 @@ from flask import Blueprint, Response, g, jsonify, request, stream_with_context
 
 from ai_memory import LocalMemory
 from ai_service import AIService, AIUnavailable, sse
-from ai_tools import dispatch, validate_path, validate_python, validate_template
+from ai_tools import (
+    SHARING_RESOURCE_TYPES,
+    VALID_PERMISSION_KEYS,
+    dispatch,
+    validate_admin_action,
+    validate_path,
+    validate_python,
+    validate_template,
+)
 from excel_template_engine import _compute_summary
 from query_executor import execute_query, get_table_schema, get_tables
 import secrets_util
@@ -373,10 +381,62 @@ def register_ai(app, settings, get_database, can_access, has_permission, query_c
             sql_snippet = r.get('sql_text', '') or ''
             if any(red in sql_snippet.lower() for red in _REDACTED_COLS):
                 sql_snippet = ''
-            queries.append({'id': r['id'], 'name': r['name'], 'dataSourceId': r['data_source_id'],
-                            'sql': sql_snippet, 'columns': col_names})
+            desc_snippet = (r.get('description') or '')[:200]
+            if any(red in desc_snippet.lower() for red in _REDACTED_COLS):
+                desc_snippet = ''
+            queries.append({'id': r['id'], 'name': r['name'], 'description': desc_snippet,
+                            'dataSourceId': r['data_source_id'], 'sql': sql_snippet, 'columns': col_names})
         return {'sources': safe_sources, 'queries': queries,
                 'note': 'All authorized table and query columns are listed above.'}
+
+    def rbac_snapshot():
+        caller_role = getattr(g, 'role', 'viewer') or 'viewer'
+        caller_level = int(getattr(g, 'level', 20) or 20)
+        roles_out = []
+        users_out = None
+        try:
+            with get_database()._conn() as conn:
+                if has_permission('role:view') or has_permission('page:admin'):
+                    role_rows = [dict(r) for r in conn.execute(
+                        'SELECT id, key, name, description, level, is_system FROM roles WHERE is_active=1 ORDER BY level DESC'
+                    )]
+                    for rr in role_rows:
+                        perms = [p['permission_key'] for p in conn.execute(
+                            'SELECT permission_key FROM role_permissions WHERE role_id=? ORDER BY permission_key',
+                            (rr['id'],),
+                        )]
+                        roles_out.append({
+                            'key': rr['key'],
+                            'name': rr['name'],
+                            'level': rr['level'],
+                            'isSystem': bool(rr['is_system']),
+                            'permissions': perms,
+                        })
+                if has_permission('user:view'):
+                    u_rows = [dict(u) for u in conn.execute(
+                        'SELECT id, display_name, role, is_active FROM users ORDER BY created_at ASC LIMIT 100'
+                    )]
+                    users_out = [
+                        {
+                            'id': u['id'],
+                            'displayName': u['display_name'],
+                            'roleKey': u['role'],
+                            'isActive': bool(u['is_active']),
+                        }
+                        for u in u_rows
+                    ]
+        except Exception:
+            logger.debug('Could not inspect RBAC snapshot', exc_info=True)
+        out = {
+            'callerRole': caller_role,
+            'callerLevel': caller_level,
+            'roles': roles_out,
+            'permissionKeys': sorted(VALID_PERMISSION_KEYS),
+            'sharingResourceTypes': sorted(SHARING_RESOURCE_TYPES),
+        }
+        if users_out is not None:
+            out['users'] = users_out
+        return out
 
     def _execute_query_live(qid=None, ds_id=None, sql_text=None, query_name=None, create_if_missing=False):
         """Load or create a SavedQuery, run it against the DB, and return live metadata + sample rows."""
@@ -1833,6 +1893,13 @@ def register_ai(app, settings, get_database, can_access, has_permission, query_c
                 if not has_permission('page:template-builder'):
                     return jsonify({'success': False, 'error': 'Forbidden.'}), 403
                 validated = validate_template(artifact, schema_snapshot()['queries'])
+            elif kind == 'admin':
+                if not has_permission('page:admin'):
+                    return jsonify({'success': False, 'error': 'Forbidden.'}), 403
+                rbac = rbac_snapshot()
+                validated = validate_admin_action(
+                    artifact, caller_level=rbac.get('callerLevel', 80), known_roles=rbac.get('roles')
+                )
             else:
                 raise ValueError('Unknown artifact kind.')
             return jsonify({'success': True, 'data': validated})
@@ -2087,10 +2154,12 @@ def register_ai(app, settings, get_database, can_access, has_permission, query_c
         if not settings.AI_ENABLED:
             return jsonify({'available': False, 'reason': 'disabled'}), 503
         page = context.get('page', 'dashboard')
-        permission_page = 'network-map' if page == 'path-definer' else page
+        permission_page = 'network-map' if page == 'path-definer' else ('query-creator' if page == 'query-viewer' else page)
         if not has_permission('page:' + permission_page):
             return jsonify({'success': False, 'error': 'Page context is not accessible.'}), 403
         snapshot = schema_snapshot()
+        if page in ('admin', 'settings', 'profile'):
+            context['rbac'] = rbac_snapshot()
         # Client query metadata is replaced with authoritative, ACL-filtered metadata.
         requested = context.get('active_queries') or []
         if not isinstance(requested, list):
@@ -2196,7 +2265,7 @@ def register_ai(app, settings, get_database, can_access, has_permission, query_c
         discovery = _discover_candidate_tables(messages[-1]['content'], snapshot, context)
         high_candidates = [c for c in (discovery.get('candidates') or []) if c.get('score', 0) >= 4]
 
-        if not selection_handled and not settings.AI_MOCK_MODE:
+        if not selection_handled and not settings.AI_MOCK_MODE and page not in ('admin', 'settings', 'profile'):
             # If user asks about tables/schema/JOINs OR if the request spans multiple candidate tables without an explicit single table name
             wants_direct_report = any(k in last_msg for k in ('rapor oluştur', 'excel raporu', 'template oluştur', 'raporu hazırla'))
             if discovery.get('asksForTableHelp') or (
@@ -2237,7 +2306,7 @@ def register_ai(app, settings, get_database, can_access, has_permission, query_c
 
         def run_tool(name, arguments):
             # Recheck current ACL instead of trusting the initial snapshot on a long stream.
-            return dispatch(name, arguments, schema_snapshot())
+            return dispatch(name, arguments, {**schema_snapshot(), 'rbac': rbac_snapshot()})
 
         def on_complete(answer_text):
             emitted_proposal = None

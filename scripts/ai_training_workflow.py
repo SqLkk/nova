@@ -66,16 +66,16 @@ def run(script, arguments, log):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('phase', choices=['prepare', 'smoke', 'train', 'evaluate', 'extended', 'report'])
-    parser.add_argument('--profile', choices=['pilot', 'final'], default='pilot')
+    parser.add_argument('--profile', choices=['pilot', 'final', 'v24'], default='v24')
     parser.add_argument('--experiment-root', type=Path)
     parser.add_argument('--checkpoint', type=int, help='Selected checkpoint for extended phase')
     parser.add_argument('--results-dir', type=Path,
                         help='New directory for evaluation retries; defaults to experiment-root/results')
     args = parser.parse_args()
-    final = args.profile == 'final'
-    version = 'v23' if final else 'v22'
-    total_iters = 600 if final else 150
-    steps = (150, 300, 450, 600) if final else (50, 100, 150)
+    final = args.profile in ('final', 'v24')
+    version = {'pilot': 'v22', 'final': 'v23', 'v24': 'v24'}[args.profile]
+    total_iters = {'pilot': 150, 'final': 600, 'v24': 320}[args.profile]
+    steps = {'pilot': (50, 100, 150), 'final': (150, 300, 450, 600), 'v24': (80, 160, 240, 320)}[args.profile]
     experiment = (args.experiment_root or ROOT / f'training/supernova-{version}').resolve()
     results = args.results_dir.resolve() if args.results_dir else experiment / 'results'
     adapter = experiment / f'adapter{total_iters}'

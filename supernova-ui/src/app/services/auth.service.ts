@@ -75,10 +75,120 @@ export class AuthService {
   }
 
   /**
+   * Demo modunda (statik web simülatörü) persona geçişi veya varsayılan oturum hazırlama.
+   * Yalnızca environment.demoMode === true olduğunda çalışır.
+   */
+  public applyDemoPersona(personaKey: string): User | null {
+    if (!(environment as any).demoMode) return null;
+    const key = (personaKey || '').toLowerCase().trim();
+    if (key === 'login' || key === 'logout') {
+      localStorage.removeItem(this.tokenKey);
+      localStorage.removeItem(this.refreshTokenKey);
+      localStorage.removeItem(this.userKey);
+      this.currentUserSubject.next(null);
+      return null;
+    }
+
+    const basePrefs: UserPreferences = {
+      theme: 'dark',
+      language: 'tr',
+      dashboardRefreshInterval: 15,
+      dateFormat: 'DD.MM.YYYY',
+      timezone: 'Europe/Istanbul',
+    };
+
+    const personas: Record<string, User> = {
+      utku: {
+        id: 'usr_utku',
+        username: 'utku',
+        displayName: 'Baş Mimar (Süper Kullanıcı)',
+        email: 'architect@nov4.com.tr',
+        role: 'superuser',
+        level: 100,
+        permissions: ['*'],
+        allowedPages: ['dashboard', 'network-map', 'alarms', 'reports', 'template-builder', 'query-creator', 'python-workspace', 'table-explorer', 'admin', 'settings', 'profile'],
+        preferences: basePrefs,
+      },
+      admin: {
+        id: 'usr_admin',
+        username: 'admin',
+        displayName: 'Sistem Yöneticisi',
+        email: 'admin@nov4.com.tr',
+        role: 'admin',
+        level: 80,
+        permissions: ['*'],
+        allowedPages: ['dashboard', 'network-map', 'alarms', 'reports', 'template-builder', 'query-creator', 'python-workspace', 'table-explorer', 'admin'],
+        preferences: basePrefs,
+      },
+      engineer: {
+        id: 'usr_engineer',
+        username: 'engineer',
+        displayName: 'Otomasyon & Veri Mühendisi',
+        email: 'engineer@nov4.com.tr',
+        role: 'engineer',
+        level: 60,
+        permissions: [
+          'page:dashboard', 'page:network-map', 'page:alarms', 'page:reports',
+          'page:template-builder', 'page:query-creator', 'page:python-workspace', 'page:table-explorer',
+          'manage:queries', 'manage:scripts', 'manage:paths', 'manage:templates', 'share:templates',
+          'export:reports', 'manage:alarms', 'manage:dashboards',
+        ],
+        allowedPages: ['dashboard', 'network-map', 'alarms', 'reports', 'template-builder', 'query-creator', 'python-workspace', 'table-explorer'],
+        preferences: basePrefs,
+      },
+      operator: {
+        id: 'usr_operator',
+        username: 'operator',
+        displayName: 'Vardiya Hat Operatörü',
+        email: 'operator@nov4.com.tr',
+        role: 'operator',
+        level: 40,
+        permissions: [
+          'page:dashboard', 'page:network-map', 'page:alarms', 'page:reports',
+          'export:reports', 'manage:alarms',
+        ],
+        allowedPages: ['dashboard', 'network-map', 'alarms', 'reports'],
+        preferences: basePrefs,
+      },
+      viewer: {
+        id: 'usr_viewer',
+        username: 'viewer',
+        displayName: 'Yönetim İzleyici (Salt Okunur)',
+        email: 'viewer@nov4.com.tr',
+        role: 'viewer',
+        level: 20,
+        permissions: ['page:dashboard', 'page:network-map', 'page:reports', 'export:reports'],
+        allowedPages: ['dashboard', 'network-map', 'reports'],
+        preferences: basePrefs,
+      },
+    };
+
+    const chosen = personas[key] || personas['utku'];
+    const token = `nov4_demo_token_${chosen.id}`;
+    localStorage.setItem(this.tokenKey, token);
+    localStorage.setItem(this.userKey, JSON.stringify(chosen));
+    this.currentUserSubject.next(chosen);
+    return chosen;
+  }
+
+  /**
    * LocalStorage'dan kullanıcı bilgilerini async yükle
    */
   private async loadUserFromStorageAsync(): Promise<void> {
     try {
+      if ((environment as any).demoMode && typeof window !== 'undefined') {
+        const params = new URLSearchParams(window.location.search || '');
+        const demoUser = (params.get('demoUser') || '').trim().toLowerCase();
+        if (demoUser === 'login') {
+          this.applyDemoPersona('login');
+          return;
+        }
+        if (demoUser || !localStorage.getItem(this.userKey)) {
+          this.applyDemoPersona(demoUser || 'utku');
+          return;
+        }
+      }
+
       const userJson = localStorage.getItem(this.userKey);
       if (userJson) {
         const user = JSON.parse(userJson);

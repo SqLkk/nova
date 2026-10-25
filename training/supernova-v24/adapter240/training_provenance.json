@@ -1,0 +1,59 @@
+{
+  "dataset_manifest_sha256": "7c82d7731fc996c520fd5782e625537003194175a7ec0b1bb66b498dd8ee0928",
+  "fixed_validation_sha256": "f2ade05b43c87beb8b28b53e88c4985a46b68279a796772fe3c2e6d1b7912048",
+  "tokenizer_audit_sha256": "92e6060dba5bb3074c83324ae971f5ec23b2f4f28a5cfebed8743a1b1e477377",
+  "enable_thinking": false,
+  "validation_count": 16,
+  "full_fixed_validation_count": 100,
+  "smoke_only": false,
+  "optimizer_resume": false,
+  "settings": {
+    "model": "/Users/utkukaraca/.cache/huggingface/hub/models--mlx-community--Qwen3.5-9B-MLX-4bit/snapshots/938d8919941c6e7efd3c7150eff7fe9d12afa631",
+    "train": true,
+    "fine_tune_type": "lora",
+    "optimizer": "adamw",
+    "optimizer_config": {
+      "adamw": {
+        "weight_decay": 0.01
+      }
+    },
+    "data": "/Users/utkukaraca/Library/CloudStorage/OneDrive-SiemensAG/Masau\u0308stu\u0308/Development/super_nov4/training/supernova-v24/data",
+    "seed": 42,
+    "num_layers": 1,
+    "batch_size": 1,
+    "iters": 240,
+    "val_batches": -1,
+    "learning_rate": 1.8e-05,
+    "steps_per_report": 20,
+    "steps_per_eval": 80,
+    "resume_adapter_file": null,
+    "adapter_path": "/Users/utkukaraca/Library/CloudStorage/OneDrive-SiemensAG/Masau\u0308stu\u0308/Development/super_nov4/training/supernova-v24/adapter240",
+    "save_every": 80,
+    "test": false,
+    "test_batches": 500,
+    "max_seq_length": 1024,
+    "config": "/Users/utkukaraca/Library/CloudStorage/OneDrive-SiemensAG/Masau\u0308stu\u0308/Development/super_nov4/optional-ai/training/v24.yaml",
+    "grad_checkpoint": true,
+    "grad_accumulation_steps": 1,
+    "clear_cache_threshold": 0,
+    "lr_schedule": {
+      "name": "cosine_decay",
+      "arguments": [
+        1.8e-05,
+        220,
+        1.8e-06
+      ],
+      "warmup": 20,
+      "warmup_init": 1e-06
+    },
+    "lora_parameters": {
+      "rank": 16,
+      "dropout": 0.05,
+      "scale": 32.0
+    },
+    "mask_prompt": true,
+    "report_to": null,
+    "project_name": null,
+    "trust_remote_code": false
+  }
+}

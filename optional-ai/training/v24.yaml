@@ -1,0 +1,31 @@
+# SuperNova v2.4 full-platform mastery LoRA profile (16 GB Apple Silicon safe).
+# Targets Qwen3.5's final full-attention + SwiGLU MLP block (layers[31], avoiding
+# unrolled GatedDeltaNet recurrent VJPs) at 4x rank (rank 16) with AdamW weight
+# decay, dropout regularization, prompt masking, and calibrated inference scale 16.0.
+fine_tune_type: lora
+num_layers: 1
+batch_size: 1
+grad_accumulation_steps: 1
+max_seq_length: 1024
+grad_checkpoint: true
+mask_prompt: true
+optimizer: adamw
+optimizer_config:
+  adamw:
+    weight_decay: 0.01
+iters: 240
+learning_rate: 0.000018
+steps_per_report: 20
+steps_per_eval: 80
+val_batches: 16
+save_every: 80
+seed: 42
+lora_parameters:
+  rank: 16
+  dropout: 0.05
+  scale: 32.0
+lr_schedule:
+  name: cosine_decay
+  arguments: [0.000018, 220, 0.0000018]
+  warmup: 20
+  warmup_init: 0.000001

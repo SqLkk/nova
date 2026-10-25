@@ -27,7 +27,12 @@ def sse(payload, event=None):
 TOOL_DEFINITIONS = [
     {'type': 'function', 'function': {
         'name': 'tool_get_database_schema',
-        'description': 'Discover authorized sources, saved queries and cached table/column metadata. No row data.',
+        'description': 'Discover authorized DB sources, tables, columns and saved queries.',
+        'parameters': {'type': 'object', 'properties': {}, 'additionalProperties': False},
+    }},
+    {'type': 'function', 'function': {
+        'name': 'tool_get_rbac_info',
+        'description': 'Discover RBAC roles, levels and valid permission keys.',
         'parameters': {'type': 'object', 'properties': {}, 'additionalProperties': False},
     }},
     *[{'type': 'function', 'function': {
@@ -35,16 +40,17 @@ TOOL_DEFINITIONS = [
         'parameters': {'type': 'object', 'properties': properties, 'required': required, 'additionalProperties': False},
     }} for name, description, properties, required in [
         ('tool_generate_python_script',
-         'Validate and generate an AST-compliant Python sandbox script for data transformation.',
+         'Validate AST Python sandbox script.',
          {'code': {'type': 'string'}}, ['code']),
         ('tool_generate_path_config',
-         'Validate and generate a Path Definer JSON hierarchy (tree, multi_level, binary_tree, sequence, grouped, dag).',
+         'Validate Path Definer JSON hierarchy.',
          {'structure': {'type': 'string', 'enum': ['tree', 'multi_level', 'binary_tree', 'sequence', 'grouped', 'dag']},
           'queryId': {'type': 'string'}, 'config': {'type': 'object'}}, ['structure', 'queryId', 'config']),
         ('tool_generate_template_widget',
-         'Validate and generate a Template Builder widget JSON fragment with charts and cells.',
+         'Validate Template Builder JSON (charts, cells, bands).',
          {'charts': {'type': 'array', 'items': {'type': 'object'}},
-          'cells': {'type': 'array', 'items': {'type': 'object'}}}, []),
+          'cells': {'type': 'array', 'items': {'type': 'object'}},
+          'bands': {'type': 'array', 'items': {'type': 'object'}}}, []),
     ]],
 ]
 
@@ -171,7 +177,12 @@ class AIService:
                 'anchor': {'row': 3, 'col': 2, 'widthCols': 5, 'heightRows': 12},
                 'xAxis': label, 'yAxis': [value], 'title': 'Copilot önizlemesi'}], 'cells': []}
             return 'Bu bir geliştirme önizlemesidir. Seçili sorgunun kolonlarıyla hazırlanmış örnek grafik:\n\n```json\n' + json.dumps(artifact, ensure_ascii=False, indent=2) + '\n```'
-        return 'Copilot bağlantısının geliştirme önizlemesi çalışıyor. Gerçek yanıtlar için yerel model sunucusunu yapılandırın. Python Workspace, SQL editörü, Path Definer veya Template Builder üzerinde bağlamınızı kullanabilirim.'
+        if page == 'admin':
+            draft = {'action': 'create_role', 'role': {'key': 'shift_analyst', 'name': 'Vardiya Analisti',
+                'description': 'Rapor ve sorgu görüntüleme rolü', 'level': 45,
+                'permissions': ['page:dashboard', 'page:reports', 'page:query-creator', 'datasource:view']}}
+            return 'Bu bir geliştirme önizlemesidir. Örnek özel rol taslağını Yönetim formuna aktarabilirsiniz:\n\n```json\n' + json.dumps(draft, ensure_ascii=False, indent=2) + '\n```'
+        return 'Copilot bağlantısının geliştirme önizlemesi çalışıyor. Gerçek yanıtlar için yerel model sunucusunu yapılandırın. Python Workspace, SQL editörü, Path Definer, Template Builder veya Admin paneli üzerinde bağlamınızı kullanabilirim.'
 
     def stream(self, messages, context, dispatch_tool, examples=None, on_complete=None):
         if not self.settings.AI_ENABLED:
@@ -200,8 +211,8 @@ class AIService:
             deadline = time.monotonic() + self.settings.AI_TIMEOUT_SECONDS
             fallback_block = ''
             last_user = (messages[-1].get('content') or '').lower() if messages else ''
-            has_context_schema = bool(context.get('active_queries') or context.get('sources'))
-            wants_schema_tool = 'tool_get_database_schema' in last_user
+            has_context_schema = bool(context.get('active_queries') or context.get('sources') or context.get('rbac'))
+            wants_schema_tool = 'tool_get_database_schema' in last_user or 'tool_get_rbac_info' in last_user
             import re as _re
             _closed_fence = _re.compile(r'```(?:python|py|sql|json)\s*\n[\s\S]+?\n```(?:\s*\n|$)')
             for round_index in range(3):
@@ -263,7 +274,7 @@ class AIService:
                 all_valid = True
                 for call in tool_calls:
                     fn = call['function']
-                    if fn['name'] == 'tool_get_database_schema':
+                    if fn['name'] in ('tool_get_database_schema', 'tool_get_rbac_info'):
                         only_artifact_tools = False
                     yield sse({'name': fn['name'], 'state': 'running'}, 'tool')
                     try:

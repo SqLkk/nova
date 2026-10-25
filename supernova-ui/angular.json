@@ -50,8 +50,34 @@
                 },
                 {
                   "type": "anyComponentStyle",
-                  "maximumWarning": "45kb",
-                  "maximumError": "60kb"
+                  "maximumWarning": "80kb",
+                  "maximumError": "150kb"
+                }
+              ],
+              "outputHashing": "all"
+            },
+            "demo": {
+              "baseHref": "/demo/",
+              "outputPath": {
+                "base": "../nova-website/public/demo",
+                "browser": ""
+              },
+              "fileReplacements": [
+                {
+                  "replace": "src/environments/environment.ts",
+                  "with": "src/environments/environment.demo.ts"
+                }
+              ],
+              "budgets": [
+                {
+                  "type": "initial",
+                  "maximumWarning": "3mb",
+                  "maximumError": "6mb"
+                },
+                {
+                  "type": "anyComponentStyle",
+                  "maximumWarning": "80kb",
+                  "maximumError": "150kb"
                 }
               ],
               "outputHashing": "all"

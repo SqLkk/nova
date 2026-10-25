@@ -85,7 +85,10 @@
           <tr *ngFor="let t of filtered">
             <!-- Şablon adı + açıklama -->
             <td class="col-name">
-              <div class="name" [title]="t.name">{{ t.name }}</div>
+              <button type="button" class="name-link" (click)="openOutputPreview(t)" [title]="t.name">
+                <span>{{ t.name }}</span>
+                <i class="fas fa-arrow-up-right-from-square"></i>
+              </button>
               <div class="desc" *ngIf="t.description">{{ t.description }}</div>
             </td>
 
@@ -121,13 +124,27 @@
 
             <!-- Aksiyonlar -->
             <td class="col-actions ta-right">
-              <!-- Üret (erişimi olan herkes) -->
-              <button class="act act-primary" (click)="generate(t)"
+              <!-- Canlı Çıktıyı Gör -->
+              <button class="act act-preview" (click)="openOutputPreview(t)" title="Canlı Rapor Çıktısını Önizle">
+                <i class="fas fa-eye"></i>
+                <span>Çıktıyı Gör</span>
+              </button>
+
+              <!-- Üret XLSX (erişimi olan herkes) -->
+              <button class="act act-primary" (click)="generate(t, 'xlsx')"
                       [disabled]="isGenerating(t.id)"
                       [title]="'REPORTS.GENERATE' | translate">
                 <i class="fas" [class.fa-circle-notch]="isGenerating(t.id)" [class.fa-spin]="isGenerating(t.id)"
-                   [class.fa-file-export]="!isGenerating(t.id)"></i>
-                <span>{{ isGenerating(t.id) ? ('REPORTS.GENERATING' | translate) : ('REPORTS.GENERATE' | translate) }}</span>
+                   [class.fa-file-excel]="!isGenerating(t.id)"></i>
+                <span>{{ isGenerating(t.id) ? ('REPORTS.GENERATING' | translate) : 'XLSX' }}</span>
+              </button>
+
+              <!-- Üret PDF -->
+              <button class="act" (click)="generate(t, 'pdf')"
+                      [disabled]="isGenerating(t.id)"
+                      title="PDF Çıktısı İndir">
+                <i class="fas fa-file-pdf"></i>
+                <span>PDF</span>
               </button>
 
               <!-- Düzenle (sahip/admin) -->
@@ -238,6 +255,126 @@
         <i class="fas fa-circle-notch fa-spin" *ngIf="shareSaving"></i>
         <span>{{ shareSaving ? ('REPORTS.SAVING' | translate) : ('REPORTS.SAVE' | translate) }}</span>
       </button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ Canlı Rapor Çıktısı Önizleme Modalı ═══════════ -->
+<div class="modal-backdrop output-backdrop" *ngIf="showOutputModal" (click)="closeOutputPreview()">
+  <div class="modal output-modal" (click)="$event.stopPropagation()">
+    <div class="modal-head output-head">
+      <div class="mh-title">
+        <i class="fas fa-table-list"></i>
+        <div>
+          <h3>{{ outputTemplate?.name }}</h3>
+          <p *ngIf="outputResult">{{ 'Canlı Çalıştırma Çıktısı · ' + (outputResult.evaluatedAt || '') }}</p>
+          <p *ngIf="!outputResult && outputTemplate?.description">{{ outputTemplate?.description }}</p>
+        </div>
+      </div>
+      <div class="output-head-actions">
+        <button *ngIf="outputTemplate" type="button" class="btn-ghost" (click)="generate(outputTemplate, 'xlsx')" [disabled]="isGenerating(outputTemplate.id)">
+          <i class="fas fa-file-excel"></i>
+          <span>.XLSX İndir</span>
+        </button>
+        <button *ngIf="outputTemplate" type="button" class="btn-ghost" (click)="generate(outputTemplate, 'pdf')" [disabled]="isGenerating(outputTemplate.id)">
+          <i class="fas fa-file-pdf"></i>
+          <span>PDF İndir</span>
+        </button>
+        <button *ngIf="outputTemplate && canModify(outputTemplate)" type="button" class="btn-primary" (click)="closeOutputPreview(); edit(outputTemplate)">
+          <i class="fas fa-pen-ruler"></i>
+          <span>Şablon Editörü</span>
+        </button>
+        <button type="button" class="x" (click)="closeOutputPreview()" aria-label="Kapat">
+          <i class="fas fa-xmark"></i>
+        </button>
+      </div>
+    </div>
+
+    <div class="output-body">
+      <div class="state" *ngIf="outputLoading">
+        <div class="spinner"></div>
+        <span>Sorgular canlı çalıştırılıyor ve rapor çıktısı hazırlanıyor…</span>
+      </div>
+
+      <div class="state error" *ngIf="!outputLoading && outputError">
+        <i class="fas fa-triangle-exclamation"></i>
+        <span>{{ outputError }}</span>
+      </div>
+
+      <ng-container *ngIf="!outputLoading && !outputError && outputResult">
+        <!-- Sorgu çalışma istatistikleri -->
+        <div class="output-stats-bar" *ngIf="outputResult.queryStats?.length">
+          <span class="stat-pill" *ngFor="let qs of outputResult.queryStats">
+            <i class="fas" [ngClass]="qs.kind === 'python' ? 'fa-code' : 'fa-database'"></i>
+            <strong>{{ qs.name }}</strong>
+            <span>· {{ qs.rowCount }} satır · {{ qs.executionMs }} ms</span>
+          </span>
+        </div>
+
+        <!-- Sayfa sekmeleri -->
+        <div class="output-sheet-tabs" *ngIf="(outputResult.sheets?.length || 0) > 1">
+          <button type="button" class="sheet-tab"
+                  *ngFor="let sh of outputResult.sheets; let idx = index"
+                  [class.active]="idx === activeSheetIndex"
+                  (click)="selectOutputSheet(idx)">
+            <i class="fas fa-file-lines"></i>
+            <span>{{ sh.name }}</span>
+          </button>
+        </div>
+
+        <!-- Gömülü Grafikler (Canlı Görsel Çıktı) -->
+        <div class="output-charts-grid" *ngIf="activeOutputSheet?.charts?.length">
+          <div class="output-chart-card" *ngFor="let ch of activeOutputSheet.charts">
+            <div class="oc-header">
+              <div>
+                <span class="oc-type">{{ (ch.type || 'bar') | uppercase }} GRAFİK</span>
+                <h4>{{ ch.title || 'Rapor Grafiği' }}</h4>
+              </div>
+              <span class="oc-rows">{{ ch.rowCount || ch.labels?.length || 0 }} kayıt</span>
+            </div>
+            <div class="oc-bars" *ngIf="ch.series?.length && ch.labels?.length">
+              <div class="oc-bar-row" *ngFor="let lbl of ch.labels.slice(0, 8); let li = index">
+                <span class="oc-bar-label" [title]="lbl">{{ lbl }}</span>
+                <div class="oc-bar-track">
+                  <div class="oc-bar-fill"
+                       [class.is-alt]="ch.type === 'line' || ch.type === 'area'"
+                       [style.width.%]="chartBarPercent(ch.series[0].values, ch.series[0].values[li])"></div>
+                </div>
+                <span class="oc-bar-val">{{ ch.series[0].values[li] }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Canlı Değerlendirilmiş Excel Çıktı Tablosu -->
+        <div class="output-grid-wrap" *ngIf="outputRowIndices.length">
+          <table class="output-sheet-table">
+            <thead>
+              <tr>
+                <th class="rn-head">#</th>
+                <th *ngFor="let c of outputColIndices">{{ colLetter(c) }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let r of outputRowIndices">
+                <td class="rn-cell">{{ r }}</td>
+                <td *ngFor="let c of outputColIndices"
+                    [ngClass]="{
+                      'is-bold': getOutputCell(r, c)?.style?.bold,
+                      'is-band': getOutputCell(r, c)?.isBandRow,
+                      'is-summary': getOutputCell(r, c)?.bindingKind === 'summary',
+                      'ta-center': getOutputCell(r, c)?.style?.align === 'center',
+                      'ta-right': getOutputCell(r, c)?.style?.align === 'right'
+                    }"
+                    [style.background-color]="getOutputCell(r, c)?.style?.bg || null"
+                    [style.color]="getOutputCell(r, c)?.style?.color || null">
+                  {{ formatOutputValue(getOutputCell(r, c)) }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </ng-container>
     </div>
   </div>
 </div>
